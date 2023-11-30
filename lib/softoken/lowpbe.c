@@ -1816,11 +1816,17 @@ sftk_fips_pbkdf_PowerUpSelfTests(void)
     pbe_params.is2KeyDES = PR_FALSE;
 
     result = nsspkcs5_ComputeKeyAndIV(&pbe_params, &inKey, NULL, PR_FALSE);
+    if (fips_request_failure("PBKDF2","SHA256")){
+        result->data[0] ^= 1;
+    }
     if ((result == NULL) || (result->len != sizeof(pbkdf_known_answer)) ||
         (PORT_Memcmp(result->data, pbkdf_known_answer, sizeof(pbkdf_known_answer)) != 0)) {
         SECITEM_FreeItem(result, PR_TRUE);
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("PBKDF2","SHA256", "sftk_fips_pbkdf_PowerUpSelfTests");
         return SECFailure;
+    } else {
+        FIPSLOG_SUCCESS("PBKDF2","SHA256", "sftk_fips_pbkdf_PowerUpSelfTests");
     }
     SECITEM_FreeItem(result, PR_TRUE);
     return SECSuccess;
