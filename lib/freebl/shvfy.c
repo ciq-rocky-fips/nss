@@ -287,10 +287,10 @@ readItem(PRFileDesc *fd, SECItem *item)
     return SECSuccess;
 }
 
-static PRBool blapi_SHVerifyFile(const char *shName, PRBool self);
+static PRBool blapi_SHVerifyFile(const char *shName, PRBool self, PRBool rerun);
 
 static PRBool
-blapi_SHVerify(const char *name, PRFuncPtr addr, PRBool self)
+blapi_SHVerify(const char *name, PRFuncPtr addr, PRBool self, PRBool rerun)
 {
     PRBool result = PR_FALSE; /* if anything goes wrong,
                    * the signature does not verify */
@@ -299,7 +299,7 @@ blapi_SHVerify(const char *name, PRFuncPtr addr, PRBool self)
     if (!shName) {
         goto loser;
     }
-    result = blapi_SHVerifyFile(shName, self);
+    result = blapi_SHVerifyFile(shName, self, rerun);
 
 loser:
     if (shName != NULL) {
@@ -312,17 +312,27 @@ loser:
 PRBool
 BLAPI_SHVerify(const char *name, PRFuncPtr addr)
 {
-    return blapi_SHVerify(name, addr, PR_FALSE);
+    PRBool rerun = PR_FALSE;
+    if (name && *name == BLAPI_FIPS_RERUN_FLAG) {
+        name++;
+        rerun = PR_TRUE;
+    }
+    return blapi_SHVerify(name, addr, PR_FALSE, rerun);
 }
 
 PRBool
 BLAPI_SHVerifyFile(const char *shName)
 {
-    return blapi_SHVerifyFile(shName, PR_FALSE);
+    PRBool rerun = PR_FALSE;
+    if (shName && *shName == BLAPI_FIPS_RERUN_FLAG) {
+        shName++;
+        rerun = PR_TRUE;
+    }
+    return blapi_SHVerifyFile(shName, PR_FALSE, rerun);
 }
 
 static PRBool
-blapi_SHVerifyFile(const char *shName, PRBool self)
+blapi_SHVerifyFile(const char *shName, PRBool self, PRBool rerun)
 {
     char *checkName = NULL;
     PRFileDesc *checkFD = NULL;
@@ -351,7 +361,7 @@ blapi_SHVerifyFile(const char *shName, PRBool self)
 
     /* If our integrity check was never ran or failed, fail any other
      * integrity checks to prevent any token going into FIPS mode. */
-    if (!self && (BL_FIPSEntryOK(PR_FALSE) != SECSuccess)) {
+    if (!self && (BL_FIPSEntryOK(PR_FALSE, rerun) != SECSuccess)) {
         return PR_FALSE;
     }
 
@@ -541,7 +551,7 @@ BLAPI_VerifySelf(const char *name)
          */
         return PR_TRUE;
     }
-    return blapi_SHVerify(name, (PRFuncPtr)decodeInt, PR_TRUE);
+    return blapi_SHVerify(name, (PRFuncPtr)decodeInt, PR_TRUE, PR_FALSE);
 }
 
 #else /* NSS_FIPS_DISABLED */
