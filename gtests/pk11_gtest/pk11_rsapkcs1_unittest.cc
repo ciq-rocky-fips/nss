@@ -16,6 +16,7 @@
 #include "secerr.h"
 #include "sechash.h"
 #include "pk11_signature_test.h"
+#include "blapit.h"
 
 #include "testvectors/rsa_signature_2048_sha224-vectors.h"
 #include "testvectors/rsa_signature_2048_sha256-vectors.h"
@@ -109,7 +110,11 @@ class Pkcs11RsaPkcs1WycheproofTest
  * Use 6 as the invalid value since modLen % 16 must be zero.
  */
 TEST(RsaPkcs1Test, Pkcs1MinimumPadding) {
-  const size_t kRsaShortKeyBits = 736;
+#define RSA_SHORT_KEY_LENGTH 736
+/* if our minimum supported key length is big enough to handle
+ * our largest Hash function, we can't test a short length */
+#if RSA_MIN_MODULUS_BITS < RSA_SHORT_KEY_LENGTH
+  const size_t kRsaShortKeyBits = RSA_SHORT_KEY_LENGTH;
   const size_t kRsaKeyBits = 752;
   static const std::vector<uint8_t> kMsg{'T', 'E', 'S', 'T'};
   static const std::vector<uint8_t> kSha512DigestInfo{
@@ -209,6 +214,9 @@ TEST(RsaPkcs1Test, Pkcs1MinimumPadding) {
                               SEC_OID_PKCS1_RSA_ENCRYPTION, SEC_OID_SHA512,
                               nullptr);
   EXPECT_EQ(SECSuccess, rv);
+#else
+  GTEST_SKIP();
+#endif
 }
 
 TEST(RsaPkcs1Test, RequireNullParameter) {

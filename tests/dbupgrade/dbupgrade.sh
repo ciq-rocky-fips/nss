@@ -69,7 +69,7 @@ dbupgrade_main()
 		echo $i
 		if [ -d $i ]; then
 			echo "upgrading db $i"
-			${BINDIR}/certutil -G -g 512 -d sql:$i -f ${PWFILE} -z ${NOISE_FILE} 2>&1
+			${BINDIR}/certutil -G -g 1024 -d sql:$i -f ${PWFILE} -z ${NOISE_FILE} 2>&1
 			html_msg $? 0 "Upgrading $i"
 		else
 			echo "skipping db $i"
