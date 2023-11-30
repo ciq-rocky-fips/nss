@@ -1042,9 +1042,11 @@ main(int argc, char **argv)
     char *export_file = NULL;
     char *dbprefix = "";
     SECStatus rv;
-    SECOidTag cipher = SEC_OID_AES_256_CBC;
-    SECOidTag hash = SEC_OID_SHA256;
-    SECOidTag certCipher = SEC_OID_AES_128_CBC;
+    SECOidTag cipher = 
+        SEC_OID_PKCS12_V2_PBE_WITH_SHA1_AND_3KEY_TRIPLE_DES_CBC;
+    SECOidTag hash = SEC_OID_SHA1;
+    SECOidTag certCipher = 
+        SEC_OID_PKCS12_V2_PBE_WITH_SHA1_AND_40_BIT_RC2_CBC;
     int keyLen = 0;
     int certKeyLen = 0;
     secuCommand pk12util;
@@ -1158,6 +1160,9 @@ main(int argc, char **argv)
         }
     }
 
+    if (PK11_IsFIPS()) {
+        certCipher =  SEC_OID_UNKNOWN;
+    }
     if (pk12util.options[opt_CertCipher].activated) {
         char *cipherString = pk12util.options[opt_CertCipher].arg;
 
