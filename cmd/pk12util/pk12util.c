@@ -1146,6 +1146,11 @@ main(int argc, char **argv)
         goto done;
     }
 
+    if (PK11_IsFIPS()) {
+        cipher =  SEC_OID_AES_256_CBC;
+        certCipher =  SEC_OID_AES_128_CBC;
+    }
+
     if (pk12util.options[opt_Cipher].activated) {
         char *cipherString = pk12util.options[opt_Cipher].arg;
 
@@ -1160,9 +1165,6 @@ main(int argc, char **argv)
         }
     }
 
-    if (PK11_IsFIPS()) {
-        certCipher =  SEC_OID_UNKNOWN;
-    }
     if (pk12util.options[opt_CertCipher].activated) {
         char *cipherString = pk12util.options[opt_CertCipher].arg;
 
