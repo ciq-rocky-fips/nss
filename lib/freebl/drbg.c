@@ -166,6 +166,7 @@ prng_instantiate(RNGContext *rng, const PRUint8 *bytes, unsigned int len)
         PORT_SetError(SEC_ERROR_NEED_RANDOM);
         return SECFailure;
     }
+
     prng_Hash_df(V(rng), VSize(rng), bytes, len, NULL, 0);
     rng->V_type = prngCGenerateType;
     prng_Hash_df(rng->C, sizeof rng->C, rng->V_Data, sizeof rng->V_Data, NULL, 0);
@@ -920,6 +921,7 @@ PRNGTEST_RunHealthTests()
     SECStatus rng_status = SECSuccess;
     PR_STATIC_ASSERT(sizeof(rng_known_result) >= sizeof(rng_reseed_result));
     PRUint8 result[sizeof(rng_known_result)];
+    int PRNInstantByte = 256 / PR_BITS_PER_BYTE;
 
     /********************************************/
     /*   First test instantiate error path.     */
@@ -928,15 +930,25 @@ PRNGTEST_RunHealthTests()
     /*   the code that checks for a entropy     */
     /*   source failure.                        */
     /********************************************/
-    rng_status = PRNGTEST_Instantiate(entropy, 256 / PR_BITS_PER_BYTE,
+
+    rng_status = PRNGTEST_Instantiate(entropy, PRNInstantByte,
                                       NULL, 0, NULL, 0);
+    if (fips_request_failure("PRNGTEST_RunHealthTests","Instantiate")){
+        rng_status = SECSuccess;
+    }
     if (rng_status == SECSuccess) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("PRNGTEST_RunHealthTests", "Instantiate", "PRNGTEST_Instantiate FAILCASE SUCCEED");
         return SECFailure;
+    } else {
+        FIPSLOG_SUCCESS("PRNGTEST_RunHealthTests", "Instantiate", "PRNGTEST_Instantiate FAILCASE PASSED");
     }
     if (PORT_GetError() != SEC_ERROR_NEED_RANDOM) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED(NULL, NULL, "PRNGTEST_Instantiate FAILCASE NOT NEED RANDOM");
         return SECFailure;
+    } else {
+        FIPSLOG_SUCCESS(NULL, NULL, "PRNGTEST_Instantiate FAILCASE PASSED");
     }
     /* we failed with the proper error code, we can continue */
 
@@ -947,30 +959,51 @@ PRNGTEST_RunHealthTests()
                                       NULL, 0, NULL, 0);
     if (rng_status != SECSuccess) {
         /* Error set by PRNGTEST_Instantiate */
+        FIPSLOG_FAILED(NULL, NULL, "Generate random bytes with a known seed");
         return SECFailure;
+    } else {
+        FIPSLOG_SUCCESS(NULL, NULL, "Generate random bytes with a known seed");
     }
     rng_status = PRNGTEST_Generate(result, sizeof rng_known_result, NULL, 0);
+    if (fips_request_failure("PRNGTEST_RunHealthTests","Generate")){
+        result[0] ^= 1;
+        FIPSLOG_INFO("PRNGTEST_RunHealthTests.Generate");
+    }
     if ((rng_status != SECSuccess) ||
         (PORT_Memcmp(result, rng_known_result,
                      sizeof rng_known_result) != 0)) {
+        FIPSLOG_FAILED("PRNGTEST_RunHealthTests", "Generate", "Generate random bytes with a known seed");
         PRNGTEST_Uninstantiate();
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
         return SECFailure;
+    } else {
+        FIPSLOG_SUCCESS("PRNGTEST_RunHealthTests", "Generate", "Generate random bytes with a known seed");
     }
+
     rng_status = PRNGTEST_Reseed(reseed_entropy, sizeof reseed_entropy,
                                  additional_input, sizeof additional_input);
     if (rng_status != SECSuccess) {
         /* Error set by PRNG_Reseed */
+        FIPSLOG_FAILED(NULL, NULL, "Generate reseed bytes with known entropy");
         PRNGTEST_Uninstantiate();
         return SECFailure;
+    } else {
+        FIPSLOG_SUCCESS(NULL, NULL, "Generate reseed bytes with known entropy");
     }
+
     rng_status = PRNGTEST_Generate(result, sizeof rng_reseed_result, NULL, 0);
+    if (fips_request_failure("PRNGTEST_RunHealthTests","reseed")){
+        result[0] ^= 1;
+    }
     if ((rng_status != SECSuccess) ||
         (PORT_Memcmp(result, rng_reseed_result,
                      sizeof rng_reseed_result) != 0)) {
+        FIPSLOG_FAILED("PRNGTEST_RunHealthTests","reseed", "Generate random bytes with a known seed");
         PRNGTEST_Uninstantiate();
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
         return SECFailure;
+    } else {
+        FIPSLOG_SUCCESS("PRNGTEST_RunHealthTests","reseed", "Generate random bytes");
     }
     /* This magic forces the reseed count to it's max count, so we can see if
      * PRNGTEST_Generate will actually when it reaches it's count */
@@ -982,28 +1015,43 @@ PRNGTEST_RunHealthTests()
     }
     /* This generate should now reseed */
     rng_status = PRNGTEST_Generate(result, sizeof rng_reseed_result, NULL, 0);
+    if (fips_request_failure("PRNGTEST_RunHealthTests","no_reseed")){
+        rng_status = SECFailure;
+        result[0] ^= 1;
+    }
     if ((rng_status != SECSuccess) ||
         /* NOTE we fail if the result is equal to the no_reseed_result.
          * no_reseed_result is the value we would have gotten if we didn't
          * do an automatic reseed in PRNGTEST_Generate */
         (PORT_Memcmp(result, rng_no_reseed_result,
                      sizeof rng_no_reseed_result) == 0)) {
+        FIPSLOG_FAILED("PRNGTEST_RunHealthTests","no_reseed", "Generate random bytes wit reseed");
         PRNGTEST_Uninstantiate();
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
         return SECFailure;
+    } else {
+        FIPSLOG_SUCCESS("PRNGTEST_RunHealthTests","no_reseed", "Generate random bytes with reseed");
     }
+
     /* make sure reseed fails when we don't supply enough entropy */
     rng_status = PRNGTEST_Reseed(reseed_entropy, 4, NULL, 0);
+    if (fips_request_failure("PRNGTEST_RunHealthTests","entropy_check")){
+        rng_status = SECSuccess;
+    }
     if (rng_status == SECSuccess) {
         PRNGTEST_Uninstantiate();
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("PRNGTEST_RunHealthTests","entropy_check", "Generate random bytes wit reseed");
         return SECFailure;
     }
     if (PORT_GetError() != SEC_ERROR_NEED_RANDOM) {
         PRNGTEST_Uninstantiate();
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("PRNGTEST_RunHealthTests","entropy_check", "Generate random bytes wit reseed");
         return SECFailure;
     }
+    FIPSLOG_SUCCESS("PRNGTEST_RunHealthTests","entropy_check", "Generate random bytes wit reseed");
+
     rng_status = PRNGTEST_Uninstantiate();
     if (rng_status != SECSuccess) {
         /* Error set by PRNG_Uninstantiate */
@@ -1012,13 +1060,104 @@ PRNGTEST_RunHealthTests()
     /* make sure uninstantiate fails if the contest is not initiated (also tests
      * if the context was cleared in the previous Uninstantiate) */
     rng_status = PRNGTEST_Uninstantiate();
+    if (fips_request_failure("PRNGTEST_RunHealthTests","Uninstantiate_check")){
+        rng_status = SECSuccess;
+    }
     if (rng_status == SECSuccess) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("PRNGTEST_RunHealthTests","Uninstantiate_check", "uninstantiate");
         return SECFailure;
     }
     if (PORT_GetError() != SEC_ERROR_LIBRARY_FAILURE) {
+        FIPSLOG_FAILED("PRNGTEST_RunHealthTests","Uninstantiate_check", "uninstantiate");
         return rng_status;
     }
+    FIPSLOG_SUCCESS("PRNGTEST_RunHealthTests","Uninstantiate_check", "uninstantiate");
 
     return SECSuccess;
+}
+
+int fips_request_failure_num(const char* name, int subnum)
+{
+    char subname[128];
+    memset(subname, 0, sizeof(subname));
+    sprintf(subname, "%d", subnum);
+    return fips_request_failure(name, subname);
+}
+
+int fips_request_failure(const char* name, const char* subname)
+{
+    static int env_var_check_done = PR_FALSE;
+	static int func_test = PR_FALSE;
+	int cmp_len = 0;
+	int subname_cmp_len = 0;
+	const char *enames = NULL;
+	const char *np;
+
+	if (!env_var_check_done) {
+		const char *e = getenv("NSS_FIPS_FUNC_TEST");
+		if (e != NULL) {
+            func_test = PR_TRUE;
+		}
+		env_var_check_done = PR_TRUE;
+	}
+	if (!func_test) {
+		return PR_FALSE;
+	}
+	/*
+	 * Here we know logging is enabled. Parse
+	 * the NSS_FIPS_LOGGING_NAMES variable
+	 * and log if the name matches. Names are
+	 * separated by a ':' character. Subnames
+	 * separated from names by a '.' character.
+	 */
+	enames = getenv("NSS_FIPS_FUNC_TEST_NAMES");
+	if (enames == NULL) {
+		return PR_FALSE;
+	}
+    if (!name) {
+        return PR_TRUE;
+    }
+	cmp_len = strlen(name);
+	if (subname != NULL) {
+		subname_cmp_len = strlen(subname);
+	}
+	for (np = enames; np != NULL;) {
+		while (*np == ':') {
+			np++;
+		}
+		/* Does "name" match ? */
+		if (strncasecmp(np, name, cmp_len)==0) {
+			if (subname == NULL) {
+				/* Move past "name." */
+				np += cmp_len + 1;
+				if (*np == ':' || *np == '\0') {
+					return PR_TRUE;
+				}
+				/* Allow wildcard match for subname in env var. */
+				if (*np == '*' && (np[1] == ':' || np[1] == '\0')) {
+					return PR_TRUE;
+				}
+			} else {
+				/* Look for .subname */
+				if (np[cmp_len] != '.') {
+					np = strchr(np, ':');
+					continue;
+				}
+				/* Move past "name." */
+				np += cmp_len + 1;
+				/* Allow wildcard match for subname in env var. */
+				if (*np == '*' && (np[1] == ':' || np[1] == '\0')) {
+					return PR_TRUE;
+				}
+				if (strncasecmp(np, subname, subname_cmp_len) == 0) {
+					if (np[subname_cmp_len] == ':' || np[subname_cmp_len] == '\0') {
+						return PR_TRUE;
+					}
+				}
+			}
+		}
+		np = strchr(np, ':');
+	}
+	return PR_FALSE;
 }
