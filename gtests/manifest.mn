@@ -33,7 +33,6 @@ NSS_SRCDIRS = \
 	smime_gtest \
 	softoken_gtest \
 	ssl_gtest \
-	$(SYSINIT_GTEST) \
 	nss_bogo_shim \
 	pkcs11testmodule \
 	$(NULL)
