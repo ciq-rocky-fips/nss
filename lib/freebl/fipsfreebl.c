@@ -1545,7 +1545,7 @@ freebl_fips_ECDSA_Test(ECParams *ecparams,
                        unsigned int knownSignatureLen)
 {
 
-    /* ECDSA Known Seed info for curves nistp256 and nistk283  */
+    /* ECDSA Known Seed info for curves nistp256 */
     static const PRUint8 ecdsa_Known_Seed[] = {
         0x6a, 0x9b, 0xf6, 0xf7, 0xce, 0xed, 0x79, 0x11,
         0xf0, 0xc7, 0xc8, 0x9a, 0xa5, 0xd1, 0x57, 0xb1,
