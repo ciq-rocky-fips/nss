@@ -1635,7 +1635,9 @@ ssl_run_tests()
             if [ "${TEST_MODE}" = "SHARED_DB" ] ; then
                 ssl_policy_listsuites
                 ssl_policy_selfserv
-                ssl_policy_pkix_ocsp
+                # requires access to external servers, which fails
+                # when running in brew
+                #ssl_policy_pkix_ocsp
                 ssl_policy
             fi
             ;;
