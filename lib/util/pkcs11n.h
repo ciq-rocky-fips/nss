@@ -638,7 +638,7 @@ typedef struct CK_NSS_GCM_PARAMS {
 typedef CK_NSS_GCM_PARAMS CK_PTR CK_NSS_GCM_PARAMS_PTR;
 
 /* deprecated #defines. Drop in future NSS releases */
-#ifdef NSS_PKCS11_2_0_COMPAT
+#ifndef NSS_PKCS11_3_0_STRICT
 
 /* defines that were changed between NSS's PKCS #11 and the Oasis headers */
 #define CKF_EC_FP CKF_EC_F_P
@@ -697,7 +697,7 @@ typedef CK_NSS_GCM_PARAMS CK_PTR CK_GCM_PARAMS_PTR;
 #define CKT_NETSCAPE_VALID CKT_NSS_VALID
 #define CKT_NETSCAPE_VALID_DELEGATOR CKT_NSS_VALID_DELEGATOR
 #else
-/* use the new CK_GCM_PARAMS if NSS_PKCS11_2_0_COMPAT is not defined */
+/* use the new CK_GCM_PARAMS if NSS_PKCS11_3_0_STRICT is defined */
 typedef struct CK_GCM_PARAMS_V3 CK_GCM_PARAMS;
 typedef CK_GCM_PARAMS_V3 CK_PTR CK_GCM_PARAMS_PTR;
 #endif
