@@ -324,11 +324,11 @@ static const oidValDef curveOptList[] = {
 static const oidValDef hashOptList[] = {
     /* Hashes */
     { CIPHER_NAME("MD2"), SEC_OID_MD2,
-      NSS_USE_ALG_IN_SSL_KX | NSS_USE_ALG_IN_SIGNATURE },
+      0 },
     { CIPHER_NAME("MD4"), SEC_OID_MD4,
-      NSS_USE_ALG_IN_SSL_KX | NSS_USE_ALG_IN_SIGNATURE },
+      0 },
     { CIPHER_NAME("MD5"), SEC_OID_MD5,
-      NSS_USE_ALG_IN_SSL_KX | NSS_USE_ALG_IN_SIGNATURE },
+      0 },
     { CIPHER_NAME("SHA1"), SEC_OID_SHA1,
       NSS_USE_ALG_IN_SSL_KX | NSS_USE_ALG_IN_SIGNATURE },
     { CIPHER_NAME("SHA224"), SEC_OID_SHA224,

@@ -2042,6 +2042,19 @@ handleHashAlgSupport(char *envVal)
             int i;
 
             for (i = 1; i < SEC_OID_TOTAL; i++) {
+                switch (i) {
+                case SEC_OID_MD2:
+                case SEC_OID_MD4:
+                case SEC_OID_MD5:
+                case SEC_OID_PKCS1_MD2_WITH_RSA_ENCRYPTION:
+                case SEC_OID_PKCS1_MD4_WITH_RSA_ENCRYPTION:
+                case SEC_OID_PKCS1_MD5_WITH_RSA_ENCRYPTION:
+                case SEC_OID_PKCS5_PBE_WITH_MD2_AND_DES_CBC:
+                case SEC_OID_PKCS5_PBE_WITH_MD5_AND_DES_CBC:
+                    continue;
+                default:
+                    break;
+                }
                 if (oids[i].desc && strstr(arg, oids[i].desc)) {
                     xOids[i].notPolicyFlags = notEnable |
                                               (xOids[i].notPolicyFlags & ~(DEF_FLAGS));
