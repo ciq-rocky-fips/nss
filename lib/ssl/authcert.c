@@ -206,6 +206,9 @@ NSS_GetClientAuthData(void *arg,
                                              certUsageSSLClient,
                                              PR_FALSE, chosenNickName == NULL,
                                              pw_arg);
+        if (certList == NULL) {
+            return SECFailure;
+        }
         /* filter only the certs that meet the nickname requirements */
         if (chosenNickName) {
             rv = CERT_FilterCertListByNickname(certList, chosenNickName,
