@@ -32,3 +32,12 @@ NSSLOW_GetVector;
 ;+    local:
 ;+       *;
 ;+};
+NSS_3.79 {    # NSS 3.79 release
+;+    global:
+PRNGTEST_Instantiate;
+PRNGTEST_Reseed;
+PRNGTEST_Generate;
+PRNGTEST_Uninstantiate;
+;+    local:
+;+       *;
+;+};

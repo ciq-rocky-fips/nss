@@ -1305,6 +1305,7 @@ pqg_ParamGen(unsigned int L, unsigned int N, pqgGenType type,
         CHECK_SEC_OK(makeGfromIndex(hashtype, &P, &Q, &(*pVfy)->seed,
                                     (*pVfy)->h.data[0], &G));
         MPINT_TO_SECITEM(&G, &(*pParams)->base, (*pParams)->arena);
+		(*pVfy)->counter = -1; // added to help with FIPS verification
         goto cleanup;
     }
     /* Initialize an arena for the params. */

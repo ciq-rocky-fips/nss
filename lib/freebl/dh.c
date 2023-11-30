@@ -192,6 +192,10 @@ cleanup:
         rv = SECFailure;
     }
     if (rv) {
+        SECITEM_ZfreeItem(&key->prime, PR_FALSE);
+        SECITEM_ZfreeItem(&key->base, PR_FALSE);
+        SECITEM_ZfreeItem(&key->publicValue, PR_FALSE);
+        SECITEM_ZfreeItem(&key->privateValue, PR_FALSE);
         *privKey = NULL;
         PORT_FreeArena(arena, PR_TRUE);
     }
@@ -445,7 +449,7 @@ cleanup:
 PRBool
 KEA_Verify(SECItem *Y, SECItem *prime, SECItem *subPrime)
 {
-    mp_int p, q, y, r;
+    mp_int p, q, y, r, psub1;
     mp_err err;
     int cmp = 1; /* default is false */
     if (!Y || !prime || !subPrime) {
@@ -456,13 +460,24 @@ KEA_Verify(SECItem *Y, SECItem *prime, SECItem *subPrime)
     MP_DIGITS(&q) = 0;
     MP_DIGITS(&y) = 0;
     MP_DIGITS(&r) = 0;
+    MP_DIGITS(&psub1) = 0;
     CHECK_MPI_OK(mp_init(&p));
     CHECK_MPI_OK(mp_init(&q));
     CHECK_MPI_OK(mp_init(&y));
     CHECK_MPI_OK(mp_init(&r));
+    CHECK_MPI_OK(mp_init(&psub1));
     SECITEM_TO_MPINT(*prime, &p);
     SECITEM_TO_MPINT(*subPrime, &q);
     SECITEM_TO_MPINT(*Y, &y);
+
+    CHECK_MPI_OK(mp_sub_d(&p, 1, &psub1));
+
+    if (mp_cmp_d(&y, 1) <= 0 ||
+        mp_cmp(&y, &psub1) >= 0) {
+        err = MP_BADARG;
+        goto cleanup;
+    }
+
     /* compute r = y**q mod p */
     CHECK_MPI_OK(mp_exptmod(&y, &q, &p, &r));
     /* compare to 1 */
@@ -472,6 +487,7 @@ cleanup:
     mp_clear(&q);
     mp_clear(&y);
     mp_clear(&r);
+    mp_clear(&psub1);
     if (err) {
         MP_TO_SEC_ERROR(err);
         return PR_FALSE;

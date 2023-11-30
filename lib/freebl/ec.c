@@ -943,7 +943,7 @@ ECDSA_VerifyDigest(ECPublicKey *key, const SECItem *signature,
     ECParams *ecParams = NULL;
     SECItem pointC = { siBuffer, NULL, 0 };
     int slen;       /* length in bytes of a half signature (r or s) */
-    int flen;       /* length in bytes of the field size */
+    int flen = 0;   /* length in bytes of the field size */
     unsigned olen;  /* length in bytes of the base point order */
     unsigned obits; /* length in bits  of the base point order */
 

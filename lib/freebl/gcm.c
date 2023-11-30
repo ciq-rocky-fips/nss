@@ -162,6 +162,9 @@ bmul(uint64_t x, uint64_t y, uint64_t *r_high, uint64_t *r_low)
 
     *r_high = (uint64_t)(r >> 64);
     *r_low = (uint64_t)r;
+
+    /* Zeroization */
+    x1 = x2 = x3 = x4 = x5 = y1 = y2 = y3 = y4 = y5 = r = z = 0;
 }
 
 SECStatus
@@ -200,6 +203,12 @@ gcm_HashMult_sftw(gcmHashContext *ghash, const unsigned char *buf,
     }
     ghash->x_low = ci_low;
     ghash->x_high = ci_high;
+
+    /* Zeroization */
+    ci_low = ci_high = z2_low = z2_high = z0_low = z0_high = z1a_low = z1a_high = 0;
+    z_low = z_high = 0;
+    i = 0;
+
     return SECSuccess;
 }
 #else
@@ -239,6 +248,10 @@ bmul32(uint32_t x, uint32_t y, uint32_t *r_high, uint32_t *r_low)
     z = z0 | z1 | z2 | z3;
     *r_high = (uint32_t)(z >> 32);
     *r_low = (uint32_t)z;
+
+    /* Zeroization */
+    x0 = x1 = x2 = x3 = y0 = y1 = y2 = y3 = 0;
+    z0 = z1 = z2 = z3 = z = 0;
 }
 
 SECStatus
@@ -324,6 +337,20 @@ gcm_HashMult_sftw32(gcmHashContext *ghash, const unsigned char *buf,
         ghash->x_high = z_high_h;
         ghash->x_low = z_high_l;
     }
+
+    /* Zeroization */
+    ci_low = ci_high = z_high_h = z_high_l = z_low_h = z_low_l = 0;
+
+    ci_high_h = ci_high_l = ci_low_h = ci_low_l
+        = b_a_h = b_a_l = a_a_h = a_a_l = b_b_h = b_b_l
+        = a_b_h = a_b_l = b_c_h = b_c_l = a_c_h = a_c_l = c_c_h = c_c_l
+        = ci_highXlow_h = ci_highXlow_l = c_a_h = c_a_l = c_b_h = c_b_l
+        = h_high_h = h_high_l = h_low_h = h_low_l = h_highXlow_h = h_highXlow_l
+        = h_highX_xored
+        = 0;
+
+    i = 0;
+
     return SECSuccess;
 }
 #endif /* HAVE_INT128_SUPPORT */
@@ -532,7 +559,13 @@ struct GCMContextStr {
     unsigned char tagKey[MAX_BLOCK_SIZE];
     PRBool ctr_context_init;
     gcmIVContext gcm_iv;
+    unsigned long long gcm_iv_bytes;
 };
+
+/* NIST SP-800-38D limits the use of GCM with a single IV to 2^39 - 256
+ * bits which translates to 2^32 - 2 128bit blocks or 2^36 - 32 bytes
+ */
+#define MAX_GCM_BYTES_PER_IV    ((1ULL << 36) - 32)
 
 SECStatus gcm_InitCounter(GCMContext *gcm, const unsigned char *iv,
                           unsigned int ivLen, unsigned int tagBits,
@@ -673,6 +706,8 @@ gcm_InitCounter(GCMContext *gcm, const unsigned char *iv, unsigned int ivLen,
         goto loser;
     }
 
+    gcm->gcm_iv_bytes = MAX_GCM_BYTES_PER_IV;
+
     /* finally mix in the AAD data */
     rv = gcmHash_Reset(ghash, aad, aadLen);
     if (rv != SECSuccess) {
@@ -774,6 +809,13 @@ GCM_EncryptUpdate(GCMContext *gcm, unsigned char *outbuf,
         return SECFailure;
     }
 
+    /* bail out if this invocation requests processing more than what is
+     * considered to be a safe limit */
+    if (gcm->gcm_iv_bytes < (unsigned long long)inlen) {
+        PORT_SetError(SEC_ERROR_INPUT_LEN);
+        return SECFailure;
+    }
+
     tagBytes = (gcm->tagBits + (PR_BITS_PER_BYTE - 1)) / PR_BITS_PER_BYTE;
     if (UINT_MAX - inlen < tagBytes) {
         PORT_SetError(SEC_ERROR_INPUT_LEN);
@@ -802,6 +844,7 @@ GCM_EncryptUpdate(GCMContext *gcm, unsigned char *outbuf,
         *outlen = 0;
         return SECFailure;
     };
+    gcm->gcm_iv_bytes -= inlen;
     *outlen += len;
     return SECSuccess;
 }
