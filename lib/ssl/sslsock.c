@@ -828,7 +828,7 @@ SSL_OptionSet(PRFileDesc *fd, PRInt32 which, PRIntn val)
             break;
 
         case SSL_ENABLE_DELEGATED_CREDENTIALS:
-            ss->opt.enableDelegatedCredentials = val;
+            /* disable it for now */
             break;
 
         case SSL_ENABLE_NPN:
@@ -1346,7 +1346,7 @@ SSL_OptionSetDefault(PRInt32 which, PRIntn val)
             break;
 
         case SSL_ENABLE_DELEGATED_CREDENTIALS:
-            ssl_defaults.enableDelegatedCredentials = val;
+            /* disable it for now */
             break;
 
         case SSL_ENABLE_NPN:
