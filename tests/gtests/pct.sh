@@ -107,60 +107,25 @@ PWD=$(pwd)
 export NSS_FIPS_LOGGING="FILE"
 export NSS_FIPS_FUNC_TEST="FT"
 
-export LD_PRELOAD="$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_OPT.OBJ/lib/libsmime3.so \
-$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_OPT.OBJ/lib/libnsssysinit.so \
-$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_OPT.OBJ/lib/libnssutil3.so \
-$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_OPT.OBJ/lib/libnssdbm3.so \
-$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_OPT.OBJ/lib/libsoftokn3.so \
-$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_OPT.OBJ/lib/libfreeblpriv3.so \
-$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_OPT.OBJ/lib/libfreebl3.so \
-$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_OPT.OBJ/lib/libnssckbi-testlib.so \
-$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_OPT.OBJ/lib/libnssckbi.so \
-$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_OPT.OBJ/lib/libssl3.so \
-$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_OPT.OBJ/lib/libpkcs11testmodule.so"
+export LD_PRELOAD="$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ/lib/libsmime3.so \
+$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ/lib/libnsssysinit.so \
+$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ/lib/libnssutil3.so \
+$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ/lib/libnssdbm3.so \
+$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ/lib/libsoftokn3.so \
+$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ/lib/libfreeblpriv3.so \
+$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ/lib/libfreebl3.so \
+$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ/lib/libnssckbi-testlib.so \
+$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ/lib/libnssckbi.so \
+$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ/lib/libssl3.so \
+$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ/lib/libpkcs11testmodule.so"
 
-#no result
-#GTESTS="${GTESTS:-base_gtest}"
-#GTESTS="${GTESTS:-certdb_gtest}"
-#GTESTS="${GTESTS:-der_gtest}"
-#GTESTS="${GTESTS:-util_gtest}"
-#GTESTS="${GTESTS:-certhigh_gtest}"
-#GTESTS="${GTESTS:-freebl_gtest}"
-#GTESTS="${GTESTS:-softoken_gtest}"
-#GTESTS="${GTESTS:-sysinit_gtest}"
-#GTESTS="${GTESTS:-smime_gtest}"
-#GTESTS="${GTESTS:-mozpkix_gtest}"
-#orig
-#GTESTS="${GTESTS:-base_gtest certhigh_gtest certdb_gtest der_gtest pk11_gtest util_gtest freebl_gtest softoken_gtest sysinit_gtest smime_gtest mozpkix_gtest}"
-#GTESTS="${GTESTS:-pk11_gtest freebl_gtest softoken_gtest}"
-#GTESTS="${GTESTS:-pk11_gtest}"
-#GTESTS="${GTESTS:-fips_gtest}"
-#GTESTS="${GTESTS:-ec_gtest dsa_gtest rsa_gtest dh_gtest}"
-
-
-declare -a PCTStringArray=(\
-#":RSA_PCT.ENCRYPT" \
-#":RSA_PCT.DECRYPT" \
-#":ECDSA_PCT.SIGN" \
-#":ECDSA_PCT.VERIFY" \
-#":RSA_PCT.SIGN" \
-#":RSA_PCT.VERIFY" \
-#":DSA_PCT.SIGN" \
-#":DSA_PCT.VERIFY" \
-#":DH_PKCS_DERIVE.DERIVE" \
-#":ECDH_DERIVE.DERIVE"\
-)
-
-
-
-
-export PATH=.:$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_OPT.OBJ/bin:$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_OBJ.OBJ/lib:/bin:/usr/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin
-export LD_LIBRARY_PATH=$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_OPT.OBJ/lib:
+export PATH=.:$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ/bin:$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_OBJ.OBJ/lib:/bin:/usr/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin
+export LD_LIBRARY_PATH=$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ/lib:
 
 export CPU_ARCH="x86_64"
 export NSS_DISABLE_AVX2=0
-export OBJDIR=Linux4.18_x86_64_cc_glibc_PTH_64_OPT.OBJ
-export BINDIR=$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_OPT.OBJ/bin
+export OBJDIR=Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ
+export BINDIR=$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ/bin
 #logger "START of NSS FIPS testing"
 gtest_init "$0"
 echo "*****************************" > summary.log

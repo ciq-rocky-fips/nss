@@ -61,7 +61,7 @@ declare -a StringArray=(\
 ":RSA-DECRYPT.2048" \
 ":ECDSA.SIG" \
 ":ECDSA.VERIFY" \
-":ECDH.P-256"
+":ECDH.P-256" \
 ":DSA.SIGN" \
 ":DSA.VERIFY" \
 ":DH.COMPUT" \
@@ -71,13 +71,12 @@ declare -a StringArray=(\
 ":HKDF.SHA384" \
 ":HKDF.SHA512" \
 ":INTEGRITY.softoken" \
-":PBKDF2.SHA256"\
-":IKE.KAT"\
-":KBKDF.KAT"\
+":PBKDF2.SHA256" \
+":IKE.KAT" \
+":KBKDF.KAT" \
 )
 
 export build_dir=Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ
-#export build_dir=Linux4.18_x86_64_cc_glibc_PTH_64_OPT.OBJ
 
 export LD_PRELOAD="./lib/smime/${build_dir}/libsmime3.so \
 ./lib/sysinit/${build_dir}/libnsssysinit.so \
@@ -95,9 +94,12 @@ export LD_PRELOAD="./lib/smime/${build_dir}/libsmime3.so \
 export INTEG_softokn="./lib/softoken/${build_dir}/libsoftokn3.so"
 export INTEG_libfreeblpriv3="./lib/freebl/${build_dir}/Linux_SINGLE_SHLIB/libfreeblpriv3.so"
 
+echo "HelpMedsfafasdjflj7897987" > /tmp/password_file.txt
+
 echo "SUCCESS CASE"
 echo ../ft/SUCCESS_POST.log
-cmd/fipstest/${build_dir}/fipstest &> ../ft/SUCCESS_POST.log
+#./cmd/certutil/${build_dir}/certutil -N -d . -f /tmp/password_file.txt &> ../ft/$myString.log
+./cmd/certutil/${build_dir}/certutil -U &> ../ft/$myString.log
 #gdb --args cmd/fipstest/${build_dir}/fipstest
 grep -n "FAILED" ../ft/SUCCESS_POST.log 2> /dev/null
 echo "*****************"
@@ -107,7 +109,8 @@ for val in ${StringArray[@]}; do
   export NSS_FIPS_FUNC_TEST_NAMES=$myString  
   echo "INDUCE FAILURE"
   echo ../ft/$myString.log    
-    cmd/fipstest/${build_dir}/fipstest &> ../ft/$myString.log
+    #./cmd/certutil/${build_dir}/certutil -N -d . -f /tmp/password_file.txt &> ../ft/$myString.log
+    ./cmd/certutil/${build_dir}/certutil -U &> ../ft/$myString.log
     #gdb --args cmd/fipstest/${build_dir}/fipstest
     grep -n "XPECTED_" ../ft/$myString.log 2> /dev/null
   echo "*****************"
