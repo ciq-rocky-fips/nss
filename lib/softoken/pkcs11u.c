@@ -1095,6 +1095,7 @@ sftk_NewObject(SFTKSlot *slot)
     object->next = object->prev = NULL;
     object->slot = slot;
     object->isFIPS = sftk_isFIPS(slot->slotID);
+    object->source = SFTK_SOURCE_DEFAULT;
 
     object->refCount = 1;
     sessObject->sessionList.next = NULL;
@@ -1679,6 +1680,7 @@ sftk_CopyObject(SFTKObject *destObject, SFTKObject *srcObject)
     unsigned int i;
 
     destObject->isFIPS = srcObject->isFIPS;
+    destObject->source = srcObject->source;
     if (src_so == NULL) {
         return sftk_CopyTokenObject(destObject, srcObject);
     }
@@ -2064,6 +2066,7 @@ sftk_NewTokenObject(SFTKSlot *slot, SECItem *dbKey, CK_OBJECT_HANDLE handle)
     }
     object->slot = slot;
     object->isFIPS = sftk_isFIPS(slot->slotID);
+    object->source = SFTK_SOURCE_DEFAULT;
     object->objectInfo = NULL;
     object->infoFree = NULL;
     if (!hasLocks) {
@@ -2230,6 +2233,15 @@ sftk_AttributeToFlags(CK_ATTRIBUTE_TYPE op)
         case CKA_DIGEST:
             flags = CKF_DIGEST;
             break;
+        /* fake attribute to select key gen */
+         case CKA_NSS_GENERATE:
+            flags = CKF_GENERATE;
+            break;
+        /* fake attribute to select key pair gen */
+        case CKA_NSS_GENERATE_KEY_PAIR:
+            flags = CKF_GENERATE_KEY_PAIR;
+            break;
+        /* fake attributes to to handle MESSAGE* flags */
         case CKA_NSS_MESSAGE | CKA_ENCRYPT:
             flags = CKF_MESSAGE_ENCRYPT;
             break;
@@ -2283,7 +2295,7 @@ sftk_quickGetECCCurveOid(SFTKObject *source)
  * the sftk_handleSpecial. Since it's currently only used
  * in FIPS indicators, it's currently only compiled with
  * the FIPS indicator code */
-static int
+static CK_ULONG
 sftk_getKeyLength(SFTKObject *source)
 {
     CK_KEY_TYPE keyType = CK_INVALID_HANDLE;
