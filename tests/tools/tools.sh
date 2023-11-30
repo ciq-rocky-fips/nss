@@ -47,9 +47,9 @@
 "PKCS #5 Password Based Encryption with SHA-1 and DES-CBC"
 
   # if we change the defaults in pk12util, update these variables
-  export CERT_ENCRYPTION_DEFAULT="AES-128-CBC"
-  export KEY_ENCRYPTION_DEFAULT="AES-256-CBC"
-  export HASH_DEFAULT="SHA-256"
+  export CERT_ENCRYPTION_DEFAULT=${pkcs12v2pbeWithSha1And40BitRc2Cbc}
+  export KEY_ENCRYPTION_DEFAULT=${pkcs12v2pbeWithSha1AndTripleDESCBC}
+  export HASH_DEFAULT="SHA-1"
 
   export PKCS5v1_PBE_CIPHERS="${pkcs5pbeWithMD2AndDEScbc},\
 ${pkcs5pbeWithMD5AndDEScbc},\
