@@ -60,16 +60,13 @@ SFTKFIPSAlgorithmList sftk_fips_mechs[] = {
 
 #define DSA_FB_KEY 2048, 4096 /* min, max */
 #define DSA_FB_STEP 1024
-#define DH_FB_KEY 2048, 4096 /* min, max */
+#define DH_FB_KEY 2048, 8192 /* min, max */
 #define DH_FB_STEP 1024
 #define EC_FB_KEY 256, 521 /* min, max */
 #define EC_FB_STEP 1       /* key limits handled by special operation */
 #define AES_FB_KEY 128, 256
 #define AES_FB_STEP 64
     { CKM_RSA_PKCS_KEY_PAIR_GEN, { RSA_FB_KEY, CKF_KPG }, RSA_FB_STEP, SFTKFIPSNone },
-    { CKM_RSA_PKCS_PSS, { RSA_FB_KEY, CKF_SGN }, RSA_FB_STEP, SFTKFIPSNone },
-    { CKM_RSA_PKCS_OAEP, { RSA_FB_KEY, CKF_ENC }, RSA_FB_STEP, SFTKFIPSNone },
-    { CKM_RSA_PKCS_PSS, { RSA_LEGACY_FB_KEY, CKF_VERIFY }, RSA_LEGACY_FB_STEP, SFTKFIPSNone },
 
     /* -------------- RSA Multipart Signing Operations -------------------- */
     { CKM_SHA224_RSA_PKCS, { RSA_FB_KEY, CKF_SGN }, RSA_FB_STEP, SFTKFIPSNone },
@@ -89,13 +86,10 @@ SFTKFIPSAlgorithmList sftk_fips_mechs[] = {
     { CKM_SHA384_RSA_PKCS_PSS, { RSA_FB_KEY, CKF_SGN }, RSA_FB_STEP, SFTKFIPSNone },
     { CKM_SHA512_RSA_PKCS_PSS, { RSA_FB_KEY, CKF_SGN }, RSA_FB_STEP, SFTKFIPSNone },
     /* ------------------------- DSA Operations --------------------------- */
-    { CKM_DSA_KEY_PAIR_GEN, { DSA_FB_KEY, CKF_KPG }, DSA_FB_STEP, SFTKFIPSNone },
-    { CKM_DSA, { DSA_FB_KEY, CKF_SGN }, DSA_FB_STEP, SFTKFIPSNone },
-    { CKM_DSA_PARAMETER_GEN, { DSA_FB_KEY, CKF_KPG }, DSA_FB_STEP, SFTKFIPSNone },
-    { CKM_DSA_SHA224, { DSA_FB_KEY, CKF_SGN }, DSA_FB_STEP, SFTKFIPSNone },
-    { CKM_DSA_SHA256, { DSA_FB_KEY, CKF_SGN }, DSA_FB_STEP, SFTKFIPSNone },
-    { CKM_DSA_SHA384, { DSA_FB_KEY, CKF_SGN }, DSA_FB_STEP, SFTKFIPSNone },
-    { CKM_DSA_SHA512, { DSA_FB_KEY, CKF_SGN }, DSA_FB_STEP, SFTKFIPSNone },
+    { CKM_DSA_SHA224, { DSA_FB_KEY, CKF_VERIFY }, DSA_FB_STEP, SFTKFIPSNone },
+    { CKM_DSA_SHA256, { DSA_FB_KEY, CKF_VERIFY }, DSA_FB_STEP, SFTKFIPSNone },
+    { CKM_DSA_SHA384, { DSA_FB_KEY, CKF_VERIFY }, DSA_FB_STEP, SFTKFIPSNone },
+    { CKM_DSA_SHA512, { DSA_FB_KEY, CKF_VERIFY }, DSA_FB_STEP, SFTKFIPSNone },
     /* -------------------- Diffie Hellman Operations --------------------- */
     /* no diffie hellman yet */
     { CKM_DH_PKCS_KEY_PAIR_GEN, { DH_FB_KEY, CKF_KPG }, DH_FB_STEP, SFTKFIPSDH },
@@ -103,7 +97,6 @@ SFTKFIPSAlgorithmList sftk_fips_mechs[] = {
     /* -------------------- Elliptic Curve Operations --------------------- */
     { CKM_EC_KEY_PAIR_GEN, { EC_FB_KEY, CKF_KPG }, EC_FB_STEP, SFTKFIPSECC },
     { CKM_ECDH1_DERIVE, { EC_FB_KEY, CKF_KEA }, EC_FB_STEP, SFTKFIPSECC },
-    { CKM_ECDSA, { EC_FB_KEY, CKF_SGN }, EC_FB_STEP, SFTKFIPSECC },
     { CKM_ECDSA_SHA224, { EC_FB_KEY, CKF_SGN }, EC_FB_STEP, SFTKFIPSECC },
     { CKM_ECDSA_SHA256, { EC_FB_KEY, CKF_SGN }, EC_FB_STEP, SFTKFIPSECC },
     { CKM_ECDSA_SHA384, { EC_FB_KEY, CKF_SGN }, EC_FB_STEP, SFTKFIPSECC },
