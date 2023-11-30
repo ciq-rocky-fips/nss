@@ -7409,6 +7409,8 @@ ssl_HandleDHServerKeyExchange(sslSocket *ss, PRUint8 *b, PRUint32 length)
     unsigned dh_p_bits;
     unsigned dh_g_bits;
     PRInt32 minDH;
+    PRInt32 optval;
+    PRBool usePolicyLength = PR_FALSE;
 
     SSL3Hashes hashes;
     SECItem signature = { siBuffer, NULL, 0 };
@@ -7419,8 +7421,13 @@ ssl_HandleDHServerKeyExchange(sslSocket *ss, PRUint8 *b, PRUint32 length)
     if (rv != SECSuccess) {
         goto loser; /* malformed. */
     }
+    rv = NSS_OptionGet(NSS_KEY_SIZE_POLICY_FLAGS, &optval);
+    if (rv == SECSuccess) {
+        usePolicyLength = (PRBool)((optval & NSS_KEY_SIZE_POLICY_SSL_FLAG) == NSS_KEY_SIZE_POLICY_SSL_FLAG);
+    }
 
-    rv = NSS_OptionGet(NSS_DH_MIN_KEY_SIZE, &minDH);
+    rv = usePolicyLength ? NSS_OptionGet(NSS_DH_MIN_KEY_SIZE, &minDH)
+                         : SECFailure;
     if (rv != SECSuccess || minDH <= 0) {
         minDH = SSL_DH_MIN_P_BITS;
     }
@@ -11411,13 +11418,20 @@ ssl_SetAuthKeyBits(sslSocket *ss, const SECKEYPublicKey *pubKey)
     SECStatus rv;
     PRUint32 minKey;
     PRInt32 optval;
+    PRBool usePolicyLength = PR_TRUE;
+
+    rv = NSS_OptionGet(NSS_KEY_SIZE_POLICY_FLAGS, &optval);
+    if (rv == SECSuccess) {
+        usePolicyLength = (PRBool)((optval & NSS_KEY_SIZE_POLICY_SSL_FLAG) == NSS_KEY_SIZE_POLICY_SSL_FLAG);
+    }
 
     ss->sec.authKeyBits = SECKEY_PublicKeyStrengthInBits(pubKey);
     switch (SECKEY_GetPublicKeyType(pubKey)) {
         case rsaKey:
         case rsaPssKey:
         case rsaOaepKey:
-            rv = NSS_OptionGet(NSS_RSA_MIN_KEY_SIZE, &optval);
+            rv = usePolicyLength ? NSS_OptionGet(NSS_RSA_MIN_KEY_SIZE, &optval)
+                                 : SECFailure;
             if (rv == SECSuccess && optval > 0) {
                 minKey = (PRUint32)optval;
             } else {
@@ -11426,7 +11440,8 @@ ssl_SetAuthKeyBits(sslSocket *ss, const SECKEYPublicKey *pubKey)
             break;
 
         case dsaKey:
-            rv = NSS_OptionGet(NSS_DSA_MIN_KEY_SIZE, &optval);
+            rv = usePolicyLength ? NSS_OptionGet(NSS_DSA_MIN_KEY_SIZE, &optval)
+                                 : SECFailure;
             if (rv == SECSuccess && optval > 0) {
                 minKey = (PRUint32)optval;
             } else {
@@ -11435,7 +11450,8 @@ ssl_SetAuthKeyBits(sslSocket *ss, const SECKEYPublicKey *pubKey)
             break;
 
         case dhKey:
-            rv = NSS_OptionGet(NSS_DH_MIN_KEY_SIZE, &optval);
+            rv = usePolicyLength ? NSS_OptionGet(NSS_DH_MIN_KEY_SIZE, &optval)
+                                 : SECFailure;
             if (rv == SECSuccess && optval > 0) {
                 minKey = (PRUint32)optval;
             } else {
@@ -11444,9 +11460,15 @@ ssl_SetAuthKeyBits(sslSocket *ss, const SECKEYPublicKey *pubKey)
             break;
 
         case ecKey:
-            /* Don't check EC strength here on the understanding that we only
-             * support curves we like. */
-            minKey = ss->sec.authKeyBits;
+            rv = usePolicyLength ? NSS_OptionGet(NSS_ECC_MIN_KEY_SIZE, &optval)
+                                 : SECFailure;
+            if (rv == SECSuccess && optval > 0) {
+                minKey = (PRUint32)optval;
+            } else {
+                /* Don't check EC strength here on the understanding that we
+                 * only support curves we like. */
+                minKey = ss->sec.authKeyBits;
+            }
             break;
 
         default:
