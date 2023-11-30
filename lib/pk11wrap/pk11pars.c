@@ -391,12 +391,9 @@ static const oidValDef signOptList[] = {
     /* Signatures */
     { CIPHER_NAME("DSA"), SEC_OID_ANSIX9_DSA_SIGNATURE,
       NSS_USE_ALG_IN_SSL_KX | NSS_USE_ALG_IN_SIGNATURE },
-    { CIPHER_NAME("RSA-PKCS"), SEC_OID_PKCS1_RSA_ENCRYPTION,
-      NSS_USE_ALG_IN_SSL_KX | NSS_USE_ALG_IN_SIGNATURE },
-    { CIPHER_NAME("RSA-PSS"), SEC_OID_PKCS1_RSA_PSS_SIGNATURE,
-      NSS_USE_ALG_IN_SSL_KX | NSS_USE_ALG_IN_SIGNATURE },
-    { CIPHER_NAME("ECDSA"), SEC_OID_ANSIX962_EC_PUBLIC_KEY,
-      NSS_USE_ALG_IN_SSL_KX | NSS_USE_ALG_IN_SIGNATURE },
+    { CIPHER_NAME("RSA-PKCS"), SEC_OID_PKCS1_RSA_ENCRYPTION, 0},
+    { CIPHER_NAME("RSA-PSS"), SEC_OID_PKCS1_RSA_PSS_SIGNATURE, 0},
+    { CIPHER_NAME("ECDSA"), SEC_OID_ANSIX962_EC_PUBLIC_KEY, 0},
 };
 
 typedef struct {
@@ -412,7 +409,7 @@ static const algListsDef algOptLists[] = {
     { macOptList, PR_ARRAY_SIZE(macOptList), "MAC", PR_FALSE },
     { cipherOptList, PR_ARRAY_SIZE(cipherOptList), "CIPHER", PR_FALSE },
     { kxOptList, PR_ARRAY_SIZE(kxOptList), "OTHER-KX", PR_FALSE },
-    { signOptList, PR_ARRAY_SIZE(signOptList), "OTHER-SIGN", PR_FALSE },
+    { signOptList, PR_ARRAY_SIZE(signOptList), "OTHER-SIGN", PR_TRUE },
 };
 
 static const optionFreeDef sslOptList[] = {
