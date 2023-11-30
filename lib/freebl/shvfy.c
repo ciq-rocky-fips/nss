@@ -19,9 +19,9 @@
 #include "pqg.h"
 #include "blapii.h"
 #include "secitem.h"
+#include "stdlib.h"
 
 #ifndef NSS_FIPS_DISABLED
-
 /*
  * Most modern version of Linux support a speed optimization scheme where an
  * application called prelink modifies programs and shared libraries to quickly
@@ -299,11 +299,20 @@ blapi_SHVerify(const char *name, PRFuncPtr addr, PRBool self, PRBool rerun)
     if (!shName) {
         goto loser;
     }
+    FIPSLOG_INFO("checking %s", shName);
     result = blapi_SHVerifyFile(shName, self, rerun);
+
+    if ( result == PR_FALSE ) {
+        FIPSLOG_FAILED(NULL, NULL, "blapi_SHVerifyFile");
+    } else {
+        FIPSLOG_SUCCESS(NULL, NULL, "blapi_SHVerifyFile");
+    }
 
 loser:
     if (shName != NULL) {
         PR_Free(shName);
+    } else {
+        FIPSLOG_SUCCESS(NULL, NULL, "no shName");
     }
 
     return result;
@@ -553,6 +562,98 @@ BLAPI_VerifySelf(const char *name)
     }
     return blapi_SHVerify(name, (PRFuncPtr)decodeInt, PR_TRUE, PR_FALSE);
 }
+
+#if defined(NSS_AUDIT_WITH_SYSLOG)
+/*
+ * FIPS specific logging.
+ * parameters 'name.subname' is used to
+ * log specific algorithms or not.
+ */
+enum fips_logging_type fips_logging_enabled(const char *name, const char *subname)
+{
+	static PRBool env_var_check_done = PR_FALSE;
+	static enum fips_logging_type logging_enabled = FIPS_NO_LOGGING;
+	size_t cmp_len = 0;
+	size_t subname_cmp_len = 0;
+	const char *enames = NULL;
+	const char *np;
+
+	if (!env_var_check_done) {
+		const char *e = getenv("NSS_FIPS_LOGGING");
+		if (e != NULL) {
+			if (strcasecmp(e, "STDERR") == 0) {
+				logging_enabled = FIPS_LOG_STDERR;
+			} else if (strcasecmp(e, "FILE") == 0) {
+				logging_enabled = FIPS_LOG_FILE;
+			} else {
+				logging_enabled = FIPS_LOG_SYSLOG;
+			}
+		}
+		env_var_check_done = PR_TRUE;
+	}
+	if (logging_enabled == FIPS_NO_LOGGING) {
+		return logging_enabled;
+	}
+	/*
+	 * Here we know logging is enabled. Parse
+	 * the NSS_FIPS_LOGGING_NAMES variable
+	 * and log if the name matches. Names are
+	 * separated by a ':' character. Subnames
+	 * separated from names by a '.' character.
+	 */
+	enames = getenv("NSS_FIPS_LOGGING_NAMES");
+	if (enames == NULL) {
+		return logging_enabled;
+	}
+    if (!name) {
+        return logging_enabled;
+    }
+	cmp_len = strlen(name);
+	if (subname != NULL) {
+		subname_cmp_len = strlen(subname);
+	} else {
+        return logging_enabled;
+    }
+	for (np = enames; np != NULL;) {
+		while (*np == ':') {
+			np++;
+		}
+		/* Does "name" match ? */
+		if (strncasecmp(np, name, cmp_len)==0) {
+			if (subname == NULL) {
+				/* Move past "name." */
+				np += cmp_len + 1;
+				if (*np == ':' || *np == '\0') {
+					return logging_enabled;
+				}
+				/* Allow wildcard match for subname in env var. */
+				if (*np == '*' && (np[1] == ':' || np[1] == '\0')) {
+					return logging_enabled;
+				}
+			} else {
+				/* Look for .subname */
+				if (np[cmp_len] != '.') {
+					np = strchr(np, ':');
+					continue;
+				}
+				/* Move past "name." */
+				np += cmp_len + 1;
+				/* Allow wildcard match for subname in env var. */
+				if (*np == '*' && (np[1] == ':' || np[1] == '\0')) {
+					return logging_enabled;
+				}
+				if (strncasecmp(np, subname, subname_cmp_len) == 0) {
+					if (np[subname_cmp_len] == ':' || np[subname_cmp_len] == '\0') {
+						return logging_enabled;
+					}
+				}
+			}
+		}
+		np = strchr(np, ':');
+	}
+	return FIPS_NO_LOGGING;
+}
+#endif /* NSS_SUCCESS_AUDIT_WITH_SYSLOG */
 
 #else /* NSS_FIPS_DISABLED */
 

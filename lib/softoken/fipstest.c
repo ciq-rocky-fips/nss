@@ -34,6 +34,8 @@
 #define INIT_FUNCTION
 #endif
 
+#define NSS_FULL_POST
+
 static void INIT_FUNCTION sftk_startup_tests(void);
 
 /* Windows pre-defined entry */
@@ -102,6 +104,7 @@ sftk_fips_RSA_PowerUpSigSelfTest(HASH_HashType shaAlg,
     unsigned int rsa_bytes_signed;
     unsigned char rsa_computed_signature[FIPS_RSA_SIGNATURE_LENGTH];
     SECStatus rv;
+    const char *str_hash = NULL;
 
     if (shaAlg == HASH_AlgSHA1) {
         if (SHA1_HashBuf(sha, rsa_known_msg, rsa_kmsg_length) != SECSuccess) {
@@ -109,24 +112,28 @@ sftk_fips_RSA_PowerUpSigSelfTest(HASH_HashType shaAlg,
         }
         shaLength = SHA1_LENGTH;
         shaOid = SEC_OID_SHA1;
+        str_hash = "SHA1";
     } else if (shaAlg == HASH_AlgSHA256) {
         if (SHA256_HashBuf(sha, rsa_known_msg, rsa_kmsg_length) != SECSuccess) {
             goto loser;
         }
         shaLength = SHA256_LENGTH;
         shaOid = SEC_OID_SHA256;
+        str_hash = "SHA256";
     } else if (shaAlg == HASH_AlgSHA384) {
         if (SHA384_HashBuf(sha, rsa_known_msg, rsa_kmsg_length) != SECSuccess) {
             goto loser;
         }
         shaLength = SHA384_LENGTH;
         shaOid = SEC_OID_SHA384;
+        str_hash = "SHA348";
     } else if (shaAlg == HASH_AlgSHA512) {
         if (SHA512_HashBuf(sha, rsa_known_msg, rsa_kmsg_length) != SECSuccess) {
             goto loser;
         }
         shaLength = SHA512_LENGTH;
         shaOid = SEC_OID_SHA512;
+        str_hash = "SHA512";
     } else {
         goto loser;
     }
@@ -144,17 +151,43 @@ sftk_fips_RSA_PowerUpSigSelfTest(HASH_HashType shaAlg,
                       sha,
                       shaLength);
 
+    if (fips_request_failure("RSA-SIGN",str_hash)){
+        rsa_computed_signature[0] ^= 1;
+    }
+
     if ((rv != SECSuccess) ||
         (rsa_bytes_signed != FIPS_RSA_SIGNATURE_LENGTH) ||
         (PORT_Memcmp(rsa_computed_signature, rsa_known_signature,
                      FIPS_RSA_SIGNATURE_LENGTH) != 0)) {
+
+        if (shaAlg == HASH_AlgSHA1) {
+            FIPSLOG_FAILED("RSA-SIGN",str_hash, "RSA SHA1  %d Single-Round Known Answer Signature Test", FIPS_RSA_SIGNATURE_LENGTH *8);
+        } else if (shaAlg == HASH_AlgSHA256) {
+            FIPSLOG_FAILED("RSA-SIGN",str_hash, "RSA SHA256  %d Single-Round Known Answer Signature Test", FIPS_RSA_SIGNATURE_LENGTH *8);
+        } else if (shaAlg == HASH_AlgSHA384) {
+            FIPSLOG_FAILED("RSA-SIGN",str_hash, "RSA SHA384 %d Single-Round Known Answer Signature Test", FIPS_RSA_SIGNATURE_LENGTH *8);
+        } else if (shaAlg == HASH_AlgSHA512) {
+            FIPSLOG_FAILED("RSA-SIGN",str_hash, "RSA SHA512 %d Single-Round Known Answer Signature Test", FIPS_RSA_SIGNATURE_LENGTH *8);
+        }
         goto loser;
+    } else {
+        if (shaAlg == HASH_AlgSHA1) {
+            FIPSLOG_SUCCESS("RSA-SIGN",str_hash, "RSA SHA1 %d Single-Round Known Answer Signature Test",  FIPS_RSA_SIGNATURE_LENGTH *8);
+        } else if (shaAlg == HASH_AlgSHA256) {
+            FIPSLOG_SUCCESS("RSA-SIGN",str_hash, "RSA SHA256 %d Single-Round Known Answer Signature Test",  FIPS_RSA_SIGNATURE_LENGTH *8);
+        } else if (shaAlg == HASH_AlgSHA384) {
+            FIPSLOG_SUCCESS("RSA-SIGN",str_hash, "RSA SHA384  %d Single-Round Known Answer Signature Test",  FIPS_RSA_SIGNATURE_LENGTH *8);
+        } else if (shaAlg == HASH_AlgSHA512) {
+            FIPSLOG_SUCCESS("RSA-SIGN",str_hash, "RSA SHA512  %d Single-Round Known Answer Signature Test",  FIPS_RSA_SIGNATURE_LENGTH *8);
+        }
     }
 
     /****************************************************/
     /* RSA Single-Round Known Answer Verification Test. */
     /****************************************************/
-
+    if (fips_request_failure("RSA-VERIFY",str_hash)){
+        shaLength = shaLength/2;
+    }
     /* Perform RSA verification with the RSA public key. */
     rv = RSA_HashCheckSign(shaOid,
                            rsa_public_key,
@@ -164,7 +197,26 @@ sftk_fips_RSA_PowerUpSigSelfTest(HASH_HashType shaAlg,
                            shaLength);
 
     if (rv != SECSuccess) {
+        if (shaAlg == HASH_AlgSHA1) {
+            FIPSLOG_FAILED("RSA-VERIFY",str_hash, "RSA SHA1 %d Single-Round Known Answer Verification Test", FIPS_RSA_SIGNATURE_LENGTH *8);
+        } else if (shaAlg == HASH_AlgSHA256) {
+            FIPSLOG_FAILED("RSA-VERIFY",str_hash, "RSA SHA256 %d Single-Round Known Answer Verification Test", FIPS_RSA_SIGNATURE_LENGTH *8);
+        } else if (shaAlg == HASH_AlgSHA384) {
+            FIPSLOG_FAILED("RSA-VERIFY",str_hash, "RSA SHA384 %d Single-Round Known Answer Verification Test", FIPS_RSA_SIGNATURE_LENGTH *8);
+        } else if (shaAlg == HASH_AlgSHA512) {
+            FIPSLOG_FAILED("RSA-VERIFY",str_hash, "RSA SHA512 %d Single-Round Known Answer Verification Test", FIPS_RSA_SIGNATURE_LENGTH *8);
+        }
         goto loser;
+    } else {
+        if (shaAlg == HASH_AlgSHA1) {
+            FIPSLOG_SUCCESS("RSA-VERIFY",str_hash, "RSA SHA1 %d Single-Round Known Answer Verification Test",  FIPS_RSA_SIGNATURE_LENGTH *8);
+        } else if (shaAlg == HASH_AlgSHA256) {
+            FIPSLOG_SUCCESS("RSA-VERIFY",str_hash, "RSA SHA256 %d Single-Round Known Answer Verification Test",  FIPS_RSA_SIGNATURE_LENGTH *8);
+        } else if (shaAlg == HASH_AlgSHA384) {
+            FIPSLOG_SUCCESS("RSA-VERIFY",str_hash, "RSA SHA384 %d Single-Round Known Answer Verification Test",  FIPS_RSA_SIGNATURE_LENGTH *8);
+        } else if (shaAlg == HASH_AlgSHA512) {
+            FIPSLOG_SUCCESS("RSA-VERIFY",str_hash, "RSA SHA512 %d Single-Round Known Answer Verification Test",  FIPS_RSA_SIGNATURE_LENGTH *8);
+        }
     }
     return (SECSuccess);
 
@@ -550,22 +602,34 @@ sftk_fips_RSA_PowerUpSelfTest(void)
                                                   rsa_public_key, rsa_private_key,
                                                   rsa_known_plaintext_msg, FIPS_RSA_MESSAGE_LENGTH,
                                                   rsa_known_sha256_signature);
-    if (rsa_status != SECSuccess)
+    if (rsa_status != SECSuccess) {
+        FIPSLOG_FAILED(NULL, NULL, "RSA Hash SHA256 signature Test");
         goto rsa_loser;
+    } else {
+        FIPSLOG_SUCCESS(NULL, NULL, "RSA Hash SHA256 signature Test");
+    }
 
     rsa_status = sftk_fips_RSA_PowerUpSigSelfTest(HASH_AlgSHA384,
                                                   rsa_public_key, rsa_private_key,
                                                   rsa_known_plaintext_msg, FIPS_RSA_MESSAGE_LENGTH,
                                                   rsa_known_sha384_signature);
-    if (rsa_status != SECSuccess)
+    if (rsa_status != SECSuccess) {
+        FIPSLOG_FAILED(NULL, NULL, "RSA Hash SHA384 signature Test");
         goto rsa_loser;
+    } else {
+        FIPSLOG_SUCCESS(NULL, NULL, "RSA Hash SHA384 signature Test");
+    }
 
     rsa_status = sftk_fips_RSA_PowerUpSigSelfTest(HASH_AlgSHA512,
                                                   rsa_public_key, rsa_private_key,
                                                   rsa_known_plaintext_msg, FIPS_RSA_MESSAGE_LENGTH,
                                                   rsa_known_sha512_signature);
-    if (rsa_status != SECSuccess)
+    if (rsa_status != SECSuccess) {
+        FIPSLOG_FAILED(NULL, NULL, "RSA Hash SHA512 signature Test");
         goto rsa_loser;
+    } else {
+        FIPSLOG_SUCCESS(NULL, NULL, "RSA Hash SHA 512 signature Test");
+    }
 
     /* Dispose of all RSA key material. */
     nsslowkey_DestroyPublicKey(rsa_public_key);
@@ -651,10 +715,16 @@ sftk_fips_HKDF_PowerUpSelfTest(void)
     status = sftk_HKDF(&hkdf_params, CK_INVALID_HANDLE, NULL,
                        base_key, 32, NULL, outBytes, sizeof(outBytes),
                        PR_TRUE, PR_TRUE);
+    if (fips_request_failure("HKDF","SHA256")){
+        outBytes[0] ^= 1;
+    }
     if ((status != SECSuccess) ||
         PORT_Memcmp(outBytes, known_hkdf_sha256_key, sizeof(outBytes)) != 0) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("HKDF","SHA256", "HKDF SHA 256 HMAC Test");
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS("HKDF","SHA256", "HKDF SHA 256 HMAC Test");
     }
 
 #ifdef NSS_FULL_POST
@@ -662,24 +732,97 @@ sftk_fips_HKDF_PowerUpSelfTest(void)
     status = sftk_HKDF(&hkdf_params, CK_INVALID_HANDLE, NULL,
                        base_key, 48, NULL, outBytes, sizeof(outBytes),
                        PR_TRUE, PR_TRUE);
+    if (fips_request_failure("HKDF","SHA384")){
+        outBytes[0] ^= 1;
+    }
     if ((status != SECSuccess) ||
         PORT_Memcmp(outBytes, known_hkdf_sha384_key, sizeof(outBytes)) != 0) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("HKDF","SHA384", "HKDF SHA 384 HMAC Test");
         return (SECFailure);
+    }  else {
+        FIPSLOG_SUCCESS("HKDF","SHA384", "HKDF SHA 384 HMAC Test");
     }
 
     hkdf_params.prfHashMechanism = CKM_SHA512_HMAC;
     status = sftk_HKDF(&hkdf_params, CK_INVALID_HANDLE, NULL,
                        base_key, 64, NULL, outBytes, sizeof(outBytes),
                        PR_TRUE, PR_TRUE);
+    if (fips_request_failure("HKDF","SHA512")){
+        outBytes[0] ^= 1;
+    }
     if ((status != SECSuccess) ||
         PORT_Memcmp(outBytes, known_hkdf_sha512_key, sizeof(outBytes)) != 0) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("HKDF","SHA512", "HKDF SHA 512 HMAC Test");
         return (SECFailure);
+    }  else {
+        FIPSLOG_SUCCESS("HKDF","SHA512", "HKDF SHA 512 HMAC Test");
     }
 #endif
 
     return (SECSuccess);
+}
+
+/*   ** Function return value meaning
+ * -1 cannot open source file
+ * -2 cannot open destination file
+ * 0 Success
+ */
+static int File_Copy (const char FileSource [], const char FileDestination [])
+{
+    int   c;
+    FILE *stream_R;
+    FILE *stream_W;
+
+    stream_R = fopen (FileSource, "r");
+    if (stream_R == NULL)
+        return -1;
+    stream_W = fopen (FileDestination, "w");   //create and write to file
+    if (stream_W == NULL)
+     {
+        fclose (stream_R);
+        return -2;
+     }
+    while ((c = fgetc(stream_R)) != EOF)
+        fputc (c, stream_W);
+    fclose (stream_R);
+    fclose (stream_W);
+
+    return 0;
+}
+
+static int inject_bad_char (const char FileSource [])
+{
+    FILE * pFile;
+    char c = 0x90;
+
+    pFile = fopen(FileSource, "w+");
+
+    if (pFile != NULL) {
+        fseek(pFile, 0, SEEK_END);
+        fputc(c, pFile);
+        fclose(pFile);
+    }
+
+    return 0;
+}
+
+static int corrupt_bin()
+{
+    const char *path = getenv("INTEG_softokn");
+
+    rename(path, ".ssl.bck");
+    File_Copy(".ssl.bck", path);
+    inject_bad_char(path);
+
+    return 0;
+}
+
+static void restore_bin()
+{
+    const char *path = getenv("INTEG_softokn");
+    rename(".ssl.bck", path);
 }
 
 static PRBool sftk_self_tests_ran = PR_FALSE;
@@ -697,7 +840,8 @@ void sftk_startup_tests_with_rerun(PRBool rerun)
     const char *libraryName = rerun ?
                BLAPI_FIPS_RERUN_FLAG_STRING SOFTOKEN_LIB_NAME :
                SOFTOKEN_LIB_NAME;
-    
+    int corrupt = 0;
+
     PORT_Assert(!sftk_self_tests_ran);
     PORT_Assert(!sftk_self_tests_success);
     sftk_self_tests_ran = PR_TRUE;
@@ -725,11 +869,23 @@ void sftk_startup_tests_with_rerun(PRBool rerun)
     if (rv != SECSuccess) {
         return;
     }
-    if (!BLAPI_SHVerify(libraryName,
-                        (PRFuncPtr)&sftk_fips_RSA_PowerUpSelfTest)) {
+
+    if (fips_request_failure("INTEGRITY","softoken")){
+        corrupt_bin();
+        corrupt = 1;
+    }
+
+    rv = !BLAPI_SHVerify(libraryName, (PRFuncPtr)&sftk_fips_RSA_PowerUpSelfTest);
+    if (corrupt) {
+        restore_bin();
+    }
+    if (rv){
         /* something is wrong with the library, fail without enabling
          * the token */
+        FIPSLOG_FAILED("INTEGRITY","softoken", "%s", libraryName);
         return;
+    } else {
+        FIPSLOG_SUCCESS("INTEGRITY","softoken", "%s", libraryName);
     }
     rv = sftk_fips_IKE_PowerUpSelfTests();
     if (rv != SECSuccess) {
@@ -738,7 +894,10 @@ void sftk_startup_tests_with_rerun(PRBool rerun)
 
     rv = sftk_fips_SP800_108_PowerUpSelfTests();
     if (rv != SECSuccess) {
+        FIPSLOG_FAILED(NULL, NULL, "kbkdf KAT");
         return;
+    }  else {
+        FIPSLOG_SUCCESS(NULL, NULL, "kbkdf KAT");
     }
 
     rv = sftk_fips_HKDF_PowerUpSelfTest();
@@ -757,7 +916,9 @@ void sftk_startup_tests_with_rerun(PRBool rerun)
 static void
 sftk_startup_tests(void)
 {
+    FIPSLOG_INFO("Softoken sftk_startup_tests START");
     sftk_startup_tests_with_rerun(PR_FALSE);
+    FIPSLOG_INFO("Softoken sftk_startup_tests END");
 }
 
 /*
@@ -768,6 +929,7 @@ sftk_startup_tests(void)
 CK_RV
 sftk_FIPSEntryOK(PRBool rerun)
 {
+    FIPSLOG_INFO("Softoken POST_START");
 #ifdef NSS_NO_INIT_SUPPORT
     /* this should only be set on platforms that can't handle one of the INIT
      * schemes.  This code allows those platforms to continue to function,
@@ -784,6 +946,7 @@ sftk_FIPSEntryOK(PRBool rerun)
         sftk_self_tests_success = PR_FALSE;
         sftk_startup_tests_with_rerun(PR_TRUE);
     }
+    FIPSLOG_INFO("Softoken POST_END");
     if (!sftk_self_tests_success) {
         return CKR_DEVICE_ERROR;
     }
