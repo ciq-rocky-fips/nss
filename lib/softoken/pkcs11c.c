@@ -4938,6 +4938,10 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
         bytes_encrypted = modulusLen;
         mech.mechanism = CKM_RSA_PKCS;
 
+        if (keyType == CKK_RSA) {
+            pct_name = "CKK_RSA";
+        }
+
         /* Allocate space for ciphertext. */
         ciphertext = (unsigned char *)PORT_ZAlloc(bytes_encrypted);
         if (ciphertext == NULL) {
@@ -4971,6 +4975,7 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
          */
         text_compared = ciphertext + bytes_encrypted - bytes_compared;
 
+        pct_subname = "ENC";
         if (fips_request_failure("RSA_PCT", "ENCRYPT")){
             pct_name = "RSA_PCT";
             pct_subname = "ENCRYPT";
@@ -5025,6 +5030,8 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
             return crv;
         }
 
+        pct_subname = "DEC";
+
         if (fips_request_failure("RSA_PCT", "DECRYPT")){
             pct_name = "RSA_PCT";
             pct_subname = "DECRYPT";
@@ -5044,6 +5051,8 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
             return CKR_GENERAL_ERROR;
         }
         FIPSLOG_SUCCESS(pct_name, pct_subname, "PCT %s %s", pct_name, pct_subname);
+        pct_name = NULL;
+        pct_subname = NULL;
     }
 
     /**********************************************/
@@ -5898,6 +5907,40 @@ NSC_GenerateKeyPair(CK_SESSION_HANDLE hSession,
     privateKey->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_NSS_GENERATE_KEY_PAIR, privateKey);
     publicKey->isFIPS = privateKey->isFIPS;
 
+    {
+    char msg[128];
+    switch(key_type) {
+        case CKK_RSA:
+            PR_snprintf(msg, sizeof msg,
+                "RSA: PCT: FIPS OPERATION");
+        break;
+        case CKK_DSA:
+            PR_snprintf(msg, sizeof msg,
+                "DSA: PCT: FIPS OPERATION");
+        break;
+        case CKK_EC:
+            PR_snprintf(msg, sizeof msg,
+                "ECDSA: PCT: FIPS OPERATION");
+            if (privateKey->isFIPS){
+                FIPSLOG_SUCCESS(pct_name, pct_subname, "%s", msg);
+            } else {
+                   FIPSLOG_FAILED(pct_name, pct_subname, "%s", msg);
+            }
+            PR_snprintf(msg, sizeof msg,
+                "ECDH: PCT: FIPS OPERATION");
+        break;
+        case CKK_DH:
+            PR_snprintf(msg, sizeof msg,
+                "DH: PCT: FIPS OPERATION");
+        break;
+    }
+    if (privateKey->isFIPS){
+           FIPSLOG_SUCCESS(pct_name, pct_subname, "%s", msg);
+    }
+    else {
+           FIPSLOG_FAILED(pct_name, pct_subname, "%s", msg);
+    }
+    }
     *phPrivateKey = privateKey->handle;
     *phPublicKey = publicKey->handle;
     sftk_FreeObject(publicKey);

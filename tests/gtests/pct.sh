@@ -78,7 +78,14 @@ gtest_start()
       OLD_MAX_PBE_ITERATIONS=$NSS_MAX_MP_PBE_ITERATION_COUNT
       unset NSS_MAX_MP_PBE_ITERATION_COUNT
     fi
-    echo "executing $i"    
+    echo "executing $i"
+    #########################
+    # Reset the log - another process was generating errors PCT errors
+    mv /tmp/test.log ./Startup.log
+    #########################
+
+    #ASAN_OPTIONS="$ASAN_OPTIONS:$EXTRA_ASAN_OPTIONS" "${BINDIR}/$i" \
+    #ASAN_OPTIONS="$ASAN_OPTIONS:$EXTRA_ASAN_OPTIONS" gdb --args "${BINDIR}/$i" \
     ASAN_OPTIONS="$ASAN_OPTIONS:$EXTRA_ASAN_OPTIONS" "${BINDIR}/$i" \
                  -s "${SOURCE_DIR}/gtests/$i" \
                  -d "$DIR" -w --gtest_output=xml:"${GTESTREPORT}" \
@@ -132,13 +139,10 @@ echo "*****************************" > summary.log
 echo "PCT SUCCESS RUN" >> summary.log
 GTESTS="${GTESTS:-fips_gtest}"
 gtest_start
+
 mv /tmp/test.log ./SUCCESS.log
 echo "*****************************" >> summary.log
-if [ `grep -c "_FAILURE" ./SUCCESS.log` -eq 0 ]; then  
-  grep "pair-wise" ./SUCCESS.log >> summary.log  
-else
-  grep "_FAILURE" ./SUCCESS.log >> summary.log
-fi
+grep "pair-wise\|PCT\|FAILED" ./SUCCESS.log >> summary.log
 echo "*****************************" >> summary.log
 
 #myString="${val:1}"
