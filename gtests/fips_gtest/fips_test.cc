@@ -59,13 +59,12 @@ TEST_F(FIPSKeyTest, GenECKey) {
 
 // Encrypt an ephemeral RSA key
 TEST_F(FIPSKeyTest, GenRsaKey) {
-  
   ScopedPK11SlotInfo slot(PK11_GetInternalSlot());
   ASSERT_NE(nullptr, slot);
 
   PK11RSAGenParams rsa_param;
-  rsa_param.keySizeInBits = 1024;
-  rsa_param.pe = 65537L;
+  rsa_param.keySizeInBits = 4096;
+  rsa_param.pe = 0x10001;
 
   SECKEYPublicKey* pub_tmp;
   ScopedSECKEYPublicKey pub_key;
