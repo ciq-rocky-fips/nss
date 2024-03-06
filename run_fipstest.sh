@@ -99,7 +99,7 @@ echo "HelpMedsfafasdjflj7897987" > /tmp/password_file.txt
 echo "SUCCESS CASE"
 echo ../ft/SUCCESS_POST.log
 #./cmd/certutil/${build_dir}/certutil -N -d . -f /tmp/password_file.txt &> ../ft/$myString.log
-./cmd/certutil/${build_dir}/certutil -U &> ../ft/$myString.log
+./cmd/certutil/${build_dir}/certutil -U &> ../ft/SUCCESS_POST.log
 #gdb --args cmd/fipstest/${build_dir}/fipstest
 grep -n "FAILED" ../ft/SUCCESS_POST.log 2> /dev/null
 echo "*****************"
