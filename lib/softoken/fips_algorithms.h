@@ -85,11 +85,6 @@ SFTKFIPSAlgorithmList sftk_fips_mechs[] = {
     { CKM_SHA256_RSA_PKCS_PSS, { RSA_FB_KEY, CKF_SGN }, RSA_FB_STEP, SFTKFIPSNone },
     { CKM_SHA384_RSA_PKCS_PSS, { RSA_FB_KEY, CKF_SGN }, RSA_FB_STEP, SFTKFIPSNone },
     { CKM_SHA512_RSA_PKCS_PSS, { RSA_FB_KEY, CKF_SGN }, RSA_FB_STEP, SFTKFIPSNone },
-    /* ------------------------- DSA Operations --------------------------- */
-    { CKM_DSA_SHA224, { DSA_FB_KEY, CKF_VERIFY }, DSA_FB_STEP, SFTKFIPSNone },
-    { CKM_DSA_SHA256, { DSA_FB_KEY, CKF_VERIFY }, DSA_FB_STEP, SFTKFIPSNone },
-    { CKM_DSA_SHA384, { DSA_FB_KEY, CKF_VERIFY }, DSA_FB_STEP, SFTKFIPSNone },
-    { CKM_DSA_SHA512, { DSA_FB_KEY, CKF_VERIFY }, DSA_FB_STEP, SFTKFIPSNone },
     /* -------------------- Diffie Hellman Operations --------------------- */
     /* no diffie hellman yet */
     { CKM_DH_PKCS_KEY_PAIR_GEN, { DH_FB_KEY, CKF_KPG }, DH_FB_STEP, SFTKFIPSDH },
