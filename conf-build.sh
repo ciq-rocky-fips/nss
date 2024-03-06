@@ -48,6 +48,7 @@ export NSS_SEED_ONLY_DEV_URANDOM=1
 
 export USE_64=1
 export USE_DEBUG_RTL=1
+export NSS_STRICT_INTEGRITY=1
 
 
 make clean
