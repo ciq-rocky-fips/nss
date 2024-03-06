@@ -3875,12 +3875,19 @@ main(int argc, char **argv)
 
     /* Do FIPS self-test */
     if (bltest.commands[cmd_FIPS].activated) {
-        CK_RV ckrv = sftk_FIPSEntryOK(PR_FALSE);
-        fprintf(stdout, "CK_RV: %ld.\n", ckrv);
         PORT_Free(cipherInfo);
-        if (ckrv == CKR_OK)
-            return SECSuccess;
+#ifdef NSS_FIPS_DISABLED
+        fprintf(stdout, "FIPS self-test failed with: NSS_FIPS_DISABLED\n");
         return SECFailure;
+#else
+        CK_RV ckrv = sftk_FIPSEntryOK(PR_FALSE);
+        if (ckrv == CKR_OK) {
+            fprintf(stdout, "FIPS self-test was successful.\n");
+            return SECSuccess;
+        }
+        fprintf(stdout, "FIPS self-test failed with the CK_RV: %ld.\n", ckrv);
+        return SECFailure;
+#endif
     }
 
     /*

@@ -382,7 +382,7 @@ blapi_SHVerifyDSACheck(PRFileDesc *shFD, const SECHashObject *hashObj,
 #ifdef NSS_STRICT_INTEGRITY
 /* don't allow MD2, MD5, SHA1 or SHA224 as your integrity hash */
 static PRBool
-blapi_HashAllowed(SECHashObject *hashObj)
+blapi_HashAllowed(const SECHashObject *hashObj)
 {
     switch (hashObj->type) {
         case HASH_AlgSHA256:
