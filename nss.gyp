@@ -216,8 +216,6 @@
             'gtests/nss_bogo_shim/nss_bogo_shim.gyp:nss_bogo_shim',
             'gtests/pkcs11testmodule/pkcs11testmodule.gyp:pkcs11testmodule',
             'gtests/pk11_gtest/pk11_gtest.gyp:pk11_gtest',
-            'gtests/fips_gtest/fips_gtest.gyp:fips_gtest',
-            'gtests/ec_gtest/ec_gtest.gyp:ec_gtest',
             'gtests/smime_gtest/smime_gtest.gyp:smime_gtest',
             'gtests/softoken_gtest/softoken_gtest.gyp:softoken_gtest',
             'gtests/ssl_gtest/ssl_gtest.gyp:ssl_gtest',

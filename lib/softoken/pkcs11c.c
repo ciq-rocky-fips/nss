@@ -4832,8 +4832,6 @@ loser:
 
 #define PAIRWISE_DIGEST_LENGTH SHA1_LENGTH /* 160-bits */
 #define PAIRWISE_MESSAGE_LENGTH 20         /* 160-bits */
-const char *pct_name;
-const char *pct_subname;
 
 /*
  * FIPS 140-2 pairwise consistency check utilized to validate key pair.
@@ -4875,7 +4873,6 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
     PRBool canSignVerify = PR_FALSE;
     PRBool isDerivable = PR_FALSE;
     CK_RV crv;
-    const char *type_str = NULL;
 
     /* Variables used for Encrypt/Decrypt functions. */
     unsigned char *known_message = (unsigned char *)"Known Crypto Message";
@@ -4938,10 +4935,6 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
         bytes_encrypted = modulusLen;
         mech.mechanism = CKM_RSA_PKCS;
 
-        if (keyType == CKK_RSA) {
-            pct_name = "CKK_RSA";
-        }
-
         /* Allocate space for ciphertext. */
         ciphertext = (unsigned char *)PORT_ZAlloc(bytes_encrypted);
         if (ciphertext == NULL) {
@@ -4975,13 +4968,6 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
          */
         text_compared = ciphertext + bytes_encrypted - bytes_compared;
 
-        pct_subname = "ENC";
-        if (fips_request_failure("RSA_PCT", "ENCRYPT")){
-            pct_name = "RSA_PCT";
-            pct_subname = "ENCRYPT";
-            text_compared = known_message;
-        }
-
         /*
          * Check to ensure that ciphertext does
          * NOT EQUAL known input message text
@@ -4989,13 +4975,11 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
          */
         if (PORT_Memcmp(text_compared, known_message,
                         bytes_compared) == 0) {
-            FIPSLOG_FAILED(pct_name, pct_subname, "PCT %s %s", pct_name, pct_subname);
             /* Set error to Invalid PRIVATE Key. */
             PORT_SetError(SEC_ERROR_INVALID_KEY);
             PORT_Free(ciphertext);
             return CKR_GENERAL_ERROR;
         }
-        FIPSLOG_SUCCESS(pct_name, pct_subname, "PCT %s %s", pct_name, pct_subname);
 
         /* Prepare for decryption using the private key. */
         crv = NSC_DecryptInit(hSession, &mech, privateKey->handle);
@@ -5030,14 +5014,6 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
             return crv;
         }
 
-        pct_subname = "DEC";
-
-        if (fips_request_failure("RSA_PCT", "DECRYPT")){
-            pct_name = "RSA_PCT";
-            pct_subname = "DECRYPT";
-            plaintext[0] ^= 1;
-        }
-
         /*
          * Check to ensure that the output plaintext
          * does EQUAL known input message text.
@@ -5045,14 +5021,10 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
         if ((bytes_decrypted != PAIRWISE_MESSAGE_LENGTH) ||
             (PORT_Memcmp(plaintext, known_message,
                          PAIRWISE_MESSAGE_LENGTH) != 0)) {
-            FIPSLOG_FAILED(pct_name, pct_subname, "PCT %s %s", pct_name, pct_subname);
             /* Set error to Bad PUBLIC Key. */
             PORT_SetError(SEC_ERROR_BAD_KEY);
             return CKR_GENERAL_ERROR;
         }
-        FIPSLOG_SUCCESS(pct_name, pct_subname, "PCT %s %s", pct_name, pct_subname);
-        pct_name = NULL;
-        pct_subname = NULL;
     }
 
     /**********************************************/
@@ -5075,18 +5047,15 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
             case CKK_RSA:
                 signature_length = modulusLen;
                 mech.mechanism = CKM_RSA_PKCS;
-                type_str = "RSA_PCT";
                 break;
             case CKK_DSA:
                 signature_length = DSA_MAX_SIGNATURE_LEN;
                 pairwise_digest_length = subPrimeLen;
                 mech.mechanism = CKM_DSA;
-                type_str = "DSA_PCT";
                 break;
             case CKK_EC:
                 signature_length = MAX_ECKEY_LEN * 2;
                 mech.mechanism = CKM_ECDSA;
-                type_str = "ECDSA_PCT";
                 break;
             default:
                 return CKR_DEVICE_ERROR;
@@ -5115,11 +5084,6 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
             return crv;
         }
 
-        if (fips_request_failure(type_str, "SIGN")){
-            pct_name = type_str;
-            pct_subname = "SIGN";
-            signature[0] ^= 1;
-        }
         /* detect trivial signing transforms */
         if ((signature_length >= pairwise_digest_length) &&
             (PORT_Memcmp(known_digest, signature + (signature_length - pairwise_digest_length), pairwise_digest_length) == 0)) {
@@ -5132,12 +5096,6 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
         if (crv != CKR_OK) {
             PORT_Free(signature);
             return crv;
-        }
-
-        if (fips_request_failure(type_str, "VERIFY")){
-            pct_name = type_str;
-            pct_subname = "VERIFY";
-            signature[0] ^= 1;
         }
 
         crv = NSC_Verify(hSession,
@@ -5196,11 +5154,6 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
                 }
                 mech.pParameter = pubAttribute->attrib.pValue;
                 mech.ulParameterLen = pubAttribute->attrib.ulValueLen;
-                if (fips_request_failure("DH_PKCS_DERIVE", "DERIVE")){
-                    pct_name = "DH_PKCS_DERIVE";
-                    pct_subname = "DERIVE";
-                    mech.ulParameterLen = pubAttribute->attrib.ulValueLen / 2;
-                }
                 break;
             case CKK_EC:
                 mech.mechanism = CKM_ECDH1_DERIVE;
@@ -5215,11 +5168,6 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
                 ecParams.pPublicData = pubAttribute->attrib.pValue;
                 mech.pParameter = &ecParams;
                 mech.ulParameterLen = sizeof(ecParams);
-                if (fips_request_failure("ECDH_DERIVE", "DERIVE")){
-                    pct_name = "ECDH_DERIVE";
-                    pct_subname = "DERIVE";
-                    mech.ulParameterLen = sizeof(ecParams) / 2;
-                }
                 break;
             default:
                 return CKR_DEVICE_ERROR;
@@ -5233,18 +5181,11 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
         /* FIPS requires full validation, but in fipx mode NSC_Derive
          * only does partial validation with approved primes, now handle
          * full validation */
-        FIPSLOG_INFO("BEFORE CKK_DH");
-        if (keyType == CKK_DH)
-            FIPSLOG_INFO("CKK_DH");
-        if (isFIPS)
-            FIPSLOG_INFO("isFIPS");
         if (isFIPS && keyType == CKK_DH) {
             SECItem pubKey;
             SECItem prime;
             SECItem subPrime;
             const SECItem *subPrimePtr = &subPrime;
-
-            FIPSLOG_INFO("CKK_DH");
 
             pubKey.data = pubAttribute->attrib.pValue;
             pubKey.len = pubAttribute->attrib.ulValueLen;
@@ -5269,15 +5210,10 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
             if (!KEA_Verify(&pubKey, &prime, (SECItem *)subPrimePtr)) {
                 crv = CKR_GENERAL_ERROR;
             }
-
-            if (fips_request_failure("DH_PKCS_DERIVE", "DERIVE")){
-                crv = CKR_GENERAL_ERROR;
-            }
         done:
             SECITEM_ZfreeItem(&subPrime, PR_FALSE);
             SECITEM_ZfreeItem(&prime, PR_FALSE);
         }
-        FIPSLOG_INFO("AFTER CKK_DH");
         /* clean up before we return */
         sftk_FreeAttribute(pubAttribute);
         crv2 = NSC_DestroyObject(hSession, newKey);
@@ -5829,8 +5765,6 @@ NSC_GenerateKeyPair(CK_SESSION_HANDLE hSession,
     }
 
     if (crv == CKR_OK) {
-        pct_name = NULL;
-        pct_subname = NULL;
         /* Perform FIPS 140-2 pairwise consistency check. */
         crv = sftk_PairwiseConsistencyCheck(hSession, slot,
                                             publicKey, privateKey, key_type);
@@ -5844,55 +5778,7 @@ NSC_GenerateKeyPair(CK_SESSION_HANDLE hSession,
                             (PRUint32)hSession, (PRUint32)pMechanism->mechanism,
                             (PRUint32)crv);
                 sftk_LogAuditMessage(NSS_AUDIT_ERROR, NSS_AUDIT_SELF_TEST, msg);
-            } else {
-                char msg[128];
-                switch(key_type) {
-                    case CKK_RSA:
-                        PR_snprintf(msg, sizeof msg,
-                            "RSA: self-test: pair-wise consistency test");
-                    break;
-                    case CKK_DSA:
-                        PR_snprintf(msg, sizeof msg,
-                            "DSA: self-test: pair-wise consistency test");
-                    break;
-                    case CKK_EC:
-                        PR_snprintf(msg, sizeof msg,
-                            "ECDSA: self-test: pair-wise consistency test");
-                        FIPSLOG_FAILED(pct_name, pct_subname, "%s", msg);
-                        PR_snprintf(msg, sizeof msg,
-                            "ECDH: self-test: pair-wise consistency test");
-                    break;
-                    case CKK_DH:
-                        PR_snprintf(msg, sizeof msg,
-                            "DH: self-test: pair-wise consistency test");
-                    break;
-                }
-                FIPSLOG_FAILED(pct_name, pct_subname, "%s", msg);
             }
-        } else {
-            char msg[128];
-            switch(key_type) {
-                case CKK_RSA:
-                    PR_snprintf(msg, sizeof msg,
-                        "RSA: self-test: pair-wise consistency test");
-                break;
-                case CKK_DSA:
-                    PR_snprintf(msg, sizeof msg,
-                        "DSA: self-test: pair-wise consistency test");
-                break;
-                case CKK_EC:
-                    PR_snprintf(msg, sizeof msg,
-                        "ECDSA: self-test: pair-wise consistency test");
-                    FIPSLOG_SUCCESS(pct_name, pct_subname, "%s", msg);
-                    PR_snprintf(msg, sizeof msg,
-                        "ECDH: self-test: pair-wise consistency test");
-                break;
-                case CKK_DH:
-                    PR_snprintf(msg, sizeof msg,
-                        "DH: self-test: pair-wise consistency test");
-                break;
-            }
-            FIPSLOG_SUCCESS(pct_name, pct_subname, "%s", msg);
         }
     }
 
@@ -5907,40 +5793,6 @@ NSC_GenerateKeyPair(CK_SESSION_HANDLE hSession,
     privateKey->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_NSS_GENERATE_KEY_PAIR, privateKey);
     publicKey->isFIPS = privateKey->isFIPS;
 
-    {
-    char msg[128];
-    switch(key_type) {
-        case CKK_RSA:
-            PR_snprintf(msg, sizeof msg,
-                "RSA: PCT: FIPS OPERATION");
-        break;
-        case CKK_DSA:
-            PR_snprintf(msg, sizeof msg,
-                "DSA: PCT: FIPS OPERATION");
-        break;
-        case CKK_EC:
-            PR_snprintf(msg, sizeof msg,
-                "ECDSA: PCT: FIPS OPERATION");
-            if (privateKey->isFIPS){
-                FIPSLOG_SUCCESS(pct_name, pct_subname, "%s", msg);
-            } else {
-                   FIPSLOG_FAILED(pct_name, pct_subname, "%s", msg);
-            }
-            PR_snprintf(msg, sizeof msg,
-                "ECDH: PCT: FIPS OPERATION");
-        break;
-        case CKK_DH:
-            PR_snprintf(msg, sizeof msg,
-                "DH: PCT: FIPS OPERATION");
-        break;
-    }
-    if (privateKey->isFIPS){
-           FIPSLOG_SUCCESS(pct_name, pct_subname, "%s", msg);
-    }
-    else {
-           FIPSLOG_FAILED(pct_name, pct_subname, "%s", msg);
-    }
-    }
     *phPrivateKey = privateKey->handle;
     *phPublicKey = publicKey->handle;
     sftk_FreeObject(publicKey);

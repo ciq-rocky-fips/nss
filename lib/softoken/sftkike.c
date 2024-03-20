@@ -1407,18 +1407,12 @@ sftk_fips_IKE_PowerUpSelfTests(void)
     crv = sftk_ike_prf_plus_raw(CK_INVALID_HANDLE, ike_sha256_known_key,
                                 sizeof(ike_sha256_known_key), &ike_params,
                                 &outKeyData, &outKeySize, 64);
-    if (fips_request_failure("IKE","KAT")){
-        outKeyData[0] ^= 1;
-    }
     if ((crv != CKR_OK) ||
         (outKeySize != sizeof(ike_known_sha256_prf_plus)) ||
         (PORT_Memcmp(outKeyData, ike_known_sha256_prf_plus,
                      sizeof(ike_known_sha256_prf_plus)) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
-        FIPSLOG_FAILED("IKE","KAT", "sftk_fips_IKE_PowerUpSelfTests");
         return SECFailure;
-    } else {
-        FIPSLOG_SUCCESS("IKE","KAT", "sftk_fips_IKE_PowerUpSelfTests");
     }
     PORT_ZFree(outKeyData, outKeySize);
     return rv;

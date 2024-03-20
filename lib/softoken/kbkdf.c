@@ -1511,21 +1511,13 @@ sftk_fips_SP800_108_PowerUpSelfTests(void)
             PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
             return SECFailure;
         }
-
-        if (fips_request_failure("KBKDF","KAT")){
-            PORT_ZFree(output_buffer, buffer_length);
-            output_buffer = NULL;
-        }
-
         if ((mac_size != test->expected_mac_size) ||
             (buffer_length != test->ret_key_length) ||
             (output_buffer == NULL) ||
             (PORT_Memcmp(output_buffer, test->expected_key_bytes, buffer_length) != 0)) {
-            FIPSLOG_FAILED("KBKDF", "KAT", "KBKDF selftest");
             PORT_ZFree(output_buffer, buffer_length);
             return SECFailure;
         }
-        FIPSLOG_SUCCESS("KBKDF", "KAT", "KBKDF selftest");
         PORT_ZFree(output_buffer, buffer_length);
     }
     return SECSuccess;
