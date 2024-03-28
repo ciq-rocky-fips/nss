@@ -36,6 +36,7 @@
 #include "pk11func.h"
 #include "secmod.h"
 #include "blapi.h"
+#include "secmodti.h" /* until SEC_OID_TLS_REQUIRE_EMS is upstream */
 
 #include <stdio.h>
 
@@ -3479,6 +3480,29 @@ ssl3_ComputeMasterSecretInt(sslSocket *ss, PK11SymKey *pms,
     /* master_params may be used as a CK_SSL3_MASTER_KEY_DERIVE_PARAMS */
     CK_TLS12_MASTER_KEY_DERIVE_PARAMS master_params;
     unsigned int master_params_len;
+
+    /* if we are using TLS and we aren't using the extended master secret,
+     * and SEC_OID_TLS_REQUIRE_EMS policy is true, fail. The caller will
+     * send and alert (eventually). In the RSA Server case, the alert
+     * won't happen until Finish time because the upper level code
+     * can't tell a difference between this failure and an RSA decrypt
+     * failure, so it will proceed with a faux key */
+    if (isTLS) {
+        PRUint32 policy;
+        SECStatus rv;
+
+        /* first fetch the policy for this algorithm */
+        rv = NSS_GetAlgorithmPolicy(SEC_OID_TLS_REQUIRE_EMS, &policy);
+        /* we only look at the policy if we can fetch it. */
+        if (rv == SECSuccess) {
+            if (policy & NSS_USE_ALG_IN_SSL_KX) {
+                /* just set the error, we don't want to map any errors
+                 * set by NSS_GetAlgorithmPolicy here */
+                PORT_SetError(SSL_ERROR_UNSUPPORTED_VERSION);
+                return SECFailure;
+            }
+        }
+    }
 
     if (isTLS12) {
         if (isDH)

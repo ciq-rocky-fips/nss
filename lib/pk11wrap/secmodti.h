@@ -202,4 +202,10 @@ struct PK11GenericObjectStr {
 /* This mask includes all CK_FLAGs with an equivalent CKA_ attribute. */
 #define CKF_KEY_OPERATION_FLAGS 0x000e7b00UL
 
+/* this oid value could change values if it's added after other new
+ * upstream oids. We protect applications by hiding the define in a private
+ * header file that only NSS sees. Currently it's only available through
+ * the policy code */
+#define SEC_OID_TLS_REQUIRE_EMS SEC_OID_PRIVATE_1
+
 #endif /* _SECMODTI_H_ */

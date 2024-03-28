@@ -1795,6 +1795,11 @@ const static SECOidData oids[SEC_OID_TOTAL] = {
        SEC_OID_EXT_KEY_USAGE_IPSEC_USER,
        "IPsec User",
        CKM_INVALID_MECHANISM, INVALID_CERT_EXTENSION),
+
+    /* this will change upstream. for now apps shouldn't use it */
+    /* we need it for the policy code.  */
+    ODE(SEC_OID_PRIVATE_1,
+        "TLS Require EMS", CKM_INVALID_MECHANISM, INVALID_CERT_EXTENSION),
 };
 
 /* PRIVATE EXTENDED SECOID Table
@@ -2095,6 +2100,8 @@ SECOID_Init(void)
 
     /* turn off NSS_USE_POLICY_IN_SSL by default */
     xOids[SEC_OID_APPLY_SSL_POLICY].notPolicyFlags = NSS_USE_POLICY_IN_SSL;
+    /* turn off TLS REQUIRE EMS by default */
+    xOids[SEC_OID_PRIVATE_1].notPolicyFlags = ~0;
 
     envVal = PR_GetEnvSecure("NSS_HASH_ALG_SUPPORT");
     if (envVal)

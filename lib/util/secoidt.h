@@ -501,6 +501,9 @@ typedef enum {
     SEC_OID_EXT_KEY_USAGE_IPSEC_END = 361,
     SEC_OID_EXT_KEY_USAGE_IPSEC_TUNNEL = 362,
     SEC_OID_EXT_KEY_USAGE_IPSEC_USER = 363,
+    /* this will change upstream. for now apps shouldn't use it */
+    /* give it an obscure name here */
+    SEC_OID_PRIVATE_1 = 372,
 
     SEC_OID_TOTAL
 } SECOidTag;
