@@ -1,3 +1,4 @@
+
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -86,8 +87,15 @@ static const ECMethod kMethods[] = {
         ec_secp384r1_scalar_validate,
         ec_secp384r1_sign_digest,
         ec_secp384r1_verify_digest,
-     }
-
+    },
+    {
+        ECCurve_NIST_P521,
+        ec_secp521r1_pt_mul,
+        ec_secp521r1_pt_validate,
+        ec_secp521r1_scalar_validate,
+        ec_secp521r1_sign_digest,
+        ec_secp521r1_verify_digest,
+    }
 };
 
 static const ECMethod *
