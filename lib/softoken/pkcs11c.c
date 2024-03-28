@@ -5092,7 +5092,7 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
         if ((signature_length >= pairwise_digest_length) &&
             (PORT_Memcmp(known_digest, signature + (signature_length - pairwise_digest_length), pairwise_digest_length) == 0)) {
             PORT_Free(signature);
-            return CKR_DEVICE_ERROR;
+            return CKR_GENERAL_ERROR;
         }
 
         /* Verify the known hash using the public key. */

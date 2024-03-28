@@ -197,7 +197,7 @@ prng_initEntropy(void)
     SHA256_Update(&ctx, block, sizeof(block));
     SHA256_End(&ctx, globalrng->previousEntropyHash, NULL,
                sizeof(globalrng->previousEntropyHash));
-    PORT_Memset(block, 0, sizeof(block));
+    PORT_SafeZero(block, sizeof(block));
     SHA256_DestroyContext(&ctx, PR_FALSE);
     return PR_SUCCESS;
 }
@@ -246,8 +246,8 @@ prng_getEntropy(PRUint8 *buffer, size_t requestLength)
     }
 
 out:
-    PORT_Memset(hash, 0, sizeof hash);
-    PORT_Memset(block, 0, sizeof block);
+    PORT_SafeZero(hash, sizeof hash);
+    PORT_SafeZero(block, sizeof block);
     return rv;
 }
 
@@ -393,8 +393,8 @@ prng_Hashgen(RNGContext *rng, PRUint8 *returned_bytes,
         PRNG_ADD_CARRY_ONLY(data, (sizeof data) - 1, carry);
         SHA256_DestroyContext(&ctx, PR_FALSE);
     }
-    PORT_Memset(data, 0, sizeof data);
-    PORT_Memset(thisHash, 0, sizeof thisHash);
+    PORT_SafeZero(data, sizeof data);
+    PORT_SafeZero(thisHash, sizeof thisHash);
 }
 
 /*
@@ -455,7 +455,7 @@ prng_generateNewBytes(RNGContext *rng,
     PRNG_ADD_CARRY_ONLY(rng->reseed_counter, (sizeof rng->reseed_counter) - 1, carry);
 
     /* if the prng failed, don't return any output, signal softoken */
-    PORT_Memset(H, 0, sizeof H);
+    PORT_SafeZero(H, sizeof H);
     if (!rng->isValid) {
         PORT_Memset(returned_bytes, 0, no_of_returned_bytes);
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
