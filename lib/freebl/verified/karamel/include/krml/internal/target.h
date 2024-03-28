@@ -4,11 +4,13 @@
 #ifndef __KRML_TARGET_H
 #define __KRML_TARGET_H
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdbool.h>
+#include <assert.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "krml/internal/callconv.h"
 
@@ -44,6 +46,23 @@
 
 #ifndef KRML_HOST_FREE
 #define KRML_HOST_FREE free
+#endif
+
+#ifndef KRML_HOST_IGNORE
+#define KRML_HOST_IGNORE(x) (void)(x)
+#endif
+
+#ifndef KRML_NOINLINE
+#if defined(_MSC_VER)
+#define KRML_NOINLINE __declspec(noinline)
+#elif defined(__GNUC__)
+#define KRML_NOINLINE __attribute__((noinline))
+#else
+#define KRML_NOINLINE
+#warning "The KRML_NOINLINE macro is not defined for this toolchain!"
+#warning "The compiler may defeat side-channel resistance with optimizations."
+#warning "Please locate target.h and try to fill it out with a suitable definition for this compiler."
+#endif
 #endif
 
 #ifndef KRML_PRE_ALIGN
@@ -130,7 +149,8 @@ krml_time()
     } while (0)
 
 #if defined(_MSC_VER) && _MSC_VER < 1900
-#define KRML_HOST_SNPRINTF(buf, sz, fmt, arg) _snprintf_s(buf, sz, _TRUNCATE, fmt, arg)
+#define KRML_HOST_SNPRINTF(buf, sz, fmt, arg) \
+    _snprintf_s(buf, sz, _TRUNCATE, fmt, arg)
 #else
 #define KRML_HOST_SNPRINTF(buf, sz, fmt, arg) snprintf(buf, sz, fmt, arg)
 #endif
@@ -149,6 +169,7 @@ krml_time()
     {                       \
         x                   \
             i += n;         \
+        (void)i;            \
     }
 
 #define KRML_LOOP2(i, n, x) \
