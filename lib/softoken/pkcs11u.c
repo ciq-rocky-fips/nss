@@ -2393,18 +2393,41 @@ sftk_getKeyLength(SFTKObject *source)
 }
 
 PRBool
-sftk_CheckFIPSHash(CK_MECHANISM_TYPE hash)
+sftk_checkFIPSHash(CK_MECHANISM_TYPE hash, PRBool allowSmall, PRBool allowCMAC)
 {
     switch (hash) {
+        case CKM_AES_CMAC:
+            return allowCMAC;
+        case CKM_SHA_1:
+        case CKM_SHA_1_HMAC:
+        case CKM_SHA224:
+        case CKM_SHA224_HMAC:
+            return allowSmall;
         case CKM_SHA256:
-        case CKG_MGF1_SHA256:
+        case CKM_SHA256_HMAC:
         case CKM_SHA384:
-        case CKG_MGF1_SHA384:
+        case CKM_SHA384_HMAC:
         case CKM_SHA512:
-        case CKG_MGF1_SHA512:
+        case CKM_SHA512_HMAC:
             return PR_TRUE;
     }
     return PR_FALSE;
+}
+
+PRBool
+sftk_checkKeyLength(CK_ULONG keyLength, CK_ULONG min,
+                    CK_ULONG max, CK_ULONG step)
+{
+     if (keyLength > max) {
+         return PR_FALSE;
+     }
+     if (keyLength < min ) {
+         return PR_FALSE;
+     }
+     if (((keyLength - min) % step) != 0) {
+         return PR_FALSE;
+     }
+     return PR_TRUE;
 }
 
 /*
@@ -2416,6 +2439,8 @@ sftk_handleSpecial(SFTKSlot *slot, CK_MECHANISM *mech,
                    SFTKFIPSAlgorithmList *mechInfo, SFTKObject *source,
                    CK_ULONG keyLength, CK_ULONG targetKeyLength)
 {
+    PRBool allowSmall = PR_FALSE;
+    PRBool allowCMAC = PR_FALSE;
     switch (mechInfo->special) {
         case SFTKFIPSDH: {
             SECItem dhPrime;
@@ -2482,7 +2507,11 @@ sftk_handleSpecial(SFTKSlot *slot, CK_MECHANISM *mech,
             if (pss->sLen > hashObj->length) {
                 return PR_FALSE;
             }
-            return sftk_CheckFIPSHash(pss->hashAlg);
+            /* Our code makes sure pss->hashAlg matches the explicit
+             * hash in the mechanism, and only mechanisms with approved
+             * hashes are included, so no need to check pss->hashAlg
+             * here */
+            return PR_TRUE;
         }
         case SFTKFIPSPBKDF2: {
             /* PBKDF2 must have the following addition restrictions
@@ -2508,12 +2537,28 @@ sftk_handleSpecial(SFTKSlot *slot, CK_MECHANISM *mech,
              return PR_TRUE;
         }
         /* check the hash mechanisms to make sure they themselves are FIPS */
+        case SFTKFIPSChkHashSp800:
+             allowCMAC = PR_TRUE;
         case SFTKFIPSChkHash:
+             allowSmall = PR_TRUE;
+        case SFTKFIPSChkHashTls:
             if (mech->ulParameterLen < mechInfo->offset +sizeof(CK_ULONG)) {
                 return PR_FALSE;
             }
-            return sftk_CheckFIPSHash(*(CK_ULONG *)(((char *)mech->pParameter)
-                        + mechInfo->offset));
+            return sftk_checkFIPSHash(*(CK_ULONG *)(((char *)mech->pParameter)
+                        + mechInfo->offset), allowSmall, allowCMAC);
+        case SFTKFIPSTlsKeyCheck:
+            if (mech->mechanism != CKM_NSS_TLS_KEY_AND_MAC_DERIVE_SHA256) {
+                /* unless the mechnism has a built-in hash, check the hash */
+                if (mech->ulParameterLen < mechInfo->offset +sizeof(CK_ULONG)) {
+                    return PR_FALSE;
+                }
+                if (!sftk_checkFIPSHash(*(CK_ULONG *)(((char *)mech->pParameter)
+                        + mechInfo->offset), PR_FALSE, PR_FALSE)) {
+                    return PR_FALSE;
+                }
+            }
+            return sftk_checkKeyLength(targetKeyLength, 112, 512, 1);
         default:
             break;
     }
@@ -2558,13 +2603,11 @@ sftk_operationIsFIPS(SFTKSlot *slot, CK_MECHANISM *mech, CK_ATTRIBUTE_TYPE op,
          * approved algorithm in the approved mode with an approved key */
         if ((mech->mechanism == mechs->type) &&
             (opFlags == (mechs->info.flags & opFlags)) &&
-            (keyLength <= mechs->info.ulMaxKeySize) &&
-            (keyLength >= mechs->info.ulMinKeySize) &&
-            (((keyLength - mechs->info.ulMinKeySize) % mechs->step) == 0) &&
-            ((targetKeyLength == 0) ||
-             ((targetKeyLength <= mechs->info.ulMaxKeySize) &&
-             (targetKeyLength >= mechs->info.ulMinKeySize) &&
-             ((targetKeyLength - mechs->info.ulMinKeySize) % mechs->step) == 0)) &&
+            sftk_checkKeyLength(keyLength, mechs->info.ulMinKeySize,
+                                mechs->info.ulMaxKeySize, mechs->step) &&
+            ((targetKeyLength == 0) ||  (mechs->special == SFTKFIPSTlsKeyCheck)
+             || sftk_checkKeyLength(targetKeyLength, mechs->info.ulMinKeySize,
+                                mechs->info.ulMaxKeySize, mechs->step)) &&
             ((mechs->special == SFTKFIPSNone) ||
              sftk_handleSpecial(slot, mech, mechs, source, keyLength, targetKeyLength))) {
             return PR_TRUE;

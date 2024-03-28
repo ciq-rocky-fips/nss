@@ -7090,7 +7090,7 @@ sftk_HKDF(CK_HKDF_PARAMS_PTR params, CK_SESSION_HANDLE hSession,
                     mech.ulParameterLen = sizeof(*params);
                     key->isFIPS = sftk_operationIsFIPS(saltKey->slot, &mech,
                                                        CKA_DERIVE, saltKey,
-                                                       keySize);
+                                                       keySize*PR_BITS_PER_BYTE);
                 }
                 saltKeySource = saltKey->source;
                 saltKey_att = sftk_FindAttribute(saltKey, CKA_VALUE);
@@ -7404,7 +7404,7 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
         }
     }
     key->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_DERIVE, sourceKey,
-                                       keySize);
+                                       keySize*PR_BITS_PER_BYTE);
 
     switch (mechanism) {
         /* get a public key from a private key. nsslowkey_ConvertToPublickey()
