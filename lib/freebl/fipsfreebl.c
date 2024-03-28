@@ -12,7 +12,7 @@
 #endif
 
 #include "blapi.h"
-#include "seccomon.h" /* Required for RSA and DSA. */
+#include "seccomon.h" /* Required for RSA. */
 #include "secerr.h"
 #include "prtypes.h"
 #include "secitem.h"
@@ -20,6 +20,9 @@
 #include "cmac.h"
 
 #include "ec.h" /* Required for EC */
+
+#include "softoknt.h"
+#include "softoken.h"
 
 /*
  * different platforms have different ways of calling and initial entry point
@@ -184,7 +187,10 @@ freebl_fips_DES3_PowerUpSelfTest(void)
         (PORT_Memcmp(des3_computed_ciphertext, des3_ecb_known_ciphertext,
                      FIPS_DES3_ENCRYPT_LENGTH) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED(NULL, NULL, "DES3-ECB Single-Round Known Answer Encryption Test");
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS(NULL, NULL, "DES3-ECB Single-Round Known Answer Encryption Test");
     }
 
     /*******************************************************/
@@ -211,7 +217,10 @@ freebl_fips_DES3_PowerUpSelfTest(void)
         (PORT_Memcmp(des3_computed_plaintext, des3_ecb_known_plaintext,
                      FIPS_DES3_DECRYPT_LENGTH) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED(NULL, NULL, "DES3-ECB Single-Round Known Answer Decryption Test");
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS(NULL, NULL, "DES3-ECB Single-Round Known Answer Decryption Test");
     }
 
     /*******************************************************/
@@ -239,7 +248,10 @@ freebl_fips_DES3_PowerUpSelfTest(void)
         (PORT_Memcmp(des3_computed_ciphertext, des3_cbc_known_ciphertext,
                      FIPS_DES3_ENCRYPT_LENGTH) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED(NULL, NULL, "DES3-CBC Single-Round Known Answer Encryption Test");
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS(NULL, NULL, "DES3-CBC Single-Round Known Answer Encryption Test");
     }
 
     /*******************************************************/
@@ -267,7 +279,10 @@ freebl_fips_DES3_PowerUpSelfTest(void)
         (PORT_Memcmp(des3_computed_plaintext, des3_cbc_known_plaintext,
                      FIPS_DES3_DECRYPT_LENGTH) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED(NULL, NULL, "DES3-CBC Single-Round Known Answer Decryption Test");
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS(NULL, NULL, "DES3-CBC Single-Round Known Answer Decryption Test");
     }
 
     return (SECSuccess);
@@ -408,12 +423,19 @@ freebl_fips_AES_PowerUpSelfTest(int aes_key_size)
 
     AES_DestroyContext(aes_context, PR_TRUE);
 
+    if (fips_request_failure_num("AES-ECB-ENCRYPT",aes_key_size *8)){
+        aes_computed_ciphertext[0] ^= 1;
+    }
+
     if ((aes_status != SECSuccess) ||
         (aes_bytes_encrypted != FIPS_AES_ENCRYPT_LENGTH) ||
         (PORT_Memcmp(aes_computed_ciphertext, aes_ecb_known_ciphertext,
                      FIPS_AES_ENCRYPT_LENGTH) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED_num("AES-ECB-ENCRYPT",aes_key_size *8, "AES-ECB %d Single-Round Known Answer Encryption Test", aes_key_size *8);
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS_num("AES-ECB-ENCRYPT",aes_key_size *8, "AES-ECB %d Single-Round Known Answer Encryption Test", aes_key_size *8);
     }
 
     /******************************************************/
@@ -435,12 +457,18 @@ freebl_fips_AES_PowerUpSelfTest(int aes_key_size)
 
     AES_DestroyContext(aes_context, PR_TRUE);
 
+    if (fips_request_failure_num("AES-ECB-DECRYPT",aes_key_size *8)){
+        aes_computed_plaintext[0] ^= 1;
+    }
     if ((aes_status != SECSuccess) ||
         (aes_bytes_decrypted != FIPS_AES_DECRYPT_LENGTH) ||
         (PORT_Memcmp(aes_computed_plaintext, aes_known_plaintext,
                      FIPS_AES_DECRYPT_LENGTH) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED_num("AES-ECB-DECRYPT",aes_key_size *8, "AES-ECB %d Single-Round Known Answer Decryption Test", aes_key_size *8);
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS_num("AES-ECB-DECRYPT",aes_key_size *8, "AES-ECB %d Single-Round Known Answer Decryption Test", aes_key_size *8);
     }
 
     /******************************************************/
@@ -463,13 +491,18 @@ freebl_fips_AES_PowerUpSelfTest(int aes_key_size)
                              FIPS_AES_DECRYPT_LENGTH);
 
     AES_DestroyContext(aes_context, PR_TRUE);
-
+    if (fips_request_failure_num("AES-CBC-ENCRYPT",aes_key_size *8)){
+        aes_computed_ciphertext[0] ^= 1;
+    }
     if ((aes_status != SECSuccess) ||
         (aes_bytes_encrypted != FIPS_AES_ENCRYPT_LENGTH) ||
         (PORT_Memcmp(aes_computed_ciphertext, aes_cbc_known_ciphertext,
                      FIPS_AES_ENCRYPT_LENGTH) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED_num("AES-CBC-ENCRYPT",aes_key_size *8, "AES-CBC %d Single-Round Known Answer Encryption Test", aes_key_size *8);
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS_num("AES-CBC-ENCRYPT",aes_key_size *8, "AES-CBC %d Single-Round Known Answer Encryption Test", aes_key_size *8);
     }
 
     /******************************************************/
@@ -492,13 +525,20 @@ freebl_fips_AES_PowerUpSelfTest(int aes_key_size)
                              FIPS_AES_ENCRYPT_LENGTH);
 
     AES_DestroyContext(aes_context, PR_TRUE);
-
+    FIPSLOG_INFO("CHECK AES-CBC-DECRYPT.%d",aes_key_size *8);
+    if (fips_request_failure_num("AES-CBC-DECRYPT",aes_key_size *8)){
+        FIPSLOG_INFO("EXPECTED_FAILURE AES-CBC-DECRYPT.%d",aes_key_size *8);
+        aes_computed_plaintext[0] ^= 1;
+    }
     if ((aes_status != SECSuccess) ||
         (aes_bytes_decrypted != FIPS_AES_DECRYPT_LENGTH) ||
         (PORT_Memcmp(aes_computed_plaintext, aes_known_plaintext,
                      FIPS_AES_DECRYPT_LENGTH) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED_num("AES-CBC-DECRYPT",aes_key_size *8, "AES-CBC %d Single-Round Known Answer Decryption Test",  aes_key_size *8);
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS_num("AES-CBC-DECRYPT",aes_key_size *8, "AES-CBC %d Single-Round Known Answer Decryption Test", aes_key_size *8);
     }
 
     /******************************************************/
@@ -526,13 +566,18 @@ freebl_fips_AES_PowerUpSelfTest(int aes_key_size)
                              FIPS_AES_DECRYPT_LENGTH);
 
     AES_DestroyContext(aes_context, PR_TRUE);
-
+    if (fips_request_failure_num("AES-GCM-ENCRYPT",aes_key_size *8)){
+        aes_computed_ciphertext[0] ^= 1;
+    }
     if ((aes_status != SECSuccess) ||
         (aes_bytes_encrypted != FIPS_AES_ENCRYPT_LENGTH * 2) ||
         (PORT_Memcmp(aes_computed_ciphertext, aes_gcm_known_ciphertext,
                      FIPS_AES_ENCRYPT_LENGTH * 2) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED_num("AES-GCM-ENCRYPT",aes_key_size *8, "AES-GCM %d Single-Round Known Answer Encryption Test", aes_key_size *8);
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS_num("AES-GCM-ENCRYPT",aes_key_size *8, "AES-GCM %d Single-Round Known Answer Encryption Test", aes_key_size *8);
     }
 
     /******************************************************/
@@ -555,13 +600,18 @@ freebl_fips_AES_PowerUpSelfTest(int aes_key_size)
                              FIPS_AES_ENCRYPT_LENGTH * 2);
 
     AES_DestroyContext(aes_context, PR_TRUE);
-
+    if (fips_request_failure_num("AES-GCM-DECRYPT",aes_key_size *8)){
+        aes_computed_plaintext[0] ^= 1;
+    }
     if ((aes_status != SECSuccess) ||
         (aes_bytes_decrypted != FIPS_AES_DECRYPT_LENGTH) ||
         (PORT_Memcmp(aes_computed_plaintext, aes_known_plaintext,
                      FIPS_AES_DECRYPT_LENGTH) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED_num("AES-GCM-DECRYPT",aes_key_size *8, "AES-GCM %d Single-Round Known Answer Decryption Test", aes_key_size *8);
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS_num("AES-GCM-DECRYPT",aes_key_size *8, "AES-GCM %d Single-Round Known Answer Decryption Test", aes_key_size *8);
     }
 
     /******************************************************/
@@ -591,15 +641,28 @@ freebl_fips_AES_PowerUpSelfTest(int aes_key_size)
 
     aes_status = CMAC_Finish(cmac_context, aes_computed_ciphertext,
                              &aes_bytes_encrypted, FIPS_AES_CMAC_LENGTH);
+    if (fips_request_failure_num("AES-CMAC-GEN",aes_key_size *8)){
+        aes_status = SECFailure;
+    }
+    if (aes_status != SECSuccess) {
+        FIPSLOG_FAILED_num("AES-CMAC-GEN",aes_key_size *8, "AES-CMAC %d Known Answer generate Test", aes_key_size *8);
+    } else {
+        FIPSLOG_SUCCESS_num("AES-CMAC-GEN",aes_key_size *8, "AES-CMAC %d Known Answer generate Test", aes_key_size *8);
+    }
 
     CMAC_Destroy(cmac_context, PR_TRUE);
-
+    if (fips_request_failure_num("AES-CMAC-VERIFY",aes_key_size *8)){
+        aes_computed_ciphertext[0] ^= 1;
+    }
     if ((aes_status != SECSuccess) ||
         (aes_bytes_encrypted != FIPS_AES_CMAC_LENGTH) ||
         (PORT_Memcmp(aes_computed_ciphertext, aes_cmac_known_ciphertext,
                      FIPS_AES_CMAC_LENGTH) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED_num("AES-CMAC-VERIFY",aes_key_size *8, "AES-CMAC %d Known Answer verify Test", aes_key_size *8);
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS_num("AES-CMAC-VERIFY",aes_key_size *8, "AES-CMAC %d Known Answer verify Test", aes_key_size *8);
     }
 
     return (SECSuccess);
@@ -715,12 +778,17 @@ freebl_fips_HMAC_PowerUpSelfTest(void)
                                    known_hash_message,
                                    FIPS_KNOWN_HASH_MESSAGE_LENGTH,
                                    HASH_AlgSHA1);
-
+    if (fips_request_failure("HMAC","SHA-1")){
+        hmac_computed[0] ^= 1;
+    }
     if ((hmac_status != SECSuccess) ||
         (PORT_Memcmp(hmac_computed, known_SHA1_hmac,
                      SHA1_LENGTH) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("HMAC","SHA-1", "HMAC SHA-1 Single-Round Known Answer HMAC Test");
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS("HMAC","SHA-1", "HMAC SHA-1 Single-Round Known Answer HMAC Test");
     }
 
     /***************************************************/
@@ -733,12 +801,17 @@ freebl_fips_HMAC_PowerUpSelfTest(void)
                                    known_hash_message,
                                    FIPS_KNOWN_HASH_MESSAGE_LENGTH,
                                    HASH_AlgSHA224);
-
+    if (fips_request_failure("HMAC","SHA-224")){
+        hmac_computed[0] ^= 1;
+    }
     if ((hmac_status != SECSuccess) ||
         (PORT_Memcmp(hmac_computed, known_SHA224_hmac,
                      SHA224_LENGTH) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("HMAC","SHA-224", "HMAC SHA-224 Single-Round Known Answer Test");
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS("HMAC","SHA-224", "HMAC SHA-224 Single-Round Known Answer Test");
     }
 
     /***************************************************/
@@ -751,12 +824,17 @@ freebl_fips_HMAC_PowerUpSelfTest(void)
                                    known_hash_message,
                                    FIPS_KNOWN_HASH_MESSAGE_LENGTH,
                                    HASH_AlgSHA256);
-
+    if (fips_request_failure("HMAC","SHA-256")){
+        hmac_computed[0] ^= 1;
+    }
     if ((hmac_status != SECSuccess) ||
         (PORT_Memcmp(hmac_computed, known_SHA256_hmac,
                      SHA256_LENGTH) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("HMAC","SHA-256", "HMAC SHA-256 Single-Round Known Answer Test");
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS("HMAC","SHA-256", "HMAC SHA-256 Single-Round Known Answer Test");
     }
 
     /***************************************************/
@@ -769,12 +847,17 @@ freebl_fips_HMAC_PowerUpSelfTest(void)
                                    known_hash_message,
                                    FIPS_KNOWN_HASH_MESSAGE_LENGTH,
                                    HASH_AlgSHA384);
-
+    if (fips_request_failure("HMAC","SHA-384")){
+        hmac_computed[0] ^= 1;
+    }
     if ((hmac_status != SECSuccess) ||
         (PORT_Memcmp(hmac_computed, known_SHA384_hmac,
                      SHA384_LENGTH) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("HMAC","SHA-384", "HMAC SHA-384 Single-Round Known Answer Test");
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS("HMAC","SHA-384", "HMAC SHA-384 Single-Round Known Answer Test");
     }
 
     /***************************************************/
@@ -787,12 +870,17 @@ freebl_fips_HMAC_PowerUpSelfTest(void)
                                    known_hash_message,
                                    FIPS_KNOWN_HASH_MESSAGE_LENGTH,
                                    HASH_AlgSHA512);
-
+    if (fips_request_failure("HMAC","SHA-512")){
+        hmac_computed[0] ^= 1;
+    }
     if ((hmac_status != SECSuccess) ||
         (PORT_Memcmp(hmac_computed, known_SHA512_hmac,
                      SHA512_LENGTH) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("HMAC","SHA-512", "HMAC SHA-512 Single-Round Known Answer Test");
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS("HMAC","SHA-512", "HMAC SHA-512 Single-Round Known Answer Test");
     }
 
     return (SECSuccess);
@@ -888,13 +976,18 @@ freebl_fips_TLS_PowerUpSelfTest(void)
     /***************************************************/
 
     status = TLS_PRF(&secret, tls_label, &seed, &result, PR_TRUE);
-
+    if (fips_request_failure("TLS_PRF","1.0")){
+        tls_computed[0] ^= 1;
+    }
     if ((status != SECSuccess) ||
         (result.len != HASH_LENGTH_MAX) ||
         (PORT_Memcmp(tls_computed, known_TLS_PRF,
                      HASH_LENGTH_MAX) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("TLS_PRF","1.0", "TLS 1.0 PRF Known Answer Test");
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS("TLS_PRF","1.0", "TLS 1.0 PRF Known Answer Test");
     }
 
     /***************************************************/
@@ -903,13 +996,18 @@ freebl_fips_TLS_PowerUpSelfTest(void)
 
     status = TLS_P_hash(HASH_AlgSHA256, &secret, tls_label,
                         &seed, &result, PR_TRUE);
-
+    if (fips_request_failure("TLS_12","SHA256")){
+        tls_computed[0] ^= 1;
+    }
     if ((status != SECSuccess) ||
         (result.len != HASH_LENGTH_MAX) ||
         (PORT_Memcmp(tls_computed, known_TLS_SHA256,
                      HASH_LENGTH_MAX) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("TLS_12","SHA256", "TLS 1.2 SHA-256 Known Answer Test");
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS("TLS_12","SHA256", "TLS 1.2 SHA-256 Known Answer Test");
     }
 
 #ifdef NSS_FULL_POST
@@ -919,13 +1017,18 @@ freebl_fips_TLS_PowerUpSelfTest(void)
 
     status = TLS_P_hash(HASH_AlgSHA224, &secret, tls_label,
                         &seed, &result, PR_TRUE);
-
+    if (fips_request_failure("TLS_12","SHA224")){
+        tls_computed[0] ^= 1;
+    }
     if ((status != SECSuccess) ||
         (result.len != HASH_LENGTH_MAX) ||
         (PORT_Memcmp(tls_computed, known_TLS_SHA224,
                      HASH_LENGTH_MAX) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("TLS_12","SHA224", "TLS 1.2 SHA-224 Known Answer Test");
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS("TLS_12","SHA224", "TLS 1.2 SHA-224 Known Answer Test");
     }
 
     /***************************************************/
@@ -934,13 +1037,18 @@ freebl_fips_TLS_PowerUpSelfTest(void)
 
     status = TLS_P_hash(HASH_AlgSHA384, &secret, tls_label,
                         &seed, &result, PR_TRUE);
-
+    if (fips_request_failure("TLS_12","SHA384")){
+        tls_computed[0] ^= 1;
+    }
     if ((status != SECSuccess) ||
         (result.len != HASH_LENGTH_MAX) ||
         (PORT_Memcmp(tls_computed, known_TLS_SHA384,
                      HASH_LENGTH_MAX) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("TLS_12","SHA384", "TLS 1.2 SHA-384 Known Answer Test");
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS("TLS_12","SHA384", "TLS 1.2 SHA-384 Known Answer Test");
     }
 
     /***************************************************/
@@ -949,13 +1057,18 @@ freebl_fips_TLS_PowerUpSelfTest(void)
 
     status = TLS_P_hash(HASH_AlgSHA512, &secret, tls_label,
                         &seed, &result, PR_TRUE);
-
+    if (fips_request_failure("TLS_12","SHA512")){
+        tls_computed[0] ^= 1;
+    }
     if ((status != SECSuccess) ||
         (result.len != HASH_LENGTH_MAX) ||
         (PORT_Memcmp(tls_computed, known_TLS_SHA512,
                      HASH_LENGTH_MAX) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("TLS_12","SHA512", "TLS 1.2 SHA-512 Known Answer Test");
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS("TLS_12","SHA512", "TLS 1.2 SHA-512 Known Answer Test");
     }
 #endif
 
@@ -1020,12 +1133,18 @@ freebl_fips_SHA_PowerUpSelfTest(void)
 
     sha_status = SHA1_HashBuf(sha_computed_digest, known_hash_message,
                               FIPS_KNOWN_HASH_MESSAGE_LENGTH);
+    if (fips_request_failure("SHA","1")){
+        sha_computed_digest[0] ^= 1;
+    }
 
     if ((sha_status != SECSuccess) ||
         (PORT_Memcmp(sha_computed_digest, sha1_known_digest,
                      SHA1_LENGTH) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("SHA","1", "SHA-1 Single-Round Known Answer Hashing Test");
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS("SHA","1", "SHA-1 Single-Round Known Answer Hashing Test");
     }
 
     /***************************************************/
@@ -1034,12 +1153,17 @@ freebl_fips_SHA_PowerUpSelfTest(void)
 
     sha_status = SHA224_HashBuf(sha_computed_digest, known_hash_message,
                                 FIPS_KNOWN_HASH_MESSAGE_LENGTH);
-
+    if (fips_request_failure("SHA","224")){
+        sha_computed_digest[0] ^= 1;
+    }
     if ((sha_status != SECSuccess) ||
         (PORT_Memcmp(sha_computed_digest, sha224_known_digest,
                      SHA224_LENGTH) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("SHA","224", "SHA-224 Single-Round Known Answer Hashing Test");
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS("SHA","224", "SHA-224 Single-Round Known Answer Hashing Test");
     }
 
     /***************************************************/
@@ -1048,12 +1172,17 @@ freebl_fips_SHA_PowerUpSelfTest(void)
 
     sha_status = SHA256_HashBuf(sha_computed_digest, known_hash_message,
                                 FIPS_KNOWN_HASH_MESSAGE_LENGTH);
-
+    if (fips_request_failure("SHA","265")){
+        sha_computed_digest[0] ^= 1;
+    }
     if ((sha_status != SECSuccess) ||
         (PORT_Memcmp(sha_computed_digest, sha256_known_digest,
                      SHA256_LENGTH) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("SHA","265", "SHA-256 Single-Round Known Answer Hashing Test");
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS("SHA","265", "SHA-256 Single-Round Known Answer Hashing Test");
     }
 
     /***************************************************/
@@ -1062,12 +1191,17 @@ freebl_fips_SHA_PowerUpSelfTest(void)
 
     sha_status = SHA384_HashBuf(sha_computed_digest, known_hash_message,
                                 FIPS_KNOWN_HASH_MESSAGE_LENGTH);
-
+    if (fips_request_failure("SHA","384")){
+        sha_computed_digest[0] ^= 1;
+    }
     if ((sha_status != SECSuccess) ||
         (PORT_Memcmp(sha_computed_digest, sha384_known_digest,
                      SHA384_LENGTH) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("SHA","384", "SHA-384 Single-Round Known Answer Hashing Test");
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS("SHA","384", "SHA-384 Single-Round Known Answer Hashing Test");
     }
 
     /***************************************************/
@@ -1076,12 +1210,17 @@ freebl_fips_SHA_PowerUpSelfTest(void)
 
     sha_status = SHA512_HashBuf(sha_computed_digest, known_hash_message,
                                 FIPS_KNOWN_HASH_MESSAGE_LENGTH);
-
+    if (fips_request_failure("SHA","512")){
+        sha_computed_digest[0] ^= 1;
+    }
     if ((sha_status != SECSuccess) ||
         (PORT_Memcmp(sha_computed_digest, sha512_known_digest,
                      SHA512_LENGTH) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("SHA","512", "SHA-512 Single-Round Known Answer Hashing Test");
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS("SHA","512", "SHA-512 Single-Round Known Answer Hashing Test");
     }
 
     return (SECSuccess);
@@ -1359,11 +1498,17 @@ freebl_fips_RSA_PowerUpSelfTest(void)
     rsa_status = RSA_PublicKeyOp(&rsa_public_key,
                                  rsa_computed_ciphertext,
                                  rsa_known_plaintext_msg);
-
+    if (fips_request_failure("RSA-ENCRYPT","2048")){
+        rsa_computed_ciphertext[0] ^= 1;
+    }
     if ((rsa_status != SECSuccess) ||
         (PORT_Memcmp(rsa_computed_ciphertext, rsa_known_ciphertext,
-                     FIPS_RSA_ENCRYPT_LENGTH) != 0))
+                     FIPS_RSA_ENCRYPT_LENGTH) != 0)) {
+        FIPSLOG_FAILED("RSA-ENCRYPT","2048", "RSA 2048 Single-Round Known Answer Encryption Test");
         goto rsa_loser;
+    } else {
+        FIPSLOG_SUCCESS("RSA-ENCRYPT","2048", "RSA 2048 Single-Round Known Answer Encryption Test");
+    }
 
     /**************************************************/
     /* RSA Single-Round Known Answer Decryption Test. */
@@ -1373,11 +1518,17 @@ freebl_fips_RSA_PowerUpSelfTest(void)
     rsa_status = RSA_PrivateKeyOp(&rsa_private_key,
                                   rsa_computed_plaintext,
                                   rsa_known_ciphertext);
-
+    if (fips_request_failure("RSA-DECRYPT","2048")){
+        rsa_computed_plaintext[0] ^= 1;
+    }
     if ((rsa_status != SECSuccess) ||
         (PORT_Memcmp(rsa_computed_plaintext, rsa_known_plaintext_msg,
-                     FIPS_RSA_DECRYPT_LENGTH) != 0))
+                     FIPS_RSA_DECRYPT_LENGTH) != 0)) {
+        FIPSLOG_FAILED("RSA-DECRYPT","2048", "RSA 2048 Single-Round Known Answer Decryption Test");
         goto rsa_loser;
+    } else {
+        FIPSLOG_SUCCESS("RSA-DECRYPT","2048", "RSA 2048 sSingle-Round Known Answer Decryption Test");
+    }
 
     return (SECSuccess);
 
@@ -1393,7 +1544,7 @@ freebl_fips_ECDSA_Test(ECParams *ecparams,
                        unsigned int knownSignatureLen)
 {
 
-    /* ECDSA Known Seed info for curves nistp256 and nistk283  */
+    /* ECDSA Known Seed info for curves nistp256 */
     static const PRUint8 ecdsa_Known_Seed[] = {
         0x6a, 0x9b, 0xf6, 0xf7, 0xce, 0xed, 0x79, 0x11,
         0xf0, 0xc7, 0xc8, 0x9a, 0xa5, 0xd1, 0x57, 0xb1,
@@ -1465,12 +1616,17 @@ freebl_fips_ECDSA_Test(ECParams *ecparams,
     if (ecdsaStatus != SECSuccess) {
         goto loser;
     }
-
+    if (fips_request_failure("ECDSA","SIG")){
+        signature.data[0] ^= 1;
+    }
     if ((signature.len != knownSignatureLen) ||
         (PORT_Memcmp(signature.data, knownSignature,
                      knownSignatureLen) != 0)) {
         ecdsaStatus = SECFailure;
+        FIPSLOG_FAILED("ECDSA","SIG", "ECDSA %d Single-Round Known Answer Signature Test nistp256, sha256", knownSignatureLen);
         goto loser;
+    } else {
+        FIPSLOG_SUCCESS("ECDSA","SIG", "ECDSA %d Single-Round Known Answer Signature Test nistp256, sha256", knownSignatureLen);
     }
 
     /******************************************************/
@@ -1479,6 +1635,9 @@ freebl_fips_ECDSA_Test(ECParams *ecparams,
 
     /* Perform ECDSA verification process. */
     ecdsaStatus = ECDSA_VerifyDigest(&ecdsa_public_key, &signature, &digest);
+    if (fips_request_failure("ECDSA","VERIFY")){
+        ecdsaStatus = SECFailure;
+    }
 
 loser:
     /* free the memory for the private key arena*/
@@ -1486,7 +1645,10 @@ loser:
 
     if (ecdsaStatus != SECSuccess) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("ECDSA","VERIFY", "ECDSA %d Single-Round Known Answer Verification Test nistp256 sha256", knownSignatureLen);
         return (SECFailure);
+    } else {
+        FIPSLOG_SUCCESS("ECDSA","VERIFY", "ECDSA %d Single-Round Known Answer Verification Test nistp256 sha256", knownSignatureLen);
     }
     return (SECSuccess);
 }
@@ -1546,10 +1708,16 @@ freebl_fips_ECDH_Test(ECParams *ecparams)
         goto loser;
     }
 
+    if (fips_request_failure("ECDH","P-256")){
+        computed_hash_result[0] ^= 1;
+    }
     if (PORT_Memcmp(computed_hash_result, ecdh_known_hash_result,
                     sizeof(ecdh_known_hash_result)) != 0) {
         ecdhStatus = SECFailure;
+        FIPSLOG_FAILED("ECDH","P-256", "ECDH Known Answer Verification Test p-256");
         goto loser;
+    } else {
+        FIPSLOG_SUCCESS("ECDH","P-256", "ECDH Known Answer Verification Test p-256");
     }
 
 loser:
@@ -1776,11 +1944,16 @@ freebl_fips_DH_PowerUpSelfTest(void)
     if (dhStatus != SECSuccess) {
         goto loser;
     }
-
+    if (fips_request_failure("DH","COMPUT")){
+        computed_hash_result[0] ^= 1;
+    }
     if (PORT_Memcmp(computed_hash_result, dh_known_hash_result,
                     sizeof(dh_known_hash_result)) != 0) {
         dhStatus = SECFailure;
+        FIPSLOG_FAILED("DH","COMPUT", "fips_DH_PowerUpSelfTest");
         goto loser;
+    } else {
+        FIPSLOG_SUCCESS("DH","COMPUT", "fips_DH_PowerUpSelfTest");
     }
 
 loser:
@@ -1806,7 +1979,10 @@ freebl_fips_RNG_PowerUpSelfTest(void)
     rng_status = PRNGTEST_RunHealthTests();
     if (rng_status != SECSuccess) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        FIPSLOG_FAILED("PRNGTEST_RunHealthTests", NULL, "SP 800-90 Health tests");
         return SECFailure;
+    } else {
+        FIPSLOG_SUCCESS("PRNGTEST_RunHealthTests", NULL, "SP 800-90 Health tests");
     }
 
     return (SECSuccess);
@@ -1819,7 +1995,10 @@ freebl_fipsSoftwareIntegrityTest(const char *libname)
 
     /* make sure that our check file signatures are OK */
     if (!BLAPI_VerifySelf(libname)) {
+        FIPSLOG_FAILED(NULL, NULL, "fipsSoftwareIntegrityTest");
         rv = SECFailure;
+    } else {
+        FIPSLOG_SUCCESS(NULL, NULL, "fipsSoftwareIntegrityTest");
     }
     return rv;
 }
@@ -1966,6 +2145,67 @@ BL_POSTRan(PRBool freebl_only)
 
 #include "blname.c"
 
+/*   ** Function return value meaning
+ * -1 cannot open source file
+ * -2 cannot open destination file
+ * 0 Success
+ */
+static int File_Copy (const char FileSource [], const char FileDestination [])
+{
+    int   c;
+    FILE *stream_R;
+    FILE *stream_W;
+
+    stream_R = fopen (FileSource, "r");
+    if (stream_R == NULL)
+        return -1;
+    stream_W = fopen (FileDestination, "w");   //create and write to file
+    if (stream_W == NULL)
+     {
+        fclose (stream_R);
+        return -2;
+     }
+    while ((c = fgetc(stream_R)) != EOF)
+        fputc (c, stream_W);
+    fclose (stream_R);
+    fclose (stream_W);
+
+    return 0;
+}
+
+static int inject_bad_char (const char FileSource [])
+{
+    FILE * pFile;
+    char c = 0x90;
+
+    pFile = fopen(FileSource, "w+");
+
+    if (pFile != NULL) {
+        fseek(pFile, 0, SEEK_END);
+        fputc(c, pFile);
+        fclose(pFile);
+    }
+
+    return 0;
+}
+
+static int corrupt_bin()
+{
+    const char *path = getenv("INTEG_libfreeblpriv3");
+
+    rename(path, ".ssl.bck");
+    File_Copy(".ssl.bck", path);
+    inject_bad_char(path);
+
+    return 0;
+}
+
+static void restore_bin()
+{
+    const char *path = getenv("INTEG_libfreeblpriv3");
+    rename(".ssl.bck", path);
+}
+
 /*
  * This function is called at dll load time, the code tha makes this
  * happen is platform specific on defined above.
@@ -1976,6 +2216,9 @@ bl_startup_tests(void)
     const char *libraryName;
     PRBool freebl_only = PR_FALSE;
     SECStatus rv;
+    int corrupt = 0;
+
+    FIPSLOG_INFO("BL POST_START");
 
     PORT_Assert(self_tests_freebl_ran == PR_FALSE);
     PORT_Assert(self_tests_success == PR_FALSE);
@@ -1997,17 +2240,30 @@ bl_startup_tests(void)
         BL_Init();                /* needs to be called before RSA can be used */
         RNG_RNGInit();
     }
-
+    FIPSLOG_INFO("BL POST_START");
     /* always run the post tests */
     rv = freebl_fipsPowerUpSelfTest(freebl_only ? DO_FREEBL : DO_FREEBL | DO_REST);
     if (rv != SECSuccess) {
+        FIPSLOG_INFO("BL POST_END");
         return;
     }
 
     libraryName = getLibName();
+    if (fips_request_failure("libfreeblpriv3","INTEG")){
+        corrupt_bin();
+        corrupt = 1;
+    }
+
     rv = freebl_fipsSoftwareIntegrityTest(libraryName);
+    if (corrupt) {
+        restore_bin();
+    }
     if (rv != SECSuccess) {
+        FIPSLOG_FAILED("libfreeblpriv3","INTEG", "%s", libraryName);
+        FIPSLOG_INFO("BL  POST_END");
         return;
+    } else {
+        FIPSLOG_SUCCESS("libfreeblpriv3","INTEG", "%s", libraryName);
     }
 
     /* posts are happy, allow the fips module to function now */
@@ -2015,6 +2271,7 @@ bl_startup_tests(void)
     if (!freebl_only) {
         self_tests_success = PR_TRUE;
     }
+    FIPSLOG_INFO("BL POST_END");
 }
 
 /*

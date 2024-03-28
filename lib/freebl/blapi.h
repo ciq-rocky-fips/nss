@@ -15,6 +15,168 @@
 
 SEC_BEGIN_PROTOS
 
+enum fips_logging_type {
+	FIPS_NO_LOGGING = 0,
+	FIPS_LOG_SYSLOG = 1,
+	FIPS_LOG_STDERR = 2,
+    FIPS_LOG_FILE = 3
+};
+
+#define NSS_AUDIT_WITH_SYSLOG 1
+#if defined(NSS_AUDIT_WITH_SYSLOG)
+#include <syslog.h>
+#include <unistd.h>
+#include <stdio.h>
+
+enum fips_logging_type fips_logging_enabled(const char *name, const char *subname);
+
+#define FIPSLOG_INFO(fmt, ...) \
+	do { \
+		enum fips_logging_type flt = fips_logging_enabled(NULL, NULL); \
+        FILE *type = (flt == FIPS_LOG_FILE) ? (fopen("/tmp/test.log", "a+")) : stderr; \
+		if (flt != FIPS_NO_LOGGING) { \
+            if (flt == FIPS_LOG_SYSLOG) { \
+                syslog(LOG_INFO, "NSS:INFO %s:%d %s:" fmt, \
+                __FILE__, __LINE__, __func__, ##__VA_ARGS__); \
+            } else { \
+                fprintf(type, "NSS:INFO %s:%d %s:" fmt "\n", \
+                __FILE__, __LINE__, __func__, ##__VA_ARGS__); \
+                fflush(type); \
+                if (flt != FIPS_LOG_STDERR) fclose(type);\
+            } \
+        } \
+	} while(0)
+
+#define FIPSLOG_SUCCESS(name, subname, fmt, ...) \
+	do { \
+		enum fips_logging_type flt = fips_logging_enabled((name), (subname)); \
+        FILE *type = (flt == FIPS_LOG_FILE) ? (fopen("/tmp/test.log", "a+")) : stderr; \
+        int check = (name == NULL && subname == NULL) ? 0 : fips_request_failure((name), (subname)); \
+		if (flt != FIPS_NO_LOGGING) { \
+			if ((subname) != NULL) { \
+				if (flt == FIPS_LOG_SYSLOG) { \
+					syslog(LOG_INFO, "NSS:%s %s:%d %s:%s.%s:" fmt, \
+                    (check == 1) ? "UNEXPECTED_SUCCESS" : "SUCCESS", \
+					__FILE__, __LINE__, __func__, ((name) != NULL) ? (const char *)(name) : "", \
+                    ((subname) != NULL) ? (const char *)(subname) : "", ##__VA_ARGS__); \
+				} else { \
+					fprintf(type, "NSS:%s %s:%d %s:%s.%s:" fmt "\n", \
+                    (check == 1) ? "UNEXPECTED_SUCCESS" : "SUCCESS", \
+					__FILE__, __LINE__, __func__, ((name) != NULL) ? (const char *)(name) : "", \
+                    ((subname) != NULL) ? (const char *)(subname) : "", ##__VA_ARGS__); \
+					fflush(type); \
+                    if (flt != FIPS_LOG_STDERR) fclose(type);\
+				} \
+			} else { \
+				if (flt == FIPS_LOG_SYSLOG) { \
+					syslog(LOG_INFO, "NSS:%s %s:%d %s:%s:" fmt, \
+                    (check == 1) ? "UNEXPECTED_SUCCESS" : "SUCCESS", \
+                    __FILE__, __LINE__, __func__, \
+                    ((name) != NULL) ? (const char *)(name) : "", ##__VA_ARGS__); \
+				} else { \
+					fprintf(type, "NSS:%s %s:%d %s:%s:" fmt "\n", \
+                    (check == 1) ? "UNEXPECTED_SUCCESS" : "SUCCESS", \
+                    __FILE__, __LINE__, __func__, ((name) != NULL) ? (const char *)(name) : "", \
+                    ##__VA_ARGS__); \
+					fflush(type); \
+                    if (flt != FIPS_LOG_STDERR) fclose(type);\
+				} \
+			} \
+		} \
+	} while(0)
+#define FIPSLOG_FAILED(name, subname, fmt, ...) \
+	do { \
+		enum fips_logging_type flt = fips_logging_enabled((name), (subname)); \
+        FILE *type = (flt == FIPS_LOG_FILE) ? (fopen("/tmp/test.log", "a+")) : stderr; \
+        int check = (name == NULL && subname == NULL) ? 0: fips_request_failure((name), (subname)); \
+		if (flt != FIPS_NO_LOGGING) { \
+			if ((subname) != NULL) { \
+				if (flt == FIPS_LOG_SYSLOG) { \
+					syslog(LOG_INFO, "NSS:%s %s:%d %s:%s.%s:" fmt, \
+					(check == 1) ? "EXPECTED_FAILURE" : "FAILED", \
+                    __FILE__, __LINE__, __func__, ((name) != NULL) ? (const char *)(name) : "", \
+                    ((subname) != NULL) ? (const char *)(subname) : "", ##__VA_ARGS__); \
+				} else { \
+					fprintf(type, "NSS:%s %s:%d %s:%s.%s:" fmt "\n", \
+                    (check == 1) ? "EXPECTED_FAILURE" : "FAILED", \
+					__FILE__, __LINE__, __func__, ((name) != NULL) ? (const char *)(name) : "", \
+                    ((subname) != NULL) ? (const char *)(subname) : "", ##__VA_ARGS__); \
+					fflush(type); \
+                    if (flt != FIPS_LOG_STDERR) fclose(type);\
+				} \
+			} else { \
+				if (flt == FIPS_LOG_SYSLOG) { \
+					syslog(LOG_INFO, "NSS:%s %s:%d %s:%s:" fmt, \
+                    (check == 1) ? "EXPECTED_FAILURE" : "FAILED", \
+                    __FILE__, __LINE__, __func__, \
+                     ((name) != NULL) ? (const char *)(name) : "", ##__VA_ARGS__); \
+				} else { \
+					fprintf(type, "NSS:%s %s:%d %s:%s:" fmt "\n", \
+                    (check == 1) ? "EXPECTED_FAILURE" : "FAILED", \
+                    __FILE__, __LINE__, __func__, \
+                     ((name) != NULL) ? (const char *)(name) : "", ##__VA_ARGS__); \
+					fflush(type); \
+                    if (flt != FIPS_LOG_STDERR) fclose(type);\
+				} \
+			} \
+		} \
+	} while(0)
+#define FIPSLOG_SUCCESS_num(name, subname, fmt, ...) \
+	do { \
+		enum fips_logging_type flt = fips_logging_enabled((name), NULL); \
+        FILE *type = (flt == FIPS_LOG_FILE) ? (fopen("/tmp/test.log", "a+")) : stderr; \
+        int check = fips_request_failure_num((name), (subname)); \
+		if (flt != FIPS_NO_LOGGING) { \
+            if (flt == FIPS_LOG_SYSLOG) { \
+                syslog(LOG_INFO, "NSS:%s %s:%d %s:%s:" fmt, \
+                (check == 1) ? "UNEXPECTED_SUCCESS" : "SUCCESS", \
+                __FILE__, __LINE__, __func__, \
+                ((name) != NULL) ? (const char *)(name) : "", ##__VA_ARGS__); \
+            } else { \
+                fprintf(type, "NSS:%s %s:%d %s:%s:" fmt "\n", \
+                (check == 1) ? "UNEXPECTED_SUCCESS" : "SUCCESS", \
+                __FILE__, __LINE__, __func__, ((name) != NULL) ? (const char *)(name) : "", \
+                ##__VA_ARGS__); \
+                fflush(type); \
+                if (flt != FIPS_LOG_STDERR) fclose(type);\
+            } \
+        } \
+	} while(0)
+#define FIPSLOG_FAILED_num(name, subname, fmt, ...) \
+	do { \
+		enum fips_logging_type flt = fips_logging_enabled((name), NULL); \
+        FILE *type = (flt == FIPS_LOG_FILE) ? (fopen("/tmp/test.log", "a+")) : stderr; \
+        int check = fips_request_failure_num((name), (subname)); \
+		if (flt != FIPS_NO_LOGGING) { \
+            if (flt == FIPS_LOG_SYSLOG) { \
+                syslog(LOG_INFO, "NSS:%s %s:%d %s:%s:" fmt, \
+                (check == 1) ? "EXPECTED_FAILURE" : "FAILED", \
+                __FILE__, __LINE__, __func__, \
+                    ((name) != NULL) ? (const char *)(name) : "", ##__VA_ARGS__); \
+            } else { \
+                fprintf(type, "NSS:%s %s:%d %s:%s:" fmt "\n", \
+                (check == 1) ? "EXPECTED_FAILURE" : "FAILED", \
+                    __FILE__, __LINE__, __func__, \
+                    ((name) != NULL) ? (const char *)(name) : "", ##__VA_ARGS__); \
+                fflush(type); \
+                if (flt != FIPS_LOG_STDERR) fclose(type);\
+            } \
+        } \
+	} while(0)
+#else /* NSS_SUCCESS_AUDIT_WITH_SYSLOG */
+
+#define FIPSLOG_INFO(name, subname, fmt, ...) ((void)0)
+#define FIPSLOG_SUCCESS(name, subname, fmt, ...) ((void)0)
+#define FIPSLOG_FAILED(name, subname, fmt, ...) ((void)0)
+
+#include <stdbool.h>
+
+inline enum fips_logging_type fips_logging_enabled(const char *name, const char *subname);
+{
+	return FIPS_NO_LOGGING;
+}
+#endif /* NSS_SUCCESS_AUDIT_WITH_SYSLOG */
+
 /*
 ** RSA encryption/decryption. When encrypting/decrypting the output
 ** buffer must be at least the size of the public key modulus.
@@ -1795,6 +1957,9 @@ extern int EC_GetPointSize(const ECParams *params);
  * use the internal table to get the size in bytes of a single EC coordinate
  */
 extern int EC_GetScalarSize(const ECParams *params);
+
+extern int fips_request_failure(const char*, const char*);
+extern int fips_request_failure_num(const char* name, int subnum);
 
 SEC_END_PROTOS
 

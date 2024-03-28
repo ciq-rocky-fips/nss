@@ -35,6 +35,11 @@ NSS_SRCDIRS = \
 	ssl_gtest \
 	$(SYSINIT_GTEST) \
 	nss_bogo_shim \
+	fips_gtest \
+	ec_gtest \
+	rsa_gtest \
+	dsa_gtest \
+	dh_gtest \
 	pkcs11testmodule \
 	$(NULL)
 
@@ -48,6 +53,11 @@ pk11_gtest: common pkcs11testmodule
 smime_gtest: common
 softoken_gtest: common
 ssl_gtest: google_test
+fips_gtest: common pkcs11testmodule
+ec_gtest: common pkcs11testmodule
+rsa_gtest: common pkcs11testmodule
+dsa_gtest: common pkcs11testmodule
+dh_gtest: common pkcs11testmodule
 sysinit_gtest: google_test
 util_gtest: common
 endif
