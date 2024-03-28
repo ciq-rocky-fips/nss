@@ -2214,28 +2214,18 @@ PR_GetPrefLoopbackAddrInfo(PRNetAddr *result,
             while (ai && ai->ai_addrlen > sizeof(PRNetAddr))
                 ai = ai->ai_next;
 
-            if (!ai) {
-                break;
-            }
-
-            /* copy sockaddr to PRNetAddr */
-            memcpy(&aNetAddr, ai->ai_addr, ai->ai_addrlen);
-            aNetAddr.raw.family = ai->ai_addr->sa_family;
+            if (ai) {
+                /* copy sockaddr to PRNetAddr */
+                memcpy(&aNetAddr, ai->ai_addr, ai->ai_addrlen);
+                aNetAddr.raw.family = ai->ai_addr->sa_family;
 #ifdef _PR_INET6
-            if (AF_INET6 == aNetAddr.raw.family)
-                aNetAddr.raw.family = PR_AF_INET6;
+                if (AF_INET6 == aNetAddr.raw.family)
+                    aNetAddr.raw.family = PR_AF_INET6;
 #endif
-            if (ai->ai_addrlen < sizeof(PRNetAddr))
-                memset(((char*)&aNetAddr)+ai->ai_addrlen, 0,
-                       sizeof(PRNetAddr) - ai->ai_addrlen);
-
-            if (result->raw.family == PR_AF_INET) {
-                aNetAddr.inet.port = htons(port);
+                if (ai->ai_addrlen < sizeof(PRNetAddr))
+                    memset(((char*)result)+ai->ai_addrlen, 0,
+                           sizeof(PRNetAddr) - ai->ai_addrlen);
             }
-            else {
-                aNetAddr.ipv6.port = htons(port);
-            }
-
 
             /* If we obtain more than one result, prefer IPv6. */
             if (result_still_empty || aNetAddr.raw.family == PR_AF_INET6) {
