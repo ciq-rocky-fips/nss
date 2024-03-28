@@ -192,6 +192,10 @@ cleanup:
         rv = SECFailure;
     }
     if (rv) {
+        SECITEM_ZfreeItem(&key->prime, PR_FALSE);
+        SECITEM_ZfreeItem(&key->base, PR_FALSE);
+        SECITEM_ZfreeItem(&key->publicValue, PR_FALSE);
+        SECITEM_ZfreeItem(&key->privateValue, PR_FALSE);
         *privKey = NULL;
         PORT_FreeArena(arena, PR_TRUE);
     }
