@@ -4625,7 +4625,10 @@ NSC_CreateObject(CK_SESSION_HANDLE hSession,
     if (object == NULL) {
         return CKR_HOST_MEMORY;
     }
-    object->isFIPS = PR_FALSE; /* if we created the object on the fly,
+    /* object types that we aren't allowed to create in FIPS mode are
+     * already rejected explicitly. If we get here, then the object is
+     * FIPS OK (most notably public key objects )*/
+    /* object->isFIPS = PR_FALSE;  if we created the object on the fly,
                                 * it's not a FIPS object */
 
     /*
