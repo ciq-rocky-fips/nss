@@ -78,7 +78,16 @@ static const ECMethod kMethods[] = {
         ec_secp256r1_scalar_validate,
         ec_secp256r1_sign_digest,
         ec_secp256r1_verify_digest,
-    }
+    },
+    {
+        ECCurve_NIST_P384,
+        ec_secp384r1_pt_mul,
+        ec_secp384r1_pt_validate,
+        ec_secp384r1_scalar_validate,
+        ec_secp384r1_sign_digest,
+        ec_secp384r1_verify_digest,
+     }
+
 };
 
 static const ECMethod *
