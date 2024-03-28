@@ -72,4 +72,9 @@ ifndef SQLITE_LIB_NAME
     SQLITE_LIB_NAME = sqlite3
 endif
 
+# Prefer in-tree headers over system headers
+ifdef IN_TREE_FREEBL_HEADERS_FIRST
+    INCLUDES += -iquote $(DIST)/../public/nss -iquote $(DIST)/../private/nss
+endif
+
 MK_LOCATION = included
