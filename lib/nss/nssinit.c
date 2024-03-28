@@ -1304,6 +1304,7 @@ NSS_IsInitialized(void)
     return (nssIsInitted) || (nssInitContextList != NULL);
 }
 
+extern const char __nss_FIPS_version[];
 extern const char __nss_base_version[];
 
 PRBool
@@ -1369,4 +1370,11 @@ const char *
 NSS_GetVersion(void)
 {
     return NSS_VERSION;
+}
+
+const char *
+NSS_FIPSShowVersion(void)
+{
+    #define NSS_FIPS_VERSION_VARIABLE __nss_FIPS_version
+    return "Rocky Linux 9 NSS Cryptographic Module Version Rocky9.20240308";
 }

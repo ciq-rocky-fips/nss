@@ -38,7 +38,7 @@
 #define VALID_CK_BOOL(x) ((x) == CK_TRUE || (x) == CK_FALSE)
 #define IS_COUNTER(_mech) ((_mech) == CKM_SP800_108_COUNTER_KDF || (_mech) == CKM_NSS_SP800_108_COUNTER_KDF_DERIVE_DATA)
 #define DOES_DERIVE_DATA(_mech) ((_mech) == CKM_NSS_SP800_108_COUNTER_KDF_DERIVE_DATA || (_mech) == CKM_NSS_SP800_108_FEEDBACK_KDF_DERIVE_DATA || (_mech) == CKM_NSS_SP800_108_DOUBLE_PIPELINE_KDF_DERIVE_DATA)
-
+#define NSS_FULL_POST
 /* [ section: parameter validation ] */
 
 static CK_RV

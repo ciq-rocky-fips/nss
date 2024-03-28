@@ -15,6 +15,8 @@
 #define _NSS_CUSTOMIZED
 #endif
 
+#define NSS_FIPS_NAME "Rocky Linux 9 NSS Cryptographic Module Version Rocky9.20240308"
+
 /*
  * NSS's major version, minor version, patch level, build number, and whether
  * this is a beta release.

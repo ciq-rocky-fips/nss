@@ -34,6 +34,8 @@
 #define INIT_FUNCTION
 #endif
 
+#define NSS_FULL_POST
+
 static void INIT_FUNCTION sftk_startup_tests(void);
 
 /* Windows pre-defined entry */
