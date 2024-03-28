@@ -4399,17 +4399,23 @@ ssl_ClearPRCList(PRCList *list, void (*f)(void *))
 SECStatus
 SSLExp_EnableTls13GreaseEch(PRFileDesc *fd, PRBool enabled)
 {
+#ifdef notdef
     sslSocket *ss = ssl_FindSocket(fd);
     if (!ss) {
         return SECFailure;
     }
     ss->opt.enableTls13GreaseEch = enabled;
     return SECSuccess;
+#else
+    PORT_SetError(SSL_ERROR_UNSUPPORTED_EXPERIMENTAL_API);
+    return SECFailure;
+#endif
 }
 
 SECStatus
 SSLExp_SetTls13GreaseEchSize(PRFileDesc *fd, PRUint8 size)
 {
+#ifdef notdef
     sslSocket *ss = ssl_FindSocket(fd);
     if (!ss || size == 0) {
         return SECFailure;
@@ -4423,28 +4429,42 @@ SSLExp_SetTls13GreaseEchSize(PRFileDesc *fd, PRUint8 size)
     ssl_Release1stHandshakeLock(ss);
 
     return SECSuccess;
+#else
+    PORT_SetError(SSL_ERROR_UNSUPPORTED_EXPERIMENTAL_API);
+    return SECFailure;
+#endif
 }
 
 SECStatus
 SSLExp_EnableTls13BackendEch(PRFileDesc *fd, PRBool enabled)
 {
+#ifdef notdef
     sslSocket *ss = ssl_FindSocket(fd);
     if (!ss) {
         return SECFailure;
     }
     ss->opt.enableTls13BackendEch = enabled;
     return SECSuccess;
+#else
+    PORT_SetError(SSL_ERROR_UNSUPPORTED_EXPERIMENTAL_API);
+    return SECFailure;
+#endif
 }
 
 SECStatus
 SSLExp_CallExtensionWriterOnEchInner(PRFileDesc *fd, PRBool enabled)
 {
+#ifdef notdef
     sslSocket *ss = ssl_FindSocket(fd);
     if (!ss) {
         return SECFailure;
     }
     ss->opt.callExtensionWriterOnEchInner = enabled;
     return SECSuccess;
+#else
+    PORT_SetError(SSL_ERROR_UNSUPPORTED_EXPERIMENTAL_API);
+    return SECFailure;
+#endif
 }
 
 SECStatus

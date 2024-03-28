@@ -57,7 +57,6 @@ CPPSRCS = \
       tls_filter.cc \
       tls_protect.cc \
       tls_psk_unittest.cc \
-      tls_ech_unittest.cc \
       $(SSLKEYLOGFILE_FILES) \
       $(NULL)
 
