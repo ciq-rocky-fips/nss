@@ -2204,7 +2204,6 @@ PR_GetPrefLoopbackAddrInfo(PRNetAddr *result,
 
     memset(&hints, 0, sizeof(hints));
 
-    hints.ai_flags = AI_PASSIVE;
     rv = GETADDRINFO(NULL, tmpBuf, &hints, &res);
     if (rv == 0) {
         PRBool result_still_empty = PR_TRUE;
