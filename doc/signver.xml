@@ -66,7 +66,7 @@
       <varlistentry>
         <term>-d <emphasis>directory</emphasis></term>
         <listitem><para>Specify the database directory which contains the certificates and keys.</para>
-	<para><command>signver</command> supports two types of databases: the legacy security databases (<filename>cert8.db</filename>, <filename>key3.db</filename>, and <filename>secmod.db</filename>) and new SQLite databases (<filename>cert9.db</filename>, <filename>key4.db</filename>, and <filename>pkcs11.txt</filename>). If the prefix <command>dbm:</command> is not used, then the tool assumes that the given databases are in the SQLite format.</para></listitem>
+	<para><command>signver</command> supports SQLite databases (<filename>cert9.db</filename>, <filename>key4.db</filename>, and <filename>pkcs11.txt</filename>). </para></listitem>
       </varlistentry>
       <varlistentry>
         <term>-a</term>
@@ -155,15 +155,7 @@ BerkleyDB. These new databases provide more accessibility and performance:</para
 
 <para>Because the SQLite databases are designed to be shared, these are the <emphasis>shared</emphasis> database type. The shared database type is preferred; the legacy format is included for backward compatibility.</para>
 
-<para>By default, the tools (<command>certutil</command>, <command>pk12util</command>, <command>modutil</command>) assume that the given security databases use the SQLite type
-Using the legacy databases must be manually specified by using the <command>dbm:</command> prefix with the given security directory. For example:</para>
-
-<programlisting># signver -A -s <replaceable>signature</replaceable> -d dbm:/home/my/sharednssdb</programlisting>
-
-<para>To set the legacy database type as the default type for the tools, set the <envar>NSS_DEFAULT_DB_TYPE</envar> environment variable to <envar>dbm</envar>:</para>
-<programlisting>export NSS_DEFAULT_DB_TYPE="dbm"</programlisting>
-
-<para>This line can be added to the <filename>~/.bashrc</filename> file to make the change permanent for the user.</para>
+<para>By default, the tools (<command>certutil</command>, <command>pk12util</command>, <command>modutil</command>) assume that the given security databases use the SQLite type.</para>
 
 <itemizedlist>
 	<listitem>
