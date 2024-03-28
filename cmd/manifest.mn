@@ -41,6 +41,7 @@ NSS_SRCDIRS = \
  crlutil  \
  crmftest \
  dbtest \
+ dbtool \
  derdump  \
  digest  \
  httpserv  \
