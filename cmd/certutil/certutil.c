@@ -4032,6 +4032,7 @@ shutdown:
 int
 main(int argc, char **argv)
 {
+    printf("\n%s\n", NSS_FIPSShowVersion());
     int rv = certutil_main(argc, argv, PR_TRUE);
     PL_ArenaFinish();
     PR_Cleanup();

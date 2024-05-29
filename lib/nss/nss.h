@@ -15,8 +15,6 @@
 #define _NSS_CUSTOMIZED
 #endif
 
-#define NSS_FIPS_NAME "Rocky Linux 8 NSS Cryptographic Module Version Rocky8.20230620"
-
 /*
  * NSS's major version, minor version, patch level, build number, and whether
  * this is a beta release.
@@ -125,6 +123,11 @@ extern PRBool NSS_VersionCheck(const char *importedVersion);
  * Returns a const string of the NSS library version.
  */
 extern const char *NSS_GetVersion(void);
+
+/*
+ * Returns a const string of the NSS library version.
+ */
+extern const char *NSS_FIPSShowVersion(void);
 
 /*
  * Open the Cert, Key, and Security Module databases, read only.

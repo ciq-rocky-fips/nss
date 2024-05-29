@@ -1375,6 +1375,5 @@ NSS_GetVersion(void)
 const char *
 NSS_FIPSShowVersion(void)
 {
-    #define NSS_FIPS_VERSION_VARIABLE __nss_FIPS_version
-    return "Rocky Linux 8 NSS Cryptographic Module Version Rocky8.20230620";
+    return "Rocky Linux 8 NSS Cryptographic Module Version Rocky8.20240528";
 }

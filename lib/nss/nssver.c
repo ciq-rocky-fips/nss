@@ -12,8 +12,6 @@
 #define _DEBUG_STRING ""
 #endif
 
-const char __nss_FIPS_version[] = "Version: " NSS_FIPS_NAME NSS_VERSION _DEBUG_STRING;
-
 /*
  * Version information
  */
