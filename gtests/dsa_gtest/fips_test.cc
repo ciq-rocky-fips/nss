@@ -126,10 +126,15 @@ TEST_F(FIPSDSAKeyTest, GenDsaKey) {
       PK11_GenerateKeyPair(slot.get(), CKM_DSA_KEY_PAIR_GEN, 
        const_cast<PQGParams*>(&PARAMS),
                            &pub_tmp, PR_FALSE, PR_TRUE, nullptr));
+#ifdef NSS_FIPS_DISABLED
   ASSERT_NE(nullptr, pub_tmp) << PORT_ErrorToName(PORT_GetError());
   ASSERT_NE(nullptr, priv_key) << "PK11_GenerateKeyPair failed: "
                                << PORT_ErrorToName(PORT_GetError());
-  
+#else
+  ASSERT_EQ(nullptr, pub_tmp) << PORT_ErrorToName(PORT_GetError());
+  ASSERT_EQ(nullptr, priv_key) << "PK11_GenerateKeyPair succeeded (should fail): "
+                               << PORT_ErrorToName(PORT_GetError());
+#endif
   pub_key.reset(pub_tmp);
   PORT_SetError(0);
 }
