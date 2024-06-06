@@ -19,6 +19,7 @@
 #include "mpprime.h"
 #include "mplogic.h"
 #include "secmpi.h"
+#include "nsslowhash.h"
 
 #define MAX_ITERATIONS 1000 /* Maximum number of iterations of primegen */
 
@@ -228,6 +229,11 @@ PQG_Check(const PQGParams *params)
 {
     unsigned int L, N;
     SECStatus rv = SECSuccess;
+
+    if (nsslow_GetFIPSEnabled()) {
+        PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
+        return SECFailure;
+    }
 
     if (params == NULL) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
@@ -1581,6 +1587,11 @@ PQG_ParamGen(unsigned int j, PQGParams **pParams, PQGVerify **pVfy)
     unsigned int L; /* Length of P in bits.  Per FIPS 186. */
     unsigned int seedBytes;
 
+    if (nsslow_GetFIPSEnabled()) {
+        PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
+        return SECFailure;
+    }
+
     if (j > 8 || !pParams || !pVfy) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         return SECFailure;
@@ -1597,6 +1608,11 @@ PQG_ParamGenSeedLen(unsigned int j, unsigned int seedBytes,
 {
     unsigned int L; /* Length of P in bits.  Per FIPS 186. */
 
+    if (nsslow_GetFIPSEnabled()) {
+        PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
+        return SECFailure;
+    }
+
     if (j > 8 || !pParams || !pVfy) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         return SECFailure;
@@ -1610,6 +1626,11 @@ SECStatus
 PQG_ParamGenV2(unsigned int L, unsigned int N, unsigned int seedBytes,
                PQGParams **pParams, PQGVerify **pVfy)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
+        return SECFailure;
+    }
+
     if (N == 0) {
         N = pqg_get_default_N(L);
     }
@@ -1644,6 +1665,13 @@ PQG_VerifyParams(const PQGParams *params,
     SECItem pseed_ = { 0, 0, 0 };
     HASH_HashType hashtype = HASH_AlgNULL;
     pqgGenType type = FIPS186_1_TYPE;
+
+    if (nsslow_GetFIPSEnabled()) {
+        PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
+        if (result != NULL)
+            *result = SECFailure;
+        return SECFailure;
+    }
 
 #define CHECKPARAM(cond)      \
     if (!(cond)) {            \
