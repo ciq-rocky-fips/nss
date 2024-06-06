@@ -14,12 +14,14 @@
 #include "prtypes.h"
 #include "prinit.h"
 #include "blapi.h"
+#include "pkcs11t.h"
 #include "nssilock.h"
 #include "secitem.h"
 #include "blapit.h"
 #include "mpi.h"
 #include "secmpi.h"
 #include "pqg.h"
+#include "nsslowhash.h"
 
 /*
  * FIPS 186-2 requires result from random output to be reduced mod q when
@@ -280,6 +282,10 @@ DSA_NewKey(const PQGParams *params, DSAPrivateKey **privKey)
     SECItem seed;
     SECStatus rv;
 
+    if (nsslow_GetFIPSEnabled()) {
+        return CKR_FUNCTION_NOT_SUPPORTED;
+    }
+
     rv = PQG_Check(params);
     if (rv != SECSuccess) {
         return rv;
@@ -306,6 +312,11 @@ DSA_NewKeyFromSeed(const PQGParams *params,
                    DSAPrivateKey **privKey)
 {
     SECItem seedItem;
+
+    if (nsslow_GetFIPSEnabled()) {
+        return CKR_FUNCTION_NOT_SUPPORTED;
+    }
+
     seedItem.data = (unsigned char *)seed;
     seedItem.len = PQG_GetLength(&params->subPrime);
     return dsa_NewKeyExtended(params, &seedItem, privKey);
@@ -502,9 +513,14 @@ DSA_SignDigest(DSAPrivateKey *key, SECItem *signature, const SECItem *digest)
     unsigned char kSeed[DSA_MAX_SUBPRIME_LEN];
     unsigned int kSeedLen = 0;
     unsigned int i;
-    unsigned int dsa_subprime_len = PQG_GetLength(&key->params.subPrime);
+    unsigned int dsa_subprime_len;
     PRBool good;
 
+    if (nsslow_GetFIPSEnabled()) {
+        return CKR_FUNCTION_NOT_SUPPORTED;
+    }
+
+    dsa_subprime_len = PQG_GetLength(&key->params.subPrime);
     PORT_SetError(0);
     do {
         rv = dsa_GenerateGlobalRandomBytes(&key->params.subPrime,
@@ -556,6 +572,10 @@ SECStatus
 DSA_VerifyDigest(DSAPublicKey *key, const SECItem *signature,
                  const SECItem *digest)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        return CKR_FUNCTION_NOT_SUPPORTED;
+    }
+
     /* FIPS-compliance dictates that digest is a SHA hash. */
     mp_int p, q, g;      /* PQG parameters */
     mp_int r_, s_;       /* tuple (r', s') is received signature) */
