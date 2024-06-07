@@ -24,8 +24,7 @@ struct NSSLOWHASHContextStr {
 };
 
 #ifndef NSS_FIPS_DISABLED
-static int
-nsslow_GetFIPSEnabled(void)
+int nsslow_GetFIPSEnabled(void)
 {
 #ifdef LINUX
     FILE *f;
