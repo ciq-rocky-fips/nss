@@ -14,6 +14,7 @@
 typedef struct NSSLOWInitContextStr NSSLOWInitContext;
 typedef struct NSSLOWHASHContextStr NSSLOWHASHContext;
 
+int nsslow_GetFIPSEnabled(void);
 NSSLOWInitContext *NSSLOW_Init(void);
 void NSSLOW_Shutdown(NSSLOWInitContext *context);
 void NSSLOW_Reset(NSSLOWInitContext *context);
