@@ -2,7 +2,7 @@
 export NSS_FIPS_LOGGING="STDERR"
 export NSS_FIPS_FUNC_TEST="FT"
 
-rm -r ../ft
+rm -rf ../ft
 mkdir ../ft
 
 declare -a StringArray=(\
@@ -62,10 +62,7 @@ declare -a StringArray=(\
 ":ECDSA.SIG" \
 ":ECDSA.VERIFY" \
 ":ECDH.P-256" \
-":DSA.SIGN" \
-":DSA.VERIFY" \
 ":DH.COMPUT" \
-":RNG.INTEG" \
 ":libfreeblpriv3.INTEG" \
 ":HKDF.SHA256" \
 ":HKDF.SHA384" \

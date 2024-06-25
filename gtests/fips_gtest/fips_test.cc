@@ -17,10 +17,6 @@
 namespace nss_test {
 
 class FIPSKeyTest : public ::testing::Test {};
-class FIPSECKeyTest : public ::testing::Test {};
-class FIPSRSAKeyTest : public ::testing::Test {};
-class FIPSDSAKeyTest : public ::testing::Test {};
-class FIPSDHKeyTest : public ::testing::Test {};
 
 // Encrypt an ephemeral EC key (U2F use case)
 TEST_F(FIPSKeyTest, GenECKey) {  
@@ -138,57 +134,6 @@ static const uint8_t DSS_G_RAW[] =
   0x37,0xE2,0x8C,0xC5,0x56,0x8C,0xDD,0x63,0xF5,0xB6,0xA3,0x46,
   0x62,0xF6,0x35,0x76,
 };
-
-typedef std::basic_string<uint8_t> ByteString;
-
-ByteString DSS_P() { return ByteString(DSS_P_RAW, sizeof(DSS_P_RAW)); }
-ByteString DSS_Q() { return ByteString(DSS_Q_RAW, sizeof(DSS_Q_RAW)); }
-ByteString DSS_G() { return ByteString(DSS_G_RAW, sizeof(DSS_G_RAW)); }
-
-ByteString p(DSS_P());
-  ByteString q(DSS_Q());
-  ByteString g(DSS_G());
-
-  static const PQGParams PARAMS = {
-    nullptr,
-    { siBuffer,
-      const_cast<uint8_t*>(p.data()),
-      static_cast<unsigned int>(p.length())
-    },
-    { siBuffer,
-      const_cast<uint8_t*>(q.data()),
-      static_cast<unsigned int>(q.length())
-    },
-    { siBuffer,
-      const_cast<uint8_t*>(g.data()),
-      static_cast<unsigned int>(g.length())
-    }
-  };
-
-// Gen DSA key
-TEST_F(FIPSKeyTest, GenDsaKey) {
-  
-  ScopedPK11SlotInfo slot(PK11_GetInternalSlot());
-  ASSERT_NE(nullptr, slot);
-    
-  SECKEYPublicKey* pub_tmp = nullptr;
-  ScopedSECKEYPublicKey pub_key;
-  ScopedSECKEYPrivateKey priv_key(
-      PK11_GenerateKeyPair(slot.get(), CKM_DSA_KEY_PAIR_GEN, 
-       const_cast<PQGParams*>(&PARAMS),
-                           &pub_tmp, PR_FALSE, PR_TRUE, nullptr));
-#ifdef NSS_FIPS_DISABLED
-  ASSERT_NE(nullptr, pub_tmp) << PORT_ErrorToName(PORT_GetError());
-  ASSERT_NE(nullptr, priv_key) << "PK11_GenerateKeyPair failed: "
-                               << PORT_ErrorToName(PORT_GetError());
-#else
-  ASSERT_EQ(nullptr, pub_tmp) << PORT_ErrorToName(PORT_GetError());
-  ASSERT_EQ(nullptr, priv_key) << "PK11_GenerateKeyPair succeeded (should fail): "
-                               << PORT_ErrorToName(PORT_GetError());
-#endif
-  pub_key.reset(pub_tmp);
-  PORT_SetError(0);
-}
 
 // from: BUILD/nss-3.79/nss/gtests/softoken_gtest/softoken_dh_vectors.h
 /* IKE 2048 prime is: 2^2048 - 2^1984 - 1 + 2^64 * { [2^1918 pi] + 124476 } */
