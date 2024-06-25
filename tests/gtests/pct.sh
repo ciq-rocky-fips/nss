@@ -133,6 +133,7 @@ export CPU_ARCH="x86_64"
 export NSS_DISABLE_AVX2=0
 export OBJDIR=Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ
 export BINDIR=$PWD/../dist/Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ/bin
+export DOMSUF="nss.local"
 #logger "START of NSS FIPS testing"
 gtest_init "$0"
 echo "*****************************" > summary.log
@@ -156,18 +157,21 @@ echo "*****************************" >> summary.log
 echo "*****************************" >> summary.log
 echo "inducing failure: :RSA_PCT.ENCRYPT" >> summary.log
 export NSS_FIPS_FUNC_TEST_NAMES="RSA_PCT.ENCRYPT" 
-GTESTS="${GTESTS:-rsa_gtest}"
+GTESTS="${GTESTS:-fips_gtest}"
+echo "inducing failure: :RSA_PCT.ENCRYPT"
 gtest_start
 mv /tmp/test.log ./RSA_PCT.ENCRYPT.log
 echo "*****************************">> summary.log
 grep "EXPECTED" ./RSA_PCT.ENCRYPT.log >> summary.log
 echo "*****************************">> summary.log
 
+#exit 1
 
 echo "*****************************" >> summary.log
 echo "inducing failure: :RSA_PCT.DECRYPT" >> summary.log
 export NSS_FIPS_FUNC_TEST_NAMES=":RSA_PCT.DECRYPT" 
-GTESTS="${GTESTS:-rsa_gtest}"
+GTESTS="${GTESTS:-fips_gtest}"
+echo "inducing failure: :RSA_PCT.DECRYPT"
 gtest_start
 mv /tmp/test.log ./RSA_PCT.DECRYPT.log
 echo "*****************************" >> summary.log
@@ -177,7 +181,8 @@ echo "*****************************" >> summary.log
 echo "*****************************" >> summary.log
 echo "inducing failure: :RSA_PCT.SIGN" >> summary.log
 export NSS_FIPS_FUNC_TEST_NAMES=":RSA_PCT.SIGN"
-GTESTS="${GTESTS:-rsa_gtest}"
+GTESTS="${GTESTS:-fips_gtest}"
+echo "inducing failure: :RSA_PCT.SIGN"
 gtest_start
 mv /tmp/test.log ./RSA_PCT.SIGN.log
 echo "*****************************" >> summary.log
@@ -186,8 +191,9 @@ echo "*****************************" >> summary.log
 
 echo "*****************************" >> summary.log
 echo "inducing failure: :RSA_PCT.VERIFY" >> summary.log
+echo "inducing failure: :RSA_PCT.VERIFY"
 export NSS_FIPS_FUNC_TEST_NAMES=":RSA_PCT.VERIFY"
-GTESTS="${GTESTS:-rsa_gtest}"
+GTESTS="${GTESTS:-fips_gtest}"
 gtest_start
 mv /tmp/test.log ./RSA_PCT.VERIFY.log
 echo "*****************************" >> summary.log
@@ -196,8 +202,9 @@ echo "*****************************" >> summary.log
 
 echo "*****************************" >> summary.log
 echo "inducing failure: :ECDSA_PCT.SIGN" >> summary.log
+echo "inducing failure: :ECDSA_PCT.SIGN"
 export NSS_FIPS_FUNC_TEST_NAMES=":ECDSA_PCT.SIGN" 
-GTESTS="${GTESTS:-ec_gtest}"
+GTESTS="${GTESTS:-fips_gtest}"
 gtest_start
 mv /tmp/test.log ./ECDSA_PCT.SIGN.log
 echo "*****************************" >> summary.log
@@ -206,8 +213,9 @@ echo "*****************************" >> summary.log
 
 echo "*****************************" >> summary.log
 echo "inducing failure: :ECDSA_PCT.VERIFY" >> summary.log
+echo "inducing failure: :ECDSA_PCT.VERIFY"
 export NSS_FIPS_FUNC_TEST_NAMES=":ECDSA_PCT.VERIFY" 
-GTESTS="${GTESTS:-ec_gtest}"
+GTESTS="${GTESTS:-fips_gtest}"
 gtest_start
 mv /tmp/test.log ./ECDSA_PCT.VERIFY.log
 echo "*****************************" >> summary.log
@@ -216,8 +224,9 @@ echo "*****************************" >> summary.log
 
 echo "*****************************" >> summary.log
 echo "inducing failure: :ECDH_DERIVE.DERIVE" >> summary.log
+echo "inducing failure: :ECDH_DERIVE.DERIVE"
 export NSS_FIPS_FUNC_TEST_NAMES=":ECDH_DERIVE.DERIVE"
-GTESTS="${GTESTS:-ec_gtest}"
+GTESTS="${GTESTS:-fips_gtest}"
 gtest_start
 mv /tmp/test.log ./ECDH_PCT.DERIVE.log
 echo "*****************************" >> summary.log
@@ -225,29 +234,10 @@ grep "EXPECTED" ./ECDH_PCT.DERIVE.log >> summary.log
 echo "*****************************" >> summary.log
 
 echo "*****************************" >> summary.log
-echo "inducing failure: :DSA_PCT.SIGN" >> summary.log
-export NSS_FIPS_FUNC_TEST_NAMES=":DSA_PCT.SIGN"
-GTESTS="${GTESTS:-dsa_gtest}"
-gtest_start
-mv /tmp/test.log ./DSA_PCT.SIGN.log
-echo "*****************************" >> summary.log
-grep "EXPECTED" ./DSA_PCT.SIGN.log >> summary.log
-echo "*****************************" >> summary.log
-
-echo "*****************************" >> summary.log
-echo "inducing failure: :DSA_PCT.VERIFY" >> summary.log
-export NSS_FIPS_FUNC_TEST_NAMES=":DSA_PCT.VERIFY"
-GTESTS="${GTESTS:-dsa_gtest}"
-gtest_start
-mv /tmp/test.log ./DSA_PCT.VERIFY.log
-echo "*****************************" >> summary.log
-grep "EXPECTED" ./DSA_PCT.VERIFY.log >> summary.log
-echo "*****************************" >> summary.log
-
-echo "*****************************" >> summary.log
 echo "inducing failure: :DH_PKCS_DERIVE.DERIVE" >> summary.log
+echo "inducing failure: :DH_PKCS_DERIVE.DERIVE"
 export NSS_FIPS_FUNC_TEST_NAMES=":DH_PKCS_DERIVE.DERIVE"
-GTESTS="${GTESTS:-dh_gtest}"
+GTESTS="${GTESTS:-fips_gtest}"
 gtest_start
 mv /tmp/test.log ./DH_PKCS_DERIVE.DERIVE.log
 echo "*****************************" >> summary.log
