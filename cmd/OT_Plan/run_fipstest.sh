@@ -47,6 +47,7 @@ echo "NSS_ENABLE_AUDIT=$NSS_ENABLE_AUDIT"
 
 #gdb Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ/pk11mode
 #Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ/pk11mode -v
+#exit 1
 
 Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ/pk11mode -v > 42.log
 
@@ -179,13 +180,7 @@ echo "Seed DRBG - FC_SeedRandom"
 echo "[`grep -n C_SeedRandom 42.log | wc -l`]"
 echo "Generate random number - FC_GenerateRandom"
 echo "[`grep -n C_GenerateRandom 42.log | wc -l`]"
-echo "Perform self-tests"
-echo "[`grep -n C_ 42.log | wc -l`]"
 echo "Show status"
-echo "[`grep -n C_ 42.log | wc -l`]"
+echo "[`grep -n C_GetFunctionStatus 42.log | wc -l`]"
 echo "Show versioning information"
-echo "[`grep -n C_ 42.log | wc -l`]"
-echo "Zeroize – destroy object"
-echo "[`grep -n C_ 42.log | wc -l`]"
-
-#ldd Linux4.18_x86_64_cc_glibc_PTH_64_DBG.OBJ/pk11mode
+echo "[`grep -n Rocky 42.log | wc -l`]"

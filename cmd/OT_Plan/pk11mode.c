@@ -36,6 +36,8 @@
 
 #include "pk11table.h"
 #include "pk11pub.h"
+#include "nss.h"
+#include "softoken.h"
 
 #define NUM_ELEM(array) (sizeof(array) / sizeof(array[0]))
 
@@ -558,7 +560,7 @@ main(int argc, char **argv)
 
     /*
      * PKM_KeyTest creates RSA,DSA public keys
-     * and AES, DES3 secret keys.
+     * and AES secret keys.
      * then does digest, hmac, encrypt/decrypt, signing operations.
      */
     crv = PKM_KeyTests(pFunctionList, pSlotList, slotID,
@@ -609,7 +611,7 @@ main(int argc, char **argv)
                   PKM_CK_RVtoStr(crv));
         goto cleanup;
     }
-#if 0
+
     crv = PKM_LegacyFunctions(pFunctionList, pSlotList, slotID,
                               pwd, pwdLen);
     if (crv == CKR_OK) {
@@ -619,7 +621,7 @@ main(int argc, char **argv)
                   PKM_CK_RVtoStr(crv));
         goto cleanup;
     }
-#endif
+
     crv = PKM_TLSKeyAndMacDerive(pFunctionList, pSlotList, slotID,
                                  pwd, pwdLen,
                                  CKM_TLS_KEY_AND_MAC_DERIVE, CORRECT);
@@ -681,33 +683,7 @@ main(int argc, char **argv)
     }
 #endif
 
-    //testInitToken(CK_FUNCTION_LIST_PTR pFunctionList);
-    //testInitToken(pFunctionList);
-
-    /* now re-init the token */
-    //crv = pFunctionList->C_InitToken(slotID,(unsigned char *)sso_pwd, sso_pwd ? PORT_Strlen(sso_pwd) : 0, tokenName);
-#if 0
-    crv = pFunctionList->C_InitToken(pSlotList[slotID],(unsigned char *)"", 0, NULL);
-    if (crv == CKR_OK) {
-        PKM_LogIt("C_InitToken succeeded\n\n");
-    } else {
-        PKM_Error("C_InitToken failed with 0x%08X, %-26s\n", crv,
-                    PKM_CK_RVtoStr(crv));
-        goto cleanup;
-    }
-#endif
-    //slot = PK11_GetInternalKeySlot();
-    //slot = PK11_FindSlotByName("internal");
-//
-    //// TODO: try to call PK11_ResetToken which calls FC_InitToken Future prob for now    
-    //crv = PK11_ResetToken(slot, sso_pass);
-    //if (crv == CKR_OK) {
-    //    PKM_LogIt("C_InitToken succeeded\n\n");
-    //} else {
-    //    PKM_Error("PK11_ResetToken calling FC_InitToken failed with 0x%08X, %-26s\n", crv,
-    //                PKM_CK_RVtoStr(crv));
-    //    goto cleanup;
-    //}
+    PKM_LogIt("\n%s\n", NSS_FIPSShowVersion());    
 
     free(pSlotList);
 
@@ -1268,24 +1244,12 @@ PKM_KeyTests(CK_FUNCTION_LIST_PTR pFunctionList,
     }
 
     crv = PKM_SecKeyCrypt(pFunctionList, hRwSession,
-                          hAESSecKey, &mech_AES_CBC,
-                          PLAINTEXT, sizeof(PLAINTEXT));
-    if (crv == CKR_OK) {
-        PKM_LogIt("PKM_SecKeyCrypt DES3 succeeded \n");
-    } else {
-        PKM_Error("PKM_SecKeyCrypt DES3 failed "
-                  "with 0x%08X, %-26s\n",
-                  crv, PKM_CK_RVtoStr(crv));
-        return crv;
-    }
-
-    crv = PKM_SecKeyCrypt(pFunctionList, hRwSession,
                           hAESSecKey, &mech_AES_CBC_PAD,
                           PLAINTEXT_PAD, sizeof(PLAINTEXT_PAD));
     if (crv == CKR_OK) {
-        PKM_LogIt("PKM_SecKeyCrypt DES3 succeeded \n\n");
+        PKM_LogIt("PKM_SecKeyCrypt AES succeeded \n\n");
     } else {
-        PKM_Error("PKM_SecKeyCrypt DES3 failed "
+        PKM_Error("PKM_SecKeyCrypt AES failed "
                   "with 0x%08X, %-26s\n",
                   crv, PKM_CK_RVtoStr(crv));
         return crv;
@@ -2395,18 +2359,7 @@ PKM_LegacyFunctions(CK_FUNCTION_LIST_PTR pFunctionList,
                   crv, PKM_CK_RVtoStr(crv));
         return crv;
     }
-
-    crv = pFunctionList->C_CancelFunction(hSession);
-    if (crv == CKR_FUNCTION_NOT_PARALLEL) {
-        PKM_LogIt("C_CancelFunction correctly "
-                  "returned CKR_FUNCTION_NOT_PARALLEL \n");
-    } else {
-        PKM_Error("C_CancelFunction failed "
-                  "with 0x%08X, %-26s\n",
-                  crv, PKM_CK_RVtoStr(crv));
-        return crv;
-    }
-
+    
     crv = pFunctionList->C_Logout(hSession);
     if (crv == CKR_OK) {
         PKM_LogIt("C_Logout succeeded\n");
