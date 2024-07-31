@@ -15,6 +15,8 @@ typedef struct NSSLOWInitContextStr NSSLOWInitContext;
 typedef struct NSSLOWHASHContextStr NSSLOWHASHContext;
 
 int nsslow_GetFIPSEnabled(void);
+void nsslow_LogFIPSError_Ex(const char *fn, const char *file, int line, const char *message);
+#define nsslow_LogFIPSError(msg) nsslow_LogFIPSError_Ex(__func__, __FILE__, __LINE__, (msg))
 NSSLOWInitContext *NSSLOW_Init(void);
 void NSSLOW_Shutdown(NSSLOWInitContext *context);
 void NSSLOW_Reset(NSSLOWInitContext *context);

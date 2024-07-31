@@ -50,6 +50,17 @@ int nsslow_GetFIPSEnabled(void)
 #endif /* LINUX */
     return 1;
 }
+
+#include <syslog.h>
+
+void nsslow_LogFIPSError_Ex(const char *fn, const char *file, int line, const char *message)
+{
+    syslog(LOG_USER, "FIPS error: %s: %s: %d: %s",
+        fn,
+        file,
+        line,
+        message);
+}
 #endif /* NSS_FIPS_DISABLED */
 
 static NSSLOWInitContext dummyContext = { 0 };
