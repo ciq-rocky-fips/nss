@@ -15,6 +15,9 @@
 #include "blapi.h"
 #include "blapii.h"
 
+#include "nsslowhash.h"
+#define MD5_ERR_MSG "MD5 invalid algorithm"
+
 #define MD5_HASH_LEN 16
 #define MD5_BUFFER_SIZE 64
 #define MD5_END_BUFFER (MD5_BUFFER_SIZE - 8)
@@ -195,6 +198,11 @@ struct MD5ContextStr {
 SECStatus
 MD5_Hash(unsigned char *dest, const char *src)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(MD5_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     return MD5_HashBuf(dest, (const unsigned char *)src, PORT_Strlen(src));
 }
 
@@ -203,6 +211,12 @@ MD5_HashBuf(unsigned char *dest, const unsigned char *src, PRUint32 src_length)
 {
     unsigned int len;
     MD5Context cx;
+
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(MD5_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
 
     MD5_Begin(&cx);
     MD5_Update(&cx, src, src_length);
@@ -214,8 +228,16 @@ MD5_HashBuf(unsigned char *dest, const unsigned char *src, PRUint32 src_length)
 MD5Context *
 MD5_NewContext(void)
 {
+    MD5Context *cx = NULL;
+
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(MD5_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        return NULL;
+    }
+
     /* no need to ZAlloc, MD5_Begin will init the context */
-    MD5Context *cx = (MD5Context *)PORT_Alloc(sizeof(MD5Context));
+    cx = (MD5Context *)PORT_Alloc(sizeof(MD5Context));
     if (cx == NULL) {
         PORT_SetError(PR_OUT_OF_MEMORY_ERROR);
         return NULL;
@@ -226,6 +248,13 @@ MD5_NewContext(void)
 void
 MD5_DestroyContext(MD5Context *cx, PRBool freeit)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        if (cx)
+            memset(cx, 0, sizeof *cx);
+        nsslow_LogFIPSError(MD5_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     memset(cx, 0, sizeof *cx);
     if (freeit) {
         PORT_Free(cx);
@@ -235,6 +264,13 @@ MD5_DestroyContext(MD5Context *cx, PRBool freeit)
 void
 MD5_Begin(MD5Context *cx)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        if (cx)
+            memset(cx, 0, sizeof *cx);
+        nsslow_LogFIPSError(MD5_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     cx->lsbInput = 0;
     cx->msbInput = 0;
     /*  memset(cx->inBuf, 0, sizeof(cx->inBuf)); */
@@ -425,6 +461,12 @@ MD5_Update(MD5Context *cx, const unsigned char *input, unsigned int inputLen)
     PRUint32 inBufIndex = cx->lsbInput & 63;
     const PRUint32 *wBuf;
 
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(MD5_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
+
     /* Add the number of input bytes to the 64-bit input counter. */
     addto64(cx->msbInput, cx->lsbInput, inputLen);
     if (inBufIndex) {
@@ -498,6 +540,12 @@ MD5_End(MD5Context *cx, unsigned char *digest,
     PRUint32 lowInput, highInput;
     PRUint32 inBufIndex = cx->lsbInput & 63;
 
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(MD5_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
+
     if (maxDigestLen < MD5_HASH_LEN) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         return;
@@ -546,6 +594,12 @@ MD5_EndRaw(MD5Context *cx, unsigned char *digest,
 #endif
     PRUint32 cv[4];
 
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(MD5_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
+
     if (maxDigestLen < MD5_HASH_LEN) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         return;
@@ -566,12 +620,24 @@ MD5_EndRaw(MD5Context *cx, unsigned char *digest,
 unsigned int
 MD5_FlattenSize(MD5Context *cx)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(MD5_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
+
     return sizeof(*cx);
 }
 
 SECStatus
 MD5_Flatten(MD5Context *cx, unsigned char *space)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(MD5_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
+
     memcpy(space, cx, sizeof(*cx));
     return SECSuccess;
 }
@@ -579,7 +645,15 @@ MD5_Flatten(MD5Context *cx, unsigned char *space)
 MD5Context *
 MD5_Resurrect(unsigned char *space, void *arg)
 {
-    MD5Context *cx = MD5_NewContext();
+    MD5Context *cx = NULL;
+
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(MD5_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
+
+    cx = MD5_NewContext();
     if (cx)
         memcpy(cx, space, sizeof(*cx));
     return cx;
@@ -588,11 +662,23 @@ MD5_Resurrect(unsigned char *space, void *arg)
 void
 MD5_Clone(MD5Context *dest, MD5Context *src)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(MD5_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
+
     memcpy(dest, src, sizeof *dest);
 }
 
 void
 MD5_TraceState(MD5Context *cx)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(MD5_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
+
     PORT_SetError(PR_NOT_IMPLEMENTED_ERROR);
 }
