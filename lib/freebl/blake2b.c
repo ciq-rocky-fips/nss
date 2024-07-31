@@ -14,6 +14,9 @@
 #include "blake2b.h"
 #include "crypto_primitives.h"
 
+#include "nsslowhash.h"
+#define BLAKE2B_ERR_MSG "blake2b invalid algorithm"
+
 /**
  * This contains the BLAKE2b initialization vectors.
  */
@@ -124,6 +127,11 @@ blake2b_Compress(BLAKE2BContext* ctx, const uint8_t* block)
 BLAKE2BContext*
 BLAKE2B_NewContext()
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(BLAKE2B_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        return NULL;
+    }
     return PORT_ZNew(BLAKE2BContext);
 }
 
@@ -133,6 +141,13 @@ BLAKE2B_NewContext()
 void
 BLAKE2B_DestroyContext(BLAKE2BContext* ctx, PRBool freeit)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        if (ctx)
+            memset(ctx, 0, sizeof(*ctx));
+        nsslow_LogFIPSError(BLAKE2B_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     PORT_Memset(ctx, 0, sizeof(*ctx));
     if (freeit) {
         PORT_Free(ctx);
@@ -188,12 +203,22 @@ failure_noclean:
 SECStatus
 BLAKE2B_Begin(BLAKE2BContext* ctx)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(BLAKE2B_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     return blake2b_Begin(ctx, BLAKE2B512_LENGTH, NULL, 0);
 }
 
 SECStatus
 BLAKE2B_MAC_Begin(BLAKE2BContext* ctx, const PRUint8* key, const size_t keylen)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(BLAKE2B_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     PORT_Assert(key != NULL);
     if (!key) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
@@ -218,6 +243,11 @@ SECStatus
 BLAKE2B_Update(BLAKE2BContext* ctx, const unsigned char* in,
                unsigned int inlen)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(BLAKE2B_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     /* Nothing to do if there's nothing. */
     if (inlen == 0) {
         return SECSuccess;
@@ -277,6 +307,11 @@ BLAKE2B_End(BLAKE2BContext* ctx, unsigned char* out,
     size_t i;
     unsigned int outlen = PR_MIN(BLAKE2B512_LENGTH, maxDigestLen);
 
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(BLAKE2B_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     /* Argument checks */
     if (!ctx || !out) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
@@ -356,6 +391,11 @@ done:
 SECStatus
 BLAKE2B_Hash(unsigned char* dest, const char* src)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(BLAKE2B_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     return blake2b_HashBuf(dest, (const unsigned char*)src, BLAKE2B512_LENGTH,
                            PORT_Strlen(src), NULL, 0);
 }
@@ -363,6 +403,11 @@ BLAKE2B_Hash(unsigned char* dest, const char* src)
 SECStatus
 BLAKE2B_HashBuf(unsigned char* output, const unsigned char* input, PRUint32 inlen)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(BLAKE2B_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     return blake2b_HashBuf(output, input, BLAKE2B512_LENGTH, inlen, NULL, 0);
 }
 
@@ -371,6 +416,11 @@ BLAKE2B_MAC_HashBuf(unsigned char* output, const unsigned char* input,
                     unsigned int inlen, const unsigned char* key,
                     unsigned int keylen)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(BLAKE2B_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     PORT_Assert(key != NULL);
     if (!key && keylen <= BLAKE2B_KEY_SIZE) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
@@ -382,12 +432,22 @@ BLAKE2B_MAC_HashBuf(unsigned char* output, const unsigned char* input,
 unsigned int
 BLAKE2B_FlattenSize(BLAKE2BContext* ctx)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(BLAKE2B_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     return sizeof(BLAKE2BContext);
 }
 
 SECStatus
 BLAKE2B_Flatten(BLAKE2BContext* ctx, unsigned char* space)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(BLAKE2B_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     PORT_Assert(space != NULL);
     if (!space) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
@@ -400,6 +460,11 @@ BLAKE2B_Flatten(BLAKE2BContext* ctx, unsigned char* space)
 BLAKE2BContext*
 BLAKE2B_Resurrect(unsigned char* space, void* arg)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(BLAKE2B_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     PORT_Assert(space != NULL);
     if (!space) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
@@ -418,6 +483,11 @@ BLAKE2B_Resurrect(unsigned char* space, void* arg)
 void
 BLAKE2B_Clone(BLAKE2BContext* dest, BLAKE2BContext* src)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(BLAKE2B_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     PORT_Assert(dest != NULL);
     PORT_Assert(src != NULL);
     if (!dest || !src) {
