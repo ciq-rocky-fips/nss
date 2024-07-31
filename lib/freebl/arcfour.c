@@ -14,6 +14,9 @@
 #include "prtypes.h"
 #include "blapi.h"
 
+#include "nsslowhash.h"
+#define RC4_ERR_MSG "RC4 invalid algorithm"
+
 /* Architecture-dependent defines */
 
 #if defined(SOLARIS) || defined(HPUX) || defined(NSS_X86) || \
@@ -108,6 +111,11 @@ static const Stype Kinit[256] = {
 RC4Context *
 RC4_AllocateContext(void)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(RC4_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        return NULL;
+    }
     return PORT_ZNew(RC4Context);
 }
 
@@ -120,6 +128,14 @@ RC4_InitContext(RC4Context *cx, const unsigned char *key, unsigned int len,
     PRUint8 j, tmp;
     PRUint8 K[256];
     PRUint8 *L;
+
+    if (nsslow_GetFIPSEnabled()) {
+        if (cx)
+            memset(cx, 0, sizeof(*cx));
+        nsslow_LogFIPSError(RC4_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
 
     /* verify the key length. */
     PORT_Assert(len > 0 && len < ARCFOUR_STATE_SIZE);
@@ -162,7 +178,14 @@ RC4_InitContext(RC4Context *cx, const unsigned char *key, unsigned int len,
 RC4Context *
 RC4_CreateContext(const unsigned char *key, int len)
 {
-    RC4Context *cx = RC4_AllocateContext();
+    RC4Context *cx = NULL;
+
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(RC4_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        return NULL;
+    }
+    cx = RC4_AllocateContext();
     if (cx) {
         SECStatus rv = RC4_InitContext(cx, key, len, NULL, 0, 0, 0);
         if (rv != SECSuccess) {
@@ -176,6 +199,13 @@ RC4_CreateContext(const unsigned char *key, int len)
 void
 RC4_DestroyContext(RC4Context *cx, PRBool freeit)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        if (cx)
+            memset(cx, 0, sizeof(*cx));
+        nsslow_LogFIPSError(RC4_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     if (freeit)
         PORT_ZFree(cx, sizeof(*cx));
 }
@@ -548,6 +578,11 @@ RC4_Encrypt(RC4Context *cx, unsigned char *output,
             unsigned int *outputLen, unsigned int maxOutputLen,
             const unsigned char *input, unsigned int inputLen)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(RC4_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     PORT_Assert(maxOutputLen >= inputLen);
     if (maxOutputLen < inputLen) {
         PORT_SetError(SEC_ERROR_OUTPUT_LEN);
@@ -571,6 +606,11 @@ RC4_Decrypt(RC4Context *cx, unsigned char *output,
             unsigned int *outputLen, unsigned int maxOutputLen,
             const unsigned char *input, unsigned int inputLen)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(RC4_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     PORT_Assert(maxOutputLen >= inputLen);
     if (maxOutputLen < inputLen) {
         PORT_SetError(SEC_ERROR_OUTPUT_LEN);
