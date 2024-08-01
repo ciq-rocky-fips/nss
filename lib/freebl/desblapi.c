@@ -18,6 +18,10 @@
 #include <stddef.h>
 #include "secerr.h"
 
+#include "hasht.h"
+#include "nsslowhash.h"
+#define DES_ERR_MSG "DES invalid algorithm"
+
 #if defined(NSS_X86_OR_X64)
 /* Intel X86 CPUs do unaligned loads and stores without complaint. */
 #define COPY8B(to, from, ptr) \
@@ -136,6 +140,11 @@ DES_EDE3CBCDe(DESContext *cx, BYTE *out, const BYTE *in, unsigned int len)
 DESContext *
 DES_AllocateContext(void)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(DES_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        return NULL;
+    }
     return PORT_ZNew(DESContext);
 }
 
@@ -145,6 +154,15 @@ DES_InitContext(DESContext *cx, const unsigned char *key, unsigned int keylen,
                 unsigned int unused)
 {
     DESDirection opposite;
+
+    if (nsslow_GetFIPSEnabled()) {
+        if (cx)
+            memset(cx, 0, sizeof(*cx));
+        nsslow_LogFIPSError(DES_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
+
     if (!cx) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         return SECFailure;
@@ -201,8 +219,16 @@ DES_InitContext(DESContext *cx, const unsigned char *key, unsigned int keylen,
 DESContext *
 DES_CreateContext(const BYTE *key, const BYTE *iv, int mode, PRBool encrypt)
 {
-    DESContext *cx = PORT_ZNew(DESContext);
-    SECStatus rv = DES_InitContext(cx, key, 0, iv, mode, encrypt, 0);
+    DESContext *cx = NULL;
+    SECStatus rv = SECFailure;
+
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(DES_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        return NULL;
+    }
+    cx = PORT_ZNew(DESContext);
+    rv = DES_InitContext(cx, key, 0, iv, mode, encrypt, 0);
 
     if (rv != SECSuccess) {
         PORT_ZFree(cx, sizeof *cx);
@@ -214,6 +240,13 @@ DES_CreateContext(const BYTE *key, const BYTE *iv, int mode, PRBool encrypt)
 void
 DES_DestroyContext(DESContext *cx, PRBool freeit)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        if (cx)
+            memset(cx, 0, sizeof(*cx));
+        nsslow_LogFIPSError(DES_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     if (cx) {
         memset(cx, 0, sizeof *cx);
         if (freeit)
@@ -225,6 +258,11 @@ SECStatus
 DES_Encrypt(DESContext *cx, BYTE *out, unsigned int *outLen,
             unsigned int maxOutLen, const BYTE *in, unsigned int inLen)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(DES_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
 
     if ((inLen % 8) != 0 || maxOutLen < inLen || !cx ||
         cx->direction != DES_ENCRYPT) {
@@ -242,6 +280,11 @@ SECStatus
 DES_Decrypt(DESContext *cx, BYTE *out, unsigned int *outLen,
             unsigned int maxOutLen, const BYTE *in, unsigned int inLen)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(DES_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
 
     if ((inLen % 8) != 0 || maxOutLen < inLen || !cx ||
         cx->direction != DES_DECRYPT) {
