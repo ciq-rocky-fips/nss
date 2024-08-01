@@ -15,6 +15,9 @@
 #include "camellia.h"
 #include "sha_fast.h" /* for SHA_HTONL and related configuration macros */
 
+#include "nsslowhash.h"
+#define CAMELLIA_ERR_MSG "camellia invalid algorithm"
+
 /* key constants */
 
 #define CAMELLIA_SIGMA1L (0xA09E667FL)
@@ -1723,6 +1726,11 @@ camellia_decryptCBC(CamelliaContext *cx, unsigned char *output,
 CamelliaContext *
 Camellia_AllocateContext(void)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(CAMELLIA_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        return NULL;
+    }
     return PORT_ZNew(CamelliaContext);
 }
 
@@ -1732,6 +1740,13 @@ Camellia_InitContext(CamelliaContext *cx, const unsigned char *key,
                      const unsigned char *iv, int mode, unsigned int encrypt,
                      unsigned int unused)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        if (cx)
+            memset(cx, 0, sizeof(*cx));
+        nsslow_LogFIPSError(CAMELLIA_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     if (key == NULL ||
         (keysize != 16 && keysize != 24 && keysize != 32)) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
@@ -1777,6 +1792,11 @@ Camellia_CreateContext(const unsigned char *key, const unsigned char *iv,
 {
     CamelliaContext *cx;
 
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(CAMELLIA_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        return NULL;
+    }
     if (key == NULL ||
         (keysize != 16 && keysize != 24 && keysize != 32)) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
@@ -1825,6 +1845,13 @@ cleanup:
 void
 Camellia_DestroyContext(CamelliaContext *cx, PRBool freeit)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        if (cx)
+            memset(cx, 0, sizeof(*cx));
+        nsslow_LogFIPSError(CAMELLIA_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     if (cx)
         memset(cx, 0, sizeof *cx);
     if (freeit)
@@ -1842,6 +1869,11 @@ Camellia_Encrypt(CamelliaContext *cx, unsigned char *output,
                  unsigned int *outputLen, unsigned int maxOutputLen,
                  const unsigned char *input, unsigned int inputLen)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(CAMELLIA_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
 
     /* Check args */
     if (cx == NULL || output == NULL || input == NULL ||
@@ -1875,6 +1907,11 @@ Camellia_Decrypt(CamelliaContext *cx, unsigned char *output,
                  unsigned int *outputLen, unsigned int maxOutputLen,
                  const unsigned char *input, unsigned int inputLen)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(CAMELLIA_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
 
     /* Check args */
     if (cx == NULL || output == NULL || input == NULL || outputLen == NULL) {
