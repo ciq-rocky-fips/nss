@@ -13,6 +13,10 @@
 
 #include "blapi.h"
 
+#include "hasht.h"
+#include "nsslowhash.h"
+#define MD2_ERR_MSG "MD2 invalid algorithm"
+
 #define MD2_DIGEST_LEN 16
 #define MD2_BUFSIZE 16
 #define MD2_X_SIZE 48  /* The X array, [CV | INPUT | TMP VARS] */
@@ -66,7 +70,15 @@ SECStatus
 MD2_Hash(unsigned char *dest, const char *src)
 {
     unsigned int len;
-    MD2Context *cx = MD2_NewContext();
+    MD2Context *cx = NULL;
+
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(MD2_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
+
+    cx = MD2_NewContext();
     if (!cx) {
         PORT_SetError(PR_OUT_OF_MEMORY_ERROR);
         return SECFailure;
@@ -81,7 +93,15 @@ MD2_Hash(unsigned char *dest, const char *src)
 MD2Context *
 MD2_NewContext(void)
 {
-    MD2Context *cx = (MD2Context *)PORT_ZAlloc(sizeof(MD2Context));
+    MD2Context *cx = NULL;
+
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(MD2_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        return NULL;
+    }
+
+    cx = (MD2Context *)PORT_ZAlloc(sizeof(MD2Context));
     if (cx == NULL) {
         PORT_SetError(PR_OUT_OF_MEMORY_ERROR);
         return NULL;
@@ -92,6 +112,14 @@ MD2_NewContext(void)
 void
 MD2_DestroyContext(MD2Context *cx, PRBool freeit)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        if (cx)
+            memset(cx, 0, sizeof(*cx));
+        nsslow_LogFIPSError(MD2_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
+
     if (freeit)
         PORT_ZFree(cx, sizeof(*cx));
 }
@@ -99,6 +127,13 @@ MD2_DestroyContext(MD2Context *cx, PRBool freeit)
 void
 MD2_Begin(MD2Context *cx)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        if (cx)
+            memset(cx, 0, sizeof(*cx));
+        nsslow_LogFIPSError(MD2_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     memset(cx, 0, sizeof(*cx));
     cx->unusedBuffer = MD2_BUFSIZE;
 }
@@ -196,6 +231,12 @@ MD2_Update(MD2Context *cx, const unsigned char *input, unsigned int inputLen)
 {
     PRUint32 bytesToConsume;
 
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(MD2_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
+
     /* Fill the remaining input buffer. */
     if (cx->unusedBuffer != MD2_BUFSIZE) {
         bytesToConsume = PR_MIN(inputLen, cx->unusedBuffer);
@@ -226,6 +267,13 @@ MD2_End(MD2Context *cx, unsigned char *digest,
         unsigned int *digestLen, unsigned int maxDigestLen)
 {
     PRUint8 padStart;
+
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(MD2_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
+
     if (maxDigestLen < MD2_BUFSIZE) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         return;
@@ -243,12 +291,22 @@ MD2_End(MD2Context *cx, unsigned char *digest,
 unsigned int
 MD2_FlattenSize(MD2Context *cx)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(MD2_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     return sizeof(*cx);
 }
 
 SECStatus
 MD2_Flatten(MD2Context *cx, unsigned char *space)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(MD2_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     memcpy(space, cx, sizeof(*cx));
     return SECSuccess;
 }
@@ -256,7 +314,13 @@ MD2_Flatten(MD2Context *cx, unsigned char *space)
 MD2Context *
 MD2_Resurrect(unsigned char *space, void *arg)
 {
-    MD2Context *cx = MD2_NewContext();
+    MD2Context *cx = NULL;
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(MD2_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
+    cx = MD2_NewContext();
     if (cx)
         memcpy(cx, space, sizeof(*cx));
     return cx;
@@ -265,5 +329,10 @@ MD2_Resurrect(unsigned char *space, void *arg)
 void
 MD2_Clone(MD2Context *dest, MD2Context *src)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(MD2_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     memcpy(dest, src, sizeof *dest);
 }
