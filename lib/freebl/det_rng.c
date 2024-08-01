@@ -10,6 +10,10 @@
 #include "secerr.h"
 #include "prinit.h"
 
+#include "hasht.h"
+#include "nsslowhash.h"
+#define RNG_ERR_MSG "RNG (ChaCha20Poly) invalid algorithm"
+
 #define GLOBAL_BYTES_SIZE 100
 static PRUint8 globalBytes[GLOBAL_BYTES_SIZE];
 static unsigned long globalNumCalls = 0;
@@ -37,6 +41,11 @@ rng_init(void)
 SECStatus
 RNG_RNGInit(void)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(RNG_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     /* Allow only one call to initialize the context */
     if (PR_CallOnce(&coRNGInit, rng_init) != PR_SUCCESS) {
         return SECFailure;
@@ -50,6 +59,11 @@ RNG_RNGInit(void)
 SECStatus
 RNG_RandomUpdate(const void *data, size_t bytes)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(RNG_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     /* Check for a valid RNG lock. */
     PORT_Assert(rng_lock != NULL);
     if (rng_lock == NULL) {
@@ -76,6 +90,11 @@ RNG_GenerateGlobalRandomBytes(void *dest, size_t len)
     static const uint8_t key[32] = { 0 };
     uint8_t nonce[12] = { 0 };
 
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(RNG_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     /* Check for a valid RNG lock. */
     PORT_Assert(rng_lock != NULL);
     if (rng_lock == NULL) {
@@ -112,6 +131,11 @@ RNG_GenerateGlobalRandomBytes(void *dest, size_t len)
 void
 RNG_RNGShutdown(void)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(RNG_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     if (rng_lock) {
         PZ_DestroyLock(rng_lock);
         rng_lock = NULL;
