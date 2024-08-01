@@ -16,6 +16,10 @@
 #include <stddef.h> /* for ptrdiff_t */
 #endif
 
+#include "hasht.h"
+#include "nsslowhash.h"
+#define RC2_ERR_MSG "RC2 invalid algorithm"
+
 /*
 ** RC2 symmetric block cypher
 */
@@ -119,6 +123,11 @@ static const PRUint8 S[256] = {
 RC2Context *
 RC2_AllocateContext(void)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(RC2_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        return NULL;
+    }
     return PORT_ZNew(RC2Context);
 }
 SECStatus
@@ -133,6 +142,13 @@ RC2_InitContext(RC2Context *cx, const unsigned char *key, unsigned int len,
 #endif
     PRUint8 tmpB;
 
+    if (nsslow_GetFIPSEnabled()) {
+        if (cx)
+            memset(cx, 0, sizeof(*cx));
+        nsslow_LogFIPSError(RC2_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     if (!key || !cx || !len || len > (sizeof cx->B) ||
         efLen8 > (sizeof cx->B)) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
@@ -204,7 +220,14 @@ RC2Context *
 RC2_CreateContext(const unsigned char *key, unsigned int len,
                   const unsigned char *iv, int mode, unsigned efLen8)
 {
-    RC2Context *cx = PORT_ZNew(RC2Context);
+    RC2Context *cx = NULL;
+
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(RC2_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        return NULL;
+    }
+    cx = PORT_ZNew(RC2Context);
     if (cx) {
         SECStatus rv = RC2_InitContext(cx, key, len, iv, mode, efLen8, 0);
         if (rv != SECSuccess) {
@@ -223,6 +246,13 @@ RC2_CreateContext(const unsigned char *key, unsigned int len,
 void
 RC2_DestroyContext(RC2Context *cx, PRBool freeit)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        if (cx)
+            memset(cx, 0, sizeof(*cx));
+        nsslow_LogFIPSError(RC2_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     if (cx) {
         memset(cx, 0, sizeof *cx);
         if (freeit) {
@@ -457,6 +487,11 @@ RC2_Encrypt(RC2Context *cx, unsigned char *output,
             const unsigned char *input, unsigned int inputLen)
 {
     SECStatus rv = SECSuccess;
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(RC2_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     if (inputLen) {
         if (inputLen % RC2_BLOCK_SIZE) {
             PORT_SetError(SEC_ERROR_INPUT_LEN);
@@ -491,6 +526,11 @@ RC2_Decrypt(RC2Context *cx, unsigned char *output,
             const unsigned char *input, unsigned int inputLen)
 {
     SECStatus rv = SECSuccess;
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(RC2_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     if (inputLen) {
         if (inputLen % RC2_BLOCK_SIZE) {
             PORT_SetError(SEC_ERROR_INPUT_LEN);
