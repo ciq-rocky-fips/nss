@@ -11,6 +11,10 @@
 #include "secitem.h"
 #include "secmpi.h"
 
+#include "hasht.h"
+#include "nsslowhash.h"
+#define JPAKE_ERR_MSG "JPAKE invalid algorithm"
+
 /* Hash an item's length and then its value. Only items smaller than 2^16 bytes
  * are allowed. Lengths are hashed in network byte order. This is designed
  * to match the OpenSSL J-PAKE implementation.
@@ -91,6 +95,12 @@ JPAKE_Sign(PLArenaPool *arena, const PQGParams *pqg, HASH_HashType hashType,
     mp_int tmp;
     mp_int R;
     SECItem v;
+
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(JPAKE_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
 
     if (!arena ||
         !pqg || !pqg->prime.data || pqg->prime.len == 0 ||
@@ -208,6 +218,12 @@ JPAKE_Verify(PLArenaPool *arena, const PQGParams *pqg, HASH_HashType hashType,
     mp_int gxh;
     mp_int gr_gxh;
     SECItem calculated;
+
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(JPAKE_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
 
     if (!arena ||
         !pqg || !pqg->prime.data || pqg->prime.len == 0 ||
@@ -359,6 +375,12 @@ JPAKE_Round2(PLArenaPool *arena,
     mp_int S;
     mp_int result;
 
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(JPAKE_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
+
     if (!arena ||
         !p || !p->data || p->len == 0 ||
         !q || !q->data || q->len == 0 ||
@@ -431,6 +453,12 @@ JPAKE_Final(PLArenaPool *arena, const SECItem *p, const SECItem *q,
     mp_int exponent;
     mp_int divisor;
     mp_int base;
+
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(JPAKE_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
 
     if (!arena ||
         !p || !p->data || p->len == 0 ||
