@@ -16,6 +16,30 @@
 #include "ec.h"
 #include "ecl.h"
 
+#include "hasht.h"
+#include "nsslowhash.h"
+#define EC_ERR_MSG "EC invalid curve"
+
+/* FIPS only supports ECCurve_NIST_P256, ECCurve_NIST_P384,
+ * ECCurve_NIST_P521 curves. */
+
+static SECStatus fips_check_curve(ECParams *ecParams)
+{
+    if (!nsslow_GetFIPSEnabled()) {
+        return SECSuccess;
+    }
+    switch (ecParams->name)
+    {
+        case ECCurve_NIST_P256:
+        case ECCurve_NIST_P384:
+        case ECCurve_NIST_P521:
+            break;
+        default:
+            return SECFailure;
+    }
+    return SECSuccess;
+}
+
 static const ECMethod kMethods[] = {
     { ECCurve25519,
       ec_Curve25519_pt_mul,
@@ -324,6 +348,15 @@ EC_NewKeyFromSeed(ECParams *ecParams, ECPrivateKey **privKey,
                   const unsigned char *seed, int seedlen)
 {
     SECStatus rv = SECFailure;
+    if (!ecParams || ecParams->name == ECCurve_noName || !privKey) {
+        PORT_SetError(SEC_ERROR_INVALID_ARGS);
+        return SECFailure;
+    }
+    if (fips_check_curve(ecParams) != SECSuccess) {
+        PORT_SetError(SEC_ERROR_UNSUPPORTED_ELLIPTIC_CURVE);
+        nsslow_LogFIPSError(EC_ERR_MSG);
+        return SECFailure;
+    }
     rv = ec_NewKey(ecParams, privKey, seed, seedlen);
     return rv;
 }
@@ -401,6 +434,12 @@ EC_NewKey(ECParams *ecParams, ECPrivateKey **privKey)
         return SECFailure;
     }
 
+    if (fips_check_curve(ecParams) != SECSuccess) {
+        PORT_SetError(SEC_ERROR_UNSUPPORTED_ELLIPTIC_CURVE);
+        nsslow_LogFIPSError(EC_ERR_MSG);
+        return SECFailure;
+    }
+
     len = ecParams->order.len;
     privKeyBytes = ec_GenerateRandomPrivateKey(ecParams->order.data, len);
     if (privKeyBytes == NULL)
@@ -438,6 +477,12 @@ EC_ValidatePublicKey(ECParams *ecParams, SECItem *publicValue)
     if (!ecParams || ecParams->name == ECCurve_noName ||
         !publicValue || !publicValue->len) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
+        return SECFailure;
+    }
+
+    if (fips_check_curve(ecParams) != SECSuccess) {
+        PORT_SetError(SEC_ERROR_UNSUPPORTED_ELLIPTIC_CURVE);
+        nsslow_LogFIPSError(EC_ERR_MSG);
         return SECFailure;
     }
 
@@ -545,6 +590,12 @@ ECDH_Derive(SECItem *publicValue,
         !ecParams || ecParams->name == ECCurve_noName ||
         !privateValue || !privateValue->len || !derivedSecret) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
+        return SECFailure;
+    }
+
+    if (fips_check_curve(ecParams) != SECSuccess) {
+        PORT_SetError(SEC_ERROR_UNSUPPORTED_ELLIPTIC_CURVE);
+        nsslow_LogFIPSError(EC_ERR_MSG);
         return SECFailure;
     }
 
@@ -692,6 +743,13 @@ ECDSA_SignDigestWithSeed(ECPrivateKey *key, SECItem *signature,
     }
 
     ecParams = &(key->ecParams);
+
+    if (fips_check_curve(ecParams) != SECSuccess) {
+        PORT_SetError(SEC_ERROR_UNSUPPORTED_ELLIPTIC_CURVE);
+        nsslow_LogFIPSError(EC_ERR_MSG);
+        return SECFailure;
+    }
+
     flen = (ecParams->fieldID.size + 7) >> 3;
     olen = ecParams->order.len;
     if (signature->data == NULL) {
@@ -900,6 +958,11 @@ ECDSA_SignDigest(ECPrivateKey *key, SECItem *signature, const SECItem *digest)
         return SECFailure;
     }
 
+    if (fips_check_curve(&key->ecParams) != SECSuccess) {
+        PORT_SetError(SEC_ERROR_UNSUPPORTED_ELLIPTIC_CURVE);
+        nsslow_LogFIPSError(EC_ERR_MSG);
+        return SECFailure;
+    }
     /* Generate random value k */
     len = key->ecParams.order.len;
     kBytes = ec_GenerateRandomPrivateKey(key->ecParams.order.data, len);
@@ -970,6 +1033,18 @@ ECDSA_VerifyDigest(ECPublicKey *key, const SECItem *signature,
     }
 
     ecParams = &(key->ecParams);
+
+    if (!ecParams) {
+        PORT_SetError(SEC_ERROR_INVALID_ARGS);
+        goto cleanup;
+    }
+
+    if (fips_check_curve(ecParams) != SECSuccess) {
+        PORT_SetError(SEC_ERROR_UNSUPPORTED_ELLIPTIC_CURVE);
+        nsslow_LogFIPSError(EC_ERR_MSG);
+        goto cleanup;
+    }
+
     flen = (ecParams->fieldID.size + 7) >> 3;
     olen = ecParams->order.len;
     if (signature->len == 0 || signature->len % 2 != 0 ||
