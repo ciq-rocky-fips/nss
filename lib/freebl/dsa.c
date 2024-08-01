@@ -23,6 +23,8 @@
 #include "pqg.h"
 #include "nsslowhash.h"
 
+#define DSA_ERR_MSG "DSA invalid algorithm"
+
 /*
  * FIPS 186-2 requires result from random output to be reduced mod q when
  * generating random numbers for DSA.
@@ -283,6 +285,10 @@ DSA_NewKey(const PQGParams *params, DSAPrivateKey **privKey)
     SECStatus rv;
 
     if (nsslow_GetFIPSEnabled()) {
+        if (privKey)
+            *privKey = NULL;
+        nsslow_LogFIPSError(DSA_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
         return CKR_FUNCTION_NOT_SUPPORTED;
     }
 
@@ -314,6 +320,10 @@ DSA_NewKeyFromSeed(const PQGParams *params,
     SECItem seedItem;
 
     if (nsslow_GetFIPSEnabled()) {
+        if (privKey)
+            *privKey = NULL;
+        nsslow_LogFIPSError(DSA_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
         return CKR_FUNCTION_NOT_SUPPORTED;
     }
 
@@ -517,6 +527,8 @@ DSA_SignDigest(DSAPrivateKey *key, SECItem *signature, const SECItem *digest)
     PRBool good;
 
     if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(DSA_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
         return CKR_FUNCTION_NOT_SUPPORTED;
     }
 
@@ -560,6 +572,11 @@ DSA_SignDigestWithSeed(DSAPrivateKey *key,
                        const unsigned char *seed)
 {
     SECStatus rv;
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(DSA_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        return CKR_FUNCTION_NOT_SUPPORTED;
+    }
     rv = dsa_SignDigest(key, signature, digest, seed);
     return rv;
 }
@@ -573,6 +590,8 @@ DSA_VerifyDigest(DSAPublicKey *key, const SECItem *signature,
                  const SECItem *digest)
 {
     if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(DSA_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
         return CKR_FUNCTION_NOT_SUPPORTED;
     }
 
