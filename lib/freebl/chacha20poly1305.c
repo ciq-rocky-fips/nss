@@ -15,6 +15,10 @@
 #include "blapii.h"
 #include "chacha20poly1305.h"
 
+#include "hasht.h"
+#include "nsslowhash.h"
+#define CHACHA20POLY_ERR_MSG "ChaCha20Poly invalid algorithm"
+
 // There are three implementations of ChaCha20Poly1305:
 // 1) 128-bit with AVX hardware acceleration used on x64
 // 2) 256-bit with AVX2 hardware acceleration used on x64
@@ -151,6 +155,13 @@ ChaCha20Poly1305_InitContext(ChaCha20Poly1305Context *ctx,
 #ifdef NSS_DISABLE_CHACHAPOLY
     return SECFailure;
 #else
+    if (nsslow_GetFIPSEnabled()) {
+        if (ctx)
+            memset(ctx, 0, sizeof(*ctx));
+        nsslow_LogFIPSError(CHACHA20POLY_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     if (keyLen != 32) {
         PORT_SetError(SEC_ERROR_BAD_KEY);
         return SECFailure;
@@ -176,6 +187,11 @@ ChaCha20Poly1305_CreateContext(const unsigned char *key, unsigned int keyLen,
 #else
     ChaCha20Poly1305Context *ctx;
 
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(CHACHA20POLY_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        return NULL;
+    }
     ctx = PORT_New(ChaCha20Poly1305Context);
     if (ctx == NULL) {
         return NULL;
@@ -194,6 +210,13 @@ void
 ChaCha20Poly1305_DestroyContext(ChaCha20Poly1305Context *ctx, PRBool freeit)
 {
 #ifndef NSS_DISABLE_CHACHAPOLY
+    if (nsslow_GetFIPSEnabled()) {
+        if (ctx)
+            memset(ctx, 0, sizeof(*ctx));
+        nsslow_LogFIPSError(CHACHA20POLY_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     PORT_Memset(ctx, 0, sizeof(*ctx));
     if (freeit) {
         PORT_Free(ctx);
@@ -259,6 +282,11 @@ ChaCha20Poly1305_Seal(const ChaCha20Poly1305Context *ctx, unsigned char *output,
     return SECFailure;
 #else
 
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(CHACHA20POLY_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     if (nonceLen != 12) {
         PORT_SetError(SEC_ERROR_INPUT_LEN);
         return SECFailure;
@@ -322,6 +350,11 @@ ChaCha20Poly1305_Open(const ChaCha20Poly1305Context *ctx, unsigned char *output,
 #else
     unsigned int ciphertextLen;
 
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(CHACHA20POLY_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     if (nonceLen != 12) {
         PORT_SetError(SEC_ERROR_INPUT_LEN);
         return SECFailure;
@@ -396,6 +429,11 @@ ChaCha20Poly1305_Encrypt(const ChaCha20Poly1305Context *ctx,
     return SECFailure;
 #else
 
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(CHACHA20POLY_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     if (nonceLen != 12) {
         PORT_SetError(SEC_ERROR_INPUT_LEN);
         return SECFailure;
@@ -448,6 +486,11 @@ ChaCha20Poly1305_Decrypt(const ChaCha20Poly1305Context *ctx,
 #else
     unsigned int ciphertextLen;
 
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(CHACHA20POLY_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     if (nonceLen != 12) {
         PORT_SetError(SEC_ERROR_INPUT_LEN);
         return SECFailure;
