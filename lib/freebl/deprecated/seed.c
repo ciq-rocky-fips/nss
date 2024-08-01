@@ -17,6 +17,10 @@
 #include "seed.h"
 #include "secerr.h"
 
+#include "hasht.h"
+#include "nsslowhash.h"
+#define SEED_ERR_MSG "SEED  invalid algorithm"
+
 static const seed_word SS[4][256] = {
     { 0x2989a1a8, 0x05858184, 0x16c6d2d4, 0x13c3d3d0,
       0x14445054, 0x1d0d111c, 0x2c8ca0ac, 0x25052124,
@@ -528,6 +532,11 @@ SEED_cbc_encrypt(const unsigned char *in, unsigned char *out,
 SEEDContext *
 SEED_AllocateContext(void)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(SEED_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        return NULL;
+    }
     return PORT_ZNew(SEEDContext);
 }
 
@@ -536,6 +545,13 @@ SEED_InitContext(SEEDContext *cx, const unsigned char *key,
                  unsigned int keylen, const unsigned char *iv,
                  int mode, unsigned int encrypt, unsigned int unused)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        if (cx)
+            memset(cx, 0, sizeof(*cx));
+        nsslow_LogFIPSError(SEED_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     if (!cx) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         return SECFailure;
@@ -567,10 +583,17 @@ SEEDContext *
 SEED_CreateContext(const unsigned char *key, const unsigned char *iv,
                    int mode, PRBool encrypt)
 {
-    SEEDContext *cx = PORT_ZNew(SEEDContext);
-    SECStatus rv = SEED_InitContext(cx, key, SEED_KEY_LENGTH, iv, mode,
-                                    encrypt, 0);
+    SEEDContext *cx = NULL;
+    SECStatus rv = SECFailure;
 
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(SEED_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        return NULL;
+    }
+    cx = PORT_ZNew(SEEDContext);
+    rv = SEED_InitContext(cx, key, SEED_KEY_LENGTH, iv, mode,
+                                    encrypt, 0);
     if (rv != SECSuccess) {
         PORT_ZFree(cx, sizeof *cx);
         cx = NULL;
@@ -582,6 +605,13 @@ SEED_CreateContext(const unsigned char *key, const unsigned char *iv,
 void
 SEED_DestroyContext(SEEDContext *cx, PRBool freeit)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        if (cx)
+            memset(cx, 0, sizeof(*cx));
+        nsslow_LogFIPSError(SEED_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     if (cx) {
         memset(cx, 0, sizeof *cx);
 
@@ -595,6 +625,11 @@ SEED_Encrypt(SEEDContext *cx, unsigned char *out, unsigned int *outLen,
              unsigned int maxOutLen, const unsigned char *in,
              unsigned int inLen)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(SEED_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     if (!cx) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         return SECFailure;
@@ -635,6 +670,11 @@ SEED_Decrypt(SEEDContext *cx, unsigned char *out, unsigned int *outLen,
              unsigned int maxOutLen, const unsigned char *in,
              unsigned int inLen)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(SEED_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     if (!cx) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         return SECFailure;
