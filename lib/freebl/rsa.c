@@ -22,6 +22,25 @@
 #include "secitem.h"
 #include "blapii.h"
 
+#include "hasht.h"
+#include "nsslowhash.h"
+#define RSA_KEY_ERR "RSA key size not equal to 2048, 3072, 4096, 6144, 8192)"
+
+static SECStatus fips_allowed_keysize(int keySizeInBits)
+{
+    if (keySizeInBits == 2048)
+        return SECSuccess;
+    if (keySizeInBits == 3072)
+        return SECSuccess;
+    if (keySizeInBits == 4096)
+        return SECSuccess;
+    if (keySizeInBits == 6144)
+        return SECSuccess;
+    if (keySizeInBits == 8192)
+        return SECSuccess;
+    return SECFailure;
+}
+
 /*
 ** Number of times to attempt to generate a prime (p or q) from a random
 ** seed (the seed changes for each iteration).
@@ -294,6 +313,13 @@ RSA_NewKey(int keySizeInBits, SECItem *publicExponent)
         BAD_RSA_KEY_SIZE((unsigned int)keySizeInBits / 8, publicExponent->len)) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         return NULL;
+    }
+    if (nsslow_GetFIPSEnabled()) {
+        if (fips_allowed_keysize(keySizeInBits) != SECSuccess) {
+            nsslow_LogFIPSError(RSA_KEY_ERR);
+            PORT_SetError(SEC_ERROR_INVALID_ARGS);
+            return NULL;
+        }
     }
     /* 1.  Set the public exponent and check if it's uneven and greater than 2.*/
     MP_DIGITS(&e) = 0;
@@ -855,6 +881,14 @@ RSA_PopulatePrivateKey(RSAPrivateKey *key)
             CHECK_MPI_OK(rsa_factorize_n_from_exponents(&e, &d, &p, &q, &n));
         } else {
             /* not enough given parameters to get both primes */
+            err = MP_BADARG;
+            goto cleanup;
+        }
+    }
+
+    if (nsslow_GetFIPSEnabled()) {
+        if (fips_allowed_keysize(keySizeInBits) != SECSuccess) {
+            nsslow_LogFIPSError(RSA_KEY_ERR);
             err = MP_BADARG;
             goto cleanup;
         }
