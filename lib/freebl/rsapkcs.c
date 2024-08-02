@@ -16,6 +16,10 @@
 #include "secitem.h"
 #include "blapii.h"
 
+#include "hasht.h"
+#include "nsslowhash.h"
+#define RSA_ERR "RSA unapproved operation"
+
 #define RSA_BLOCK_MIN_PAD_LEN 8
 #define RSA_BLOCK_FIRST_OCTET 0x00
 #define RSA_BLOCK_PRIVATE_PAD_OCTET 0xff
@@ -451,6 +455,12 @@ RSA_EncryptRaw(RSAPublicKey *key,
     SECItem formatted;
     SECItem unformatted;
 
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(RSA_ERR);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
+
     formatted.data = NULL;
     if (maxOutputLen < modulusLen)
         goto failure;
@@ -487,6 +497,12 @@ RSA_DecryptRaw(RSAPrivateKey *key,
 {
     SECStatus rv;
     unsigned int modulusLen = rsa_modulusLen(&key->modulus);
+
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(RSA_ERR);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
 
     if (modulusLen > maxOutputLen)
         goto failure;
@@ -804,6 +820,8 @@ RSA_EncryptOAEP(RSAPublicKey *key,
     unsigned int modulusLen = rsa_modulusLen(&key->modulus);
     unsigned char *oaepEncoded = NULL;
 
+    /* This is key-wrapping encryption, allowed by FIPS. */
+
     if (maxOutputLen < modulusLen) {
         PORT_SetError(SEC_ERROR_OUTPUT_LEN);
         return SECFailure;
@@ -856,6 +874,8 @@ RSA_DecryptOAEP(RSAPrivateKey *key,
     unsigned int modulusLen = rsa_modulusLen(&key->modulus);
     unsigned char *oaepEncoded = NULL;
 
+    /* This is key-wrapping encryption, allowed by FIPS. */
+
     if ((hashAlg == HASH_AlgNULL) || (maskHashAlg == HASH_AlgNULL)) {
         PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
         return SECFailure;
@@ -905,6 +925,12 @@ RSA_EncryptBlock(RSAPublicKey *key,
     unsigned int modulusLen = rsa_modulusLen(&key->modulus);
     SECItem formatted;
     SECItem unformatted;
+
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(RSA_ERR);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
 
     formatted.data = NULL;
     if (maxOutputLen < modulusLen)
@@ -1109,6 +1135,12 @@ RSA_DecryptBlock(RSAPrivateKey *key,
     unsigned int errorLength;
     const SECHashObject *hashObj;
     HMACContext *hmac = NULL;
+
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(RSA_ERR);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
 
     /* failures in the top section indicate failures in the environment
      * (memory) or the library. OK to return errors in these cases because
