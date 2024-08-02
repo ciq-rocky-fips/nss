@@ -18,7 +18,6 @@ REQDIR=${TESTDIR}/req
 RSPDIR=${TESTDIR}/resp
 
 sha_ShortMsg_requests="
-SHA1ShortMsg.req
 SHA224ShortMsg.req
 SHA256ShortMsg.req
 SHA384ShortMsg.req
@@ -26,7 +25,6 @@ SHA512ShortMsg.req
 "
 
 sha_LongMsg_requests="
-SHA1LongMsg.req
 SHA224LongMsg.req
 SHA256LongMsg.req
 SHA384LongMsg.req
@@ -34,7 +32,6 @@ SHA512LongMsg.req
 "
 
 sha_Monte_requests="
-SHA1Monte.req
 SHA224Monte.req
 SHA256Monte.req
 SHA384Monte.req
