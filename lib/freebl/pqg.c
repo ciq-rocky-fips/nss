@@ -21,6 +21,8 @@
 #include "secmpi.h"
 #include "nsslowhash.h"
 
+#define PQG_ERR_MSG "DSA PQG invalid algorithm"
+
 #define MAX_ITERATIONS 1000 /* Maximum number of iterations of primegen */
 
 typedef enum {
@@ -231,6 +233,7 @@ PQG_Check(const PQGParams *params)
     SECStatus rv = SECSuccess;
 
     if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(PQG_ERR_MSG);
         PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
         return SECFailure;
     }
@@ -1588,6 +1591,7 @@ PQG_ParamGen(unsigned int j, PQGParams **pParams, PQGVerify **pVfy)
     unsigned int seedBytes;
 
     if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(PQG_ERR_MSG);
         PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
         return SECFailure;
     }
@@ -1609,6 +1613,7 @@ PQG_ParamGenSeedLen(unsigned int j, unsigned int seedBytes,
     unsigned int L; /* Length of P in bits.  Per FIPS 186. */
 
     if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(PQG_ERR_MSG);
         PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
         return SECFailure;
     }
@@ -1627,6 +1632,7 @@ PQG_ParamGenV2(unsigned int L, unsigned int N, unsigned int seedBytes,
                PQGParams **pParams, PQGVerify **pVfy)
 {
     if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(PQG_ERR_MSG);
         PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
         return SECFailure;
     }
@@ -1667,6 +1673,7 @@ PQG_VerifyParams(const PQGParams *params,
     pqgGenType type = FIPS186_1_TYPE;
 
     if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(PQG_ERR_MSG);
         PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
         if (result != NULL)
             *result = SECFailure;
