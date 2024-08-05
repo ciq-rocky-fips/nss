@@ -1264,6 +1264,8 @@ sftk_fips_IKE_PowerUpSelfTests(void)
         0x8c, 0xd3, 0xc9, 0x3a, 0xe5, 0x98, 0xa9, 0x80,
         0x30, 0x06, 0xff, 0xb6, 0x7c, 0x40, 0xe9, 0xe4
     };
+#if 0
+    /* SHA-1 is disabled. */
     static const PRUint8 ike_sha1_known_key[] = {
         0x59, 0x98, 0x2b, 0x5b, 0xa5, 0x7e, 0x62, 0xc0,
         0x46, 0x0d, 0xef, 0xc7, 0x1e, 0x18, 0x64, 0x63
@@ -1279,6 +1281,7 @@ sftk_fips_IKE_PowerUpSelfTests(void)
         0x2a, 0xad, 0xc9, 0x94, 0x5a, 0x90, 0x26, 0xfa,
         0xc7, 0x91, 0xe2, 0x4b
     };
+#endif
     static const PRUint8 ike_sha256_known_key[] = {
         0x9d, 0xa2, 0xd5, 0x8f, 0x57, 0xf0, 0x39, 0xf9,
         0x20, 0x4e, 0x0d, 0xd0, 0xef, 0x04, 0xf3, 0x72
@@ -1373,12 +1376,15 @@ sftk_fips_IKE_PowerUpSelfTests(void)
                   ike_xcbc_known_mac_4, sizeof(ike_xcbc_known_mac_4));
     if (rv != SECSuccess)
         return rv;
+#if 0
+    /* SHA-1 is disabled. */
     rv = prf_test(CKM_SHA_1_HMAC,
                   ike_sha1_known_key, sizeof(ike_sha1_known_key),
                   ike_sha1_known_plain_text, sizeof(ike_sha1_known_plain_text),
                   ike_sha1_known_mac, sizeof(ike_sha1_known_mac));
     if (rv != SECSuccess)
         return rv;
+#endif
     rv = prf_test(CKM_SHA256_HMAC,
                   ike_sha256_known_key, sizeof(ike_sha256_known_key),
                   ike_sha256_known_plain_text,

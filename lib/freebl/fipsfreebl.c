@@ -658,12 +658,15 @@ freebl_fips_HMAC_PowerUpSelfTest(void)
 
     static const PRUint8 HMAC_known_secret_key_length = sizeof HMAC_known_secret_key;
 
+#if 0
+    /* SHA-1 is disabled. */
     /* known SHA1 hmac (20 bytes) */
     static const PRUint8 known_SHA1_hmac[] = {
         0xd5, 0x85, 0xf6, 0x5b, 0x39, 0xfa, 0xb9, 0x05,
         0x3b, 0x57, 0x1d, 0x61, 0xe7, 0xb8, 0x84, 0x1e,
         0x5d, 0x0e, 0x1e, 0x11
     };
+#endif
 
     /* known SHA224 hmac (28 bytes) */
     static const PRUint8 known_SHA224_hmac[] = {
@@ -706,6 +709,8 @@ freebl_fips_HMAC_PowerUpSelfTest(void)
     SECStatus hmac_status;
     PRUint8 hmac_computed[HASH_LENGTH_MAX];
 
+#if 0
+    /* SHA-1 is disabled. */
     /***************************************************/
     /* HMAC SHA-1 Single-Round Known Answer HMAC Test. */
     /***************************************************/
@@ -723,6 +728,7 @@ freebl_fips_HMAC_PowerUpSelfTest(void)
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
         return (SECFailure);
     }
+#endif
 
     /***************************************************/
     /* HMAC SHA-224 Single-Round Known Answer Test.    */
@@ -808,6 +814,8 @@ freebl_fips_TLS_PowerUpSelfTest(void)
 
     static const PRUint8 TLS_known_secret_key_length = sizeof TLS_known_secret_key;
 
+#if 0
+    /* MD5 and SHA-1 are disabled. */
     /* known tls prf with sha1/md5 */
     static const PRUint8 known_TLS_PRF[] = {
         0x87, 0x4c, 0xc0, 0xc5, 0x15, 0x14, 0x2b, 0xdc,
@@ -819,6 +827,7 @@ freebl_fips_TLS_PowerUpSelfTest(void)
         0x2b, 0x91, 0x2a, 0x81, 0x9d, 0x3a, 0x30, 0x40,
         0xc5, 0xdf, 0xbb, 0xfa, 0xd8, 0x4c, 0xbc, 0x18
     };
+#endif
 
     /* known SHA256 tls mac */
     static const PRUint8 known_TLS_SHA256[] = {
@@ -884,6 +893,9 @@ freebl_fips_TLS_PowerUpSelfTest(void)
     result.data = tls_computed;
     result.len = sizeof(tls_computed);
 
+#if 0
+    /* MD5 and SHA-1 are disabled. */
+    /* TLS 1.0 is disabled. */
     /***************************************************/
     /* TLS 1.0 PRF Known Answer Test                   */
     /***************************************************/
@@ -897,6 +909,7 @@ freebl_fips_TLS_PowerUpSelfTest(void)
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
         return (SECFailure);
     }
+#endif
 
     /***************************************************/
     /* TLS 1.2 SHA-256 Known Answer Test.              */
@@ -966,12 +979,15 @@ freebl_fips_TLS_PowerUpSelfTest(void)
 static SECStatus
 freebl_fips_SHA_PowerUpSelfTest(void)
 {
+#if 0
+    /* SHA-1 is disabled. */
     /* SHA-1 Known Digest Message (160-bits). */
     static const PRUint8 sha1_known_digest[] = {
         0x0a, 0x6d, 0x07, 0xba, 0x1e, 0xbd, 0x8a, 0x1b,
         0x72, 0xf6, 0xc7, 0x22, 0xf1, 0x27, 0x9f, 0xf0,
         0xe0, 0x68, 0x47, 0x7a
     };
+#endif
 
     /* SHA-224 Known Digest Message (224-bits). */
     static const PRUint8 sha224_known_digest[] = {
@@ -1015,6 +1031,8 @@ freebl_fips_SHA_PowerUpSelfTest(void)
     PRUint8 sha_computed_digest[HASH_LENGTH_MAX];
     SECStatus sha_status;
 
+#if 0
+    /* SHA-1 is disabled. */
     /*************************************************/
     /* SHA-1 Single-Round Known Answer Hashing Test. */
     /*************************************************/
@@ -1028,6 +1046,7 @@ freebl_fips_SHA_PowerUpSelfTest(void)
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
         return (SECFailure);
     }
+#endif
 
     /***************************************************/
     /* SHA-224 Single-Round Known Answer Hashing Test. */

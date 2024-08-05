@@ -12,6 +12,9 @@
 #include "prerror.h"
 #include "secerr.h"
 
+#include "nsslowhash.h"
+#define SHA1_ERR_MSG "SHA1 invalid algorithm"
+
 #ifdef TRACING_SSL
 #include "ssl.h"
 #include "ssltrace.h"
@@ -57,6 +60,14 @@ SHA1_Update_Native(SHA1Context *ctx, const unsigned char *dataIn, unsigned int l
 void
 SHA1_Begin(SHA1Context *ctx)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        if (ctx)
+            memset(ctx, 0, sizeof *ctx);
+        nsslow_LogFIPSError(SHA1_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
+
     ctx->size = 0;
     /*
    *  Initialize H with constants from FIPS180-1.
@@ -124,6 +135,11 @@ SHA1_Begin(SHA1Context *ctx)
 void
 SHA1_Update(SHA1Context *ctx, const unsigned char *dataIn, unsigned int len)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(SHA1_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     ctx->update(ctx, dataIn, len);
 }
 
@@ -188,6 +204,11 @@ SHA1_End(SHA1Context *ctx, unsigned char *hashout,
     register PRUint64 size;
     register PRUint32 lenB;
 
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(SHA1_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     static const unsigned char bulk_pad[64] = { 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                                                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                                                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -504,6 +525,11 @@ shaCompress(volatile SHA_HW_t *X, const PRUint32 *inbuf)
 static void
 SHA1_Compress_Generic(SHA1Context *ctx)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(SHA1_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     shaCompress(&ctx->H[H2X], ctx->u.w);
 }
 
@@ -516,6 +542,11 @@ SHA1_NewContext(void)
 {
     SHA1Context *cx;
 
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(SHA1_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        return NULL;
+    }
     /* no need to ZNew, SHA1_Begin will init the context */
     cx = PORT_New(SHA1Context);
     return cx;
@@ -525,6 +556,13 @@ SHA1_NewContext(void)
 void
 SHA1_DestroyContext(SHA1Context *cx, PRBool freeit)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        if (cx)
+            memset(cx, 0, sizeof *cx);
+        nsslow_LogFIPSError(SHA1_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     memset(cx, 0, sizeof *cx);
     if (freeit) {
         PORT_Free(cx);
@@ -537,6 +575,11 @@ SHA1_HashBuf(unsigned char *dest, const unsigned char *src, PRUint32 src_length)
     SHA1Context ctx;
     unsigned int outLen;
 
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(SHA1_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     SHA1_Begin(&ctx);
     ctx.update(&ctx, src, src_length);
     SHA1_End(&ctx, dest, &outLen, SHA1_LENGTH);
@@ -548,6 +591,11 @@ SHA1_HashBuf(unsigned char *dest, const unsigned char *src, PRUint32 src_length)
 SECStatus
 SHA1_Hash(unsigned char *dest, const char *src)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(SHA1_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     return SHA1_HashBuf(dest, (const unsigned char *)src, PORT_Strlen(src));
 }
 
@@ -558,12 +606,22 @@ SHA1_Hash(unsigned char *dest, const char *src)
 unsigned int
 SHA1_FlattenSize(SHA1Context *cx)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(SHA1_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     return sizeof(SHA1Context);
 }
 
 SECStatus
 SHA1_Flatten(SHA1Context *cx, unsigned char *space)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(SHA1_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     PORT_Memcpy(space, cx, sizeof(SHA1Context));
     return SECSuccess;
 }
@@ -571,7 +629,14 @@ SHA1_Flatten(SHA1Context *cx, unsigned char *space)
 SHA1Context *
 SHA1_Resurrect(unsigned char *space, void *arg)
 {
-    SHA1Context *cx = SHA1_NewContext();
+    SHA1Context *cx = NULL;
+
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(SHA1_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
+    cx = SHA1_NewContext();
     if (cx == NULL)
         return NULL;
 
@@ -582,11 +647,21 @@ SHA1_Resurrect(unsigned char *space, void *arg)
 void
 SHA1_Clone(SHA1Context *dest, SHA1Context *src)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(SHA1_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     memcpy(dest, src, sizeof *dest);
 }
 
 void
 SHA1_TraceState(SHA1Context *ctx)
 {
+    if (nsslow_GetFIPSEnabled()) {
+        nsslow_LogFIPSError(SHA1_ERR_MSG);
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        abort();
+    }
     PORT_SetError(PR_NOT_IMPLEMENTED_ERROR);
 }
