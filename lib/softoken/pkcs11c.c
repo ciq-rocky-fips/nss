@@ -7217,8 +7217,6 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
     SFTKAttribute *att = NULL;
     SFTKAttribute *att2 = NULL;
     unsigned char *buf;
-    SHA1Context *sha;
-    MD5Context *md5;
     MD2Context *md2;
     CK_ULONG macSize;
     CK_ULONG tmpKeySize;
@@ -7549,6 +7547,8 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
                     break;
                 }
             } else {
+                SHA1Context *sha = NULL;
+                MD5Context *md5 = NULL;
                 /* now allocate the hash contexts */
                 md5 = MD5_NewContext();
                 if (md5 == NULL) {
@@ -7757,21 +7757,8 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
                 break;
             }
             sftk_FreeAttribute(att2);
-            md5 = MD5_NewContext();
-            if (md5 == NULL) {
-                crv = CKR_HOST_MEMORY;
-                break;
-            }
-            sha = SHA1_NewContext();
-            if (sha == NULL) {
-                MD5_DestroyContext(md5, PR_TRUE);
-                crv = CKR_HOST_MEMORY;
-                break;
-            }
 
             if (BAD_PARAM_CAST(pMechanism, sizeof(CK_SSL3_KEY_MAT_PARAMS))) {
-                MD5_DestroyContext(md5, PR_TRUE);
-                SHA1_DestroyContext(sha, PR_TRUE);
                 crv = CKR_MECHANISM_PARAM_INVALID;
                 break;
             }
@@ -7803,8 +7790,6 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
 
             /* bIsExport must be false. */
             if (ssl3_keys->bIsExport) {
-                MD5_DestroyContext(md5, PR_TRUE);
-                SHA1_DestroyContext(sha, PR_TRUE);
                 PORT_Memset(srcrdata, 0, sizeof srcrdata);
                 crv = CKR_MECHANISM_PARAM_INVALID;
                 break;
@@ -7844,6 +7829,20 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
                 }
             } else {
                 unsigned int block_bytes = 0;
+                SHA1Context *sha = NULL;
+                MD5Context *md5 = NULL;
+
+                md5 = MD5_NewContext();
+                if (md5 == NULL) {
+                    crv = CKR_HOST_MEMORY;
+                    break;
+                }
+                sha = SHA1_NewContext();
+                if (sha == NULL) {
+                    MD5_DestroyContext(md5, PR_TRUE);
+                    crv = CKR_HOST_MEMORY;
+                    break;
+                }
                 /* key_block =
                  *     MD5(master_secret + SHA('A' + master_secret +
                  *                      ServerHello.random + ClientHello.random)) +
@@ -7870,6 +7869,8 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
                     block_bytes += outLen;
                 }
                 PORT_Memset(sha_out, 0, sizeof sha_out);
+                MD5_DestroyContext(md5, PR_TRUE);
+                SHA1_DestroyContext(sha, PR_TRUE);
             }
 
             /*
@@ -7950,8 +7951,6 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
             }
             PORT_Memset(srcrdata, 0, sizeof srcrdata);
             PORT_Memset(key_block, 0, sizeof key_block);
-            MD5_DestroyContext(md5, PR_TRUE);
-            SHA1_DestroyContext(sha, PR_TRUE);
             sftk_FreeObject(key);
             key = NULL;
             break;
