@@ -185,6 +185,9 @@ ec_secp384r1_verify_digest(ECPublicKey *key, const SECItem *signature,
 {
     SECStatus res = SECSuccess;
 
+    unsigned char _padded_sig_data[96] = { 0 };
+    unsigned char *sig_r, *sig_s;
+
     if (!key || !signature || !digest ||
         !key->publicValue.data ||
         !signature->data || !digest->data ||
@@ -194,9 +197,10 @@ ec_secp384r1_verify_digest(ECPublicKey *key, const SECItem *signature,
         return res;
     }
 
-    if (key->publicValue.len != 97 ||
-        digest->len == 0 ||
-        signature->len != 96) {
+    unsigned int olen = key->ecParams.order.len;
+    if (signature->len == 0 || signature->len % 2 != 0 ||
+        signature->len > 2 * olen ||
+        digest->len == 0 || key->publicValue.len != 97) {
         PORT_SetError(SEC_ERROR_INPUT_LEN);
         res = SECFailure;
         return res;
@@ -206,6 +210,24 @@ ec_secp384r1_verify_digest(ECPublicKey *key, const SECItem *signature,
         PORT_SetError(SEC_ERROR_UNSUPPORTED_EC_POINT_FORM);
         res = SECFailure;
         return res;
+    }
+
+    /* P-384 signature has to be 96 bytes long, pad it with 0s if it isn't */
+    if (signature->len != 96) {
+        unsigned split = signature->len / 2;
+        unsigned pad = 48 - split;
+
+        unsigned char *o_sig = signature->data;
+        unsigned char *p_sig = _padded_sig_data;
+
+        memcpy(p_sig + pad, o_sig, split);
+        memcpy(p_sig + 48 + pad, o_sig + split, split);
+
+        sig_r = p_sig;
+        sig_s = p_sig + 48;
+    } else {
+        sig_r = signature->data;
+        sig_s = signature->data + 48;
     }
 
     uint8_t hash[48] = { 0 };
@@ -218,7 +240,7 @@ ec_secp384r1_verify_digest(ECPublicKey *key, const SECItem *signature,
     bool b = Hacl_P384_ecdsa_verif_without_hash(
         48, hash,
         key->publicValue.data + 1,
-        signature->data, signature->data + 48);
+        sig_r, sig_s);
     if (!b) {
         PORT_SetError(SEC_ERROR_BAD_SIGNATURE);
         res = SECFailure;
