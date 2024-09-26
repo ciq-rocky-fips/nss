@@ -42,6 +42,8 @@
 #define NULL_PTR 0
 #endif
 
+CK_NSS_GetFIPSStatus fipsIndicator;
+
 /* Returns constant error string for "CRV".
  * Returns "unknown error" if errNum is unknown.
  */
@@ -319,6 +321,7 @@ int
 main(int argc, char **argv)
 {
     CK_C_GetFunctionList pC_GetFunctionList;
+    CK_C_GetInterface ientry = NULL;
     CK_FUNCTION_LIST_PTR pFunctionList;
     CK_RV crv = CKR_OK;
     CK_C_INITIALIZE_ARGS_NSS initArgs;
@@ -326,6 +329,7 @@ main(int argc, char **argv)
     CK_SLOT_ID *pSlotList = NULL;
     CK_TOKEN_INFO tokenInfo;
     CK_ULONG slotID = 0; /* slotID == 0 for FIPSMODE */
+    CK_INTERFACE_PTR interface;
 
     CK_UTF8CHAR *pwd = NULL;
     CK_ULONG pwdLen = 0;
@@ -429,6 +433,18 @@ main(int argc, char **argv)
                                                                          "FC_GetFunctionList");
         assert(pC_GetFunctionList != NULL);
         slotID = 0;
+        ientry = (CK_C_GetInterface)PR_FindSymbol(lib, "FC_GetInterface");
+        if ((*ientry)((CK_UTF8CHAR_PTR) "PKCS 11", NULL, &interface,
+                      CKF_INTERFACE_FORK_SAFE) != CKR_OK) {
+            /* one is not appearantly available, get a non-fork safe version */
+            if ((*ientry)((CK_UTF8CHAR_PTR) "PKCS 11", NULL, &interface, 0) != CKR_OK) {
+                goto cleanup;
+            }
+        }
+        if ((*ientry)((CK_UTF8CHAR_PTR) "Vendor NSS FIPS Interface", NULL,
+                      &interface, 0) == CKR_OK) {
+            fipsIndicator = ((CK_NSS_FIPS_FUNCTIONS *)(interface->pFunctionList))->NSC_NSSGetFIPSStatus;
+        }
     } else {
         pC_GetFunctionList = (CK_C_GetFunctionList)PR_FindFunctionSymbol(lib,
                                                                          "C_GetFunctionList");
@@ -882,6 +898,7 @@ PKM_KeyTests(CK_FUNCTION_LIST_PTR pFunctionList,
     CK_ULONG sigRSAMechsSZ = NUM_ELEM(sigRSAMechs);
     CK_ULONG hmacMechsSZ = NUM_ELEM(hmacMechs);
     CK_MECHANISM mech;
+    CK_SESSION_INFO sinfo;
 
     unsigned int i;
 
@@ -1134,6 +1151,17 @@ PKM_KeyTests(CK_FUNCTION_LIST_PTR pFunctionList,
         return crv;
     }
 
+    PKM_LogIt("    Opened a session: handle = 0x%08x\n", hRwSession);
+
+    (void)memset(&sinfo, 0, sizeof(CK_SESSION_INFO));
+     /* get the session */
+    crv = pFunctionList->C_GetSessionInfo(hRwSession, &sinfo);
+    if (CKR_OK != crv) {
+        PKM_LogIt("C_GetSessionInfo(%lu, ) returned 0x%08X, %-26s\n", hRwSession, crv,
+                  PKM_CK_RVtoStr(crv));
+        return crv;
+    }
+
     PKM_LogIt("Generate an 3DES key ...\n");
     /* generate an 3DES Secret Key */
     crv = pFunctionList->C_GenerateKey(hRwSession, &sDES3KeyGenMechanism,
@@ -1328,6 +1356,12 @@ PKM_KeyTests(CK_FUNCTION_LIST_PTR pFunctionList,
 
         mech.mechanism = sigRSAMechs[i].mechanism;
 
+        /*if (PK11_SlotGetLastFIPSStatus(pSlotList[slotID]) ) {
+            PKM_LogIt("B sig PK11_SlotGetLastFIPSStatus TRUE");
+        } else {
+            PKM_LogIt("B sig PK11_SlotGetLastFIPSStatus FALSE");
+        }*/
+
         crv = PKM_PubKeySign(pFunctionList, hRwSession,
                              hRSApubKey, hRSAprivKey,
                              &mech,
@@ -1342,6 +1376,12 @@ PKM_KeyTests(CK_FUNCTION_LIST_PTR pFunctionList,
                       PKM_CK_RVtoStr(crv));
             return crv;
         }
+        /*if (PK11_SlotGetLastFIPSStatus(pSlotList[slotID]) ) {
+            PKM_LogIt("B sig PK11_SlotGetLastFIPSStatus TRUE");
+        } else {
+            PKM_LogIt("B sig PK11_SlotGetLastFIPSStatus FALSE");
+        }*/
+
         crv = PKM_DualFuncSign(pFunctionList, hRwSession,
                                hRSApubKey, hRSAprivKey,
                                &mech,
@@ -2991,6 +3031,7 @@ PKM_PubKeySign(CK_FUNCTION_LIST_PTR pFunctionList,
     CK_RV crv = CKR_OK;
     CK_BYTE sig[MAX_SIG_SZ];
     CK_ULONG sigLen = 0;
+    CK_ULONG ir = 0;
 
     NUMTESTS++; /* increment NUMTESTS */
     memset(sig, 0, sizeof(sig));
@@ -3002,6 +3043,12 @@ PKM_PubKeySign(CK_FUNCTION_LIST_PTR pFunctionList,
                   PKM_CK_RVtoStr(crv));
         return crv;
     }
+    fipsIndicator(hRwSession, hPrivKey, CKT_NSS_SESSION_LAST_CHECK, &ir);
+    if ( ir == CKS_NSS_FIPS_OK ) {
+        PKM_LogIt("APPROVED\n");
+    } else {
+        PKM_LogIt("NON-APPROVED\n");
+    }
     sigLen = sizeof(sig);
     crv = pFunctionList->C_Sign(hRwSession, (CK_BYTE *)pData, pDataLen,
                                 sig, &sigLen);
@@ -3011,12 +3058,25 @@ PKM_PubKeySign(CK_FUNCTION_LIST_PTR pFunctionList,
         return crv;
     }
 
+    fipsIndicator(hRwSession, hPrivKey, CKT_NSS_SESSION_LAST_CHECK, &ir);
+    if ( ir == CKS_NSS_FIPS_OK ) {
+        PKM_LogIt("APPROVED\n");
+    } else {
+        PKM_LogIt("NON-APPROVED\n");
+    }
+
     /* C_Verify the signature */
     crv = pFunctionList->C_VerifyInit(hRwSession, signMech, hPubKey);
     if (crv != CKR_OK) {
         PKM_Error("C_VerifyInit failed with 0x%08X, %-26s\n", crv,
                   PKM_CK_RVtoStr(crv));
         return crv;
+    }
+    fipsIndicator(hRwSession, hPrivKey, CKT_NSS_SESSION_LAST_CHECK, &ir);
+    if ( ir == CKS_NSS_FIPS_OK ) {
+        PKM_LogIt("APPROVED\n");
+    } else {
+        PKM_LogIt("NON-APPROVED\n");
     }
     crv = pFunctionList->C_Verify(hRwSession, (CK_BYTE *)pData, pDataLen,
                                   sig, sigLen);
@@ -3026,6 +3086,12 @@ PKM_PubKeySign(CK_FUNCTION_LIST_PTR pFunctionList,
         PKM_Error("C_Verify failed with 0x%08X, %-26s\n", crv,
                   PKM_CK_RVtoStr(crv));
         return crv;
+    }
+    fipsIndicator(hRwSession, hPrivKey, CKT_NSS_SESSION_LAST_CHECK, &ir);
+    if ( ir == CKS_NSS_FIPS_OK ) {
+        PKM_LogIt("APPROVED\n");
+    } else {
+        PKM_LogIt("NON-APPROVED\n");
     }
 
     /* Check that the mechanism is Multi-part */
