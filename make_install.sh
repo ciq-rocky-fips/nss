@@ -61,14 +61,15 @@ export NSS_FIPS_140_3=1
 export NSS_ENABLE_FIPS_INDICATORS=1
 #
 ## Enable compiler optimizations and disable debugging code
-export BUILD_OPT=1
+export BUILD_OPT=11
 #
 ## Uncomment to disable optimizations
-##RPM_OPT_FLAGS=`echo $RPM_OPT_FLAGS | sed -e 's/-O2/-O0/g'`
-##export RPM_OPT_FLAGS
+RPM_OPT_FLAGS=`echo $RPM_OPT_FLAGS | sed -e 's/-O2/-O0/g'`
+export RPM_OPT_FLAGS
+
 #
 ## Generate symbolic info for debuggers
-#export XCFLAGS=$RPM_OPT_FLAGS
+export XCFLAGS="$RPM_OPT_FLAGS -g -O0"
 #
 ## Work around false-positive warnings with gcc 10:
 ## https://bugzilla.redhat.com/show_bug.cgi?id=1803029
@@ -92,6 +93,7 @@ export NSS_USE_SYSTEM_SQLITE=1
 export NSS_ALLOW_SSLKEYLOGFILE=1
 #
 export NSS_SEED_ONLY_DEV_URANDOM=1
+export USE_DEBUG_RTL=1
 #
 #%if %{with dbm}
 #%else

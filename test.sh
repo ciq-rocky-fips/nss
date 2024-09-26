@@ -1,0 +1,4 @@
+
+export LD_PRELOAD="./lib/freebl/Linux5.14_x86_64_cc_glibc_PTH_64_OPT.OBJ/Linux_SINGLE_SHLIB/libfreeblpriv3.so ./lib/freebl/Linux5.14_x86_64_cc_glibc_PTH_64_OPT.OBJ/Linux_SINGLE_SHLIB/libfreebl3.so ./lib/nss/Linux5.14_x86_64_cc_glibc_PTH_64_OPT.OBJ/libnss3.so ./lib/smime/Linux5.14_x86_64_cc_glibc_PTH_64_OPT.OBJ/libsmime3.so ./lib/softoken/Linux5.14_x86_64_cc_glibc_PTH_64_OPT.OBJ/libsoftokn3.so ./lib/ssl/Linux5.14_x86_64_cc_glibc_PTH_64_OPT.OBJ/libssl3.so ./lib/sysinit/Linux5.14_x86_64_cc_glibc_PTH_64_OPT.OBJ/libnsssysinit.so ./lib/util/Linux5.14_x86_64_cc_glibc_PTH_64_OPT.OBJ/libnssutil3.so"
+rm -f key4.db cert9.db
+gdb --args /mnt/code/atsec/RA/nss/gh-nss/cmd/pk11mode/Linux5.14_x86_64_cc_glibc_PTH_64_OPT.OBJ/pk11mode -v
