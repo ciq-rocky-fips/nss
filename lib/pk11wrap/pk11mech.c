@@ -1715,10 +1715,16 @@ PK11_ParamToAlgid(SECOidTag algTag, SECItem *param,
         case CKM_JUNIPER_CBC128:
         case CKM_JUNIPER_COUNTER:
         case CKM_JUNIPER_SHUFFLE:
-            newParams = SEC_ASN1EncodeItem(NULL, NULL, param,
-                                           SEC_ASN1_GET(SEC_OctetStringTemplate));
-            if (newParams == NULL)
-                break;
+            /* if no parameters have been supplied, then encode a NULL params
+             */
+            if (param && param->len > 0) {
+                newParams = SEC_ASN1EncodeItem(NULL, NULL, param,
+                                               SEC_ASN1_GET(SEC_OctetStringTemplate));
+                if (newParams == NULL)
+                    break;
+            } else {
+                newParams = NULL;
+            }
             rv = SECSuccess;
             break;
     }

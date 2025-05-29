@@ -55,7 +55,8 @@ SECOID_SetAlgorithmID(PLArenaPool *arena, SECAlgorithmID *id, SECOidTag which,
         return SECFailure;
 
     if ((secoid_IsRSAPKCS1(which)) ||
-        (HASH_GetHashTypeByOidTag(which) != HASH_AlgNULL)) {
+        (HASH_GetHashTypeByOidTag(which) != HASH_AlgNULL) /* ||
+        (HASH_GetHashOidTagByHMACOidTag(which) != SEC_OID_UNKNOWN) */) {
         add_null_param = PR_TRUE;
     } else {
         add_null_param = PR_FALSE;
