@@ -366,7 +366,7 @@ dbtest_main()
       RARRAY=($dtime)
       TIMEARRAY=(${RARRAY[1]//./ })
       echo "${TIMEARRAY[0]} seconds"
-      test ${TIMEARRAY[0]} -lt 5
+      test ${TIMEARRAY[0]} -lt ${NSS_DB_DUMP_TIME-5}
       ret=$?
       html_msg ${ret} 0 "certutil dump keys with explicit default trust flags"
     fi
