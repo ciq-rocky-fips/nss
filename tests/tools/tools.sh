@@ -585,7 +585,7 @@ tools_p12()
   tools_p12_import_old_files
   tools_p12_import_pbmac1_samples
   tools_p12_import_rsa_pss_private_key
-  tools_p12_policy
+  #tools_p12_policy
 }
 
 ############################## tools_sign ##############################

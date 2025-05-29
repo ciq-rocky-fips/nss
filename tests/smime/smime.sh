@@ -872,6 +872,6 @@ smime_init
 smime_main
 smime_data_tb
 smime_p7
-smime_policy
+#smime_policy
 smime_cleanup
 

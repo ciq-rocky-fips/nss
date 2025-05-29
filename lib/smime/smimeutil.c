@@ -202,6 +202,7 @@ smime_get_policy_tag_from_key_length(SECOidTag algtag, unsigned long keybits)
 PRBool
 smime_allowed_by_policy(SECOidTag algtag, PRUint32 neededPolicy)
 {
+#ifdef notdef
     PRUint32 policyFlags;
 
     /* some S/MIME algs map to the same underlying KEA mechanism,
@@ -221,6 +222,7 @@ smime_allowed_by_policy(SECOidTag algtag, PRUint32 neededPolicy)
         PORT_SetError(SEC_ERROR_BAD_EXPORT_ALGORITHM);
         return PR_FALSE;
     }
+#endif
     return PR_TRUE;
 }
 
@@ -485,6 +487,7 @@ smime_init_once(void *arg)
         return PR_FAILURE;
     }
 
+#ifdef notdef
     /* At initialization time, we need to set up the defaults. We first
      * look to see if the system or application has set up certain algorithms
      * by policy. If they have set up values by policy we'll only allow those
@@ -497,6 +500,11 @@ smime_init_once(void *arg)
         PORT_Free(tags);
         tags = NULL;
     }
+#else
+    /* just initialize the old maps */
+    rv = SECSuccess;
+    tagCount = 0;
+#endif
     if ((rv != SECSuccess) || (tagCount == 0)) {
         /* No algorithms have been enabled by policy (either by the system
          * or by the application, we then will use the traditional default

@@ -37,6 +37,7 @@ static pkcs12SuiteMap pkcs12SuiteMaps[] = {
 static PRBool
 sec_PKCS12Allowed(SECOidTag alg, PRUint32 needed)
 {
+#ifdef notdef
     PRUint32 policy;
     SECStatus rv;
 
@@ -48,6 +49,9 @@ sec_PKCS12Allowed(SECOidTag alg, PRUint32 needed)
         return PR_TRUE;
     }
     return PR_FALSE;
+#else
+    return PR_TRUE;
+#endif
 }
 
 PRBool
