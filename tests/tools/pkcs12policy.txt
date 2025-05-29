@@ -91,21 +91,21 @@
   0 18 allow_all disallow=rc2 PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC4 PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC SHA-1  disallow rc2 (read), RC4 and RC2
 # integrity policy check the various has based controls.
 #  NOTE: md4, md2, and md5 are turned off by policy by default for encrypting
-# (decrypting is fine). To be enabled, you must allow=all or allow=mdX on the
+# (decrypting is fine). To be enabled, you must allow=mdX/pkcs12 on the
 # encryption side. These tests purposefully tests that the default fails to encrypt
 # but succeeds when decrypting.
  27  x allow=tls allow=tls PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Use default policy with multiple hashes
-  0  0 allow=all allow=tls PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Allow all encrypt, use default decrypt with multiple hashes
-  0  0 allow=all allow=all PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Allow all with multiple hashes
- 28  x disallow=sha1_allow=md2 allow=all PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha1 on write
+  0  0 allow=md2/pkcs12 allow=tls PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Allow all encrypt, use default decrypt with multiple hashes
+  0  0 allow=md2/pkcs12 allow=all PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Allow all with multiple hashes
+ 28  x disallow=sha1_allow=md2/pkcs12 allow=all PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha1 on write
  27  x disallow=md2 allow=all PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow md2 on write
- 29  x disallow=sha256_allow=md2 allow=all PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha256 on write
-  0 19 allow=all disallow=sha1 PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha1 on read
-  0 18 allow=all disallow=md2 PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow md2 on read
-  0 17 allow=all disallow=sha256 PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha256 on read
-  0  0 allow=all disallow=md2/pkcs12-encrypt PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow md2 on read
-  0  0 allow=all disallow=sha1/pkcs12-encrypt PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha1 on read
-  0  0 allow=all disallow=sha256/pkcs12-encrypt PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha256 on read
+ 29  x disallow=sha256_allow=md2/pkcs12 allow=all PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha256 on write
+  0 19 allow=all:md2/pkcs12 disallow=sha1 PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha1 on read
+  0 18 allow=md2/pkcs12 disallow=md2 PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow md2 on read
+  0 17 allow=md2/pkcs12 disallow=sha256 PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha256 on read
+  0  0 allow=md2/pkcs12 disallow=md2/pkcs12-encrypt PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow md2 on read
+  0  0 allow=md2/pkcs12 disallow=sha1/pkcs12-encrypt PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha1 on read
+  0  0 allow=md2/pkcs12 disallow=sha256/pkcs12-encrypt PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha256 on read
   0  0 allow=all allow=all AES-128-CBC AES-128-CBC HMAC_SHA-256
  29  x disallow=hmac-sha256 allow=all AES-128-CBC AES-128-CBC HMAC_SHA-256
   0 18 allow=all disallow=hmac-sha256 AES-128-CBC AES-128-CBC HMAC_SHA-256
