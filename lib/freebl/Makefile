@@ -303,7 +303,7 @@ endif
 ifeq ($(CPU_ARCH),ppc)
     EXTRA_SRCS += gcm-ppc.c
 ifdef USE_64
-    DEFINES += -DNSS_NO_INIT_SUPPORT
+#    DEFINES += -DNSS_NO_INIT_SUPPORT
     PPC_ABI := $(shell $(CC) -dM -E - < /dev/null | awk '$$2 == "_CALL_ELF" {print $$3}')
     ifeq ($(PPC_ABI),2)
         ASFILES += sha512-p8.s
