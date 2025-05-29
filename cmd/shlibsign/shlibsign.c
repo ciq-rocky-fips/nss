@@ -1426,7 +1426,7 @@ main(int argc, char **argv)
     } else {
         /* NON FIPS mode  == C_GetFunctionList */
         pC_GetFunctionList = (CK_C_GetFunctionList)
-            PR_FindFunctionSymbol(lib, "C_GetFunctionList");
+            PR_FindFunctionSymbol(lib, "NSC_GetFunctionList");
     }
     assert(pC_GetFunctionList != NULL);
     if (!pC_GetFunctionList) {
