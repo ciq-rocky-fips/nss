@@ -582,7 +582,7 @@ NSS_CMSRecipientInfo_UnwrapBulkKey(NSSCMSRecipientInfo *ri, int subIndex,
             parameters = &(ri->ri.keyAgreeRecipientInfo.keyEncAlg.parameters);
             enckey = &(ri->ri.keyAgreeRecipientInfo.recipientEncryptedKeys[subIndex]->encKey);
             oiok = &(ri->ri.keyAgreeRecipientInfo.originatorIdentifierOrKey);
-            ukm = &(ri->ri.keyAgreeRecipientInfo.ukm);
+            ukm = ri->ri.keyAgreeRecipientInfo.ukm;
             break;
         case NSSCMSRecipientInfoID_KEK:
             algid = &(ri->ri.kekRecipientInfo.keyEncAlg);

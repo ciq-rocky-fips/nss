@@ -376,7 +376,7 @@ typedef struct NSSCMSRecipientEncryptedKeyStr NSSCMSRecipientEncryptedKey;
 struct NSSCMSKeyAgreeRecipientInfoStr {
     SECItem version;
     NSSCMSOriginatorIdentifierOrKey originatorIdentifierOrKey;
-    SECItem ukm; /* optional */
+    SECItem *ukm; /* optional */
     SECAlgorithmID keyEncAlg;
     NSSCMSRecipientEncryptedKey **recipientEncryptedKeys;
 };
