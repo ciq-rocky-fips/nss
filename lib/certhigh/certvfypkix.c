@@ -39,7 +39,7 @@ pkix_pl_lifecycle_ObjectTableUpdate(int *objCountTable);
 PRInt32 parallelFnInvocationCount;
 #endif /* PKIX_OBJECT_LEAK_TEST */
 
-static PRBool usePKIXValidationEngine = PR_TRUE;
+static PRBool usePKIXValidationEngine = PR_FALSE;
 #endif /* NSS_DISABLE_LIBPKIX */
 
 /*

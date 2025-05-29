@@ -974,8 +974,9 @@ ssl_policy_pkix_ocsp()
       return 0
   fi
 
-  PKIX_SAVE=${NSS_DISABLE_LIBPKIX_VERIFY-"unset"}
-  unset NSS_DISABLE_LIBPKIX_VERIFY
+  PKIX_SAVE=${NSS_ENABLE_PKIX_VERIFY-"unset"}
+  NSS_ENABLE_PKIX_VERIFY="1"
+  export NSS_ENABLE_PKIX_VERIFY
 
   testname=""
 
@@ -1000,10 +1001,12 @@ ssl_policy_pkix_ocsp()
   html_msg $RET $RET_EXP "${testname}" \
            "produced a returncode of $RET, expected is $RET_EXP"
 
-  if [ "{PKIX_SAVE}" != "unset" ]; then
-      export NSS_DISABLE_LIBPKIX_VERIFY=${PKIX_SAVE}
+  if [ "${PKIX_SAVE}" = "unset" ]; then
+      unset NSS_ENABLE_PKIX_VERIFY
+  else
+      NSS_ENABLE_PKIX_VERIFY=${PKIX_SAVE}
+      export NSS_ENABLE_PKIX_VERIFY
   fi
-
   cp ${P_R_SERVERDIR}/pkcs11.txt.sav ${P_R_SERVERDIR}/pkcs11.txt
 
   html "</TABLE><BR>"
