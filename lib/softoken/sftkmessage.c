@@ -157,16 +157,25 @@ sftk_CryptMessage(CK_SESSION_HANDLE hSession, CK_VOID_PTR pParameter,
         } else {
             CK_GCM_MESSAGE_PARAMS *p = (CK_GCM_MESSAGE_PARAMS *)pParameter;
             switch (p->ivGenerator) {
+                default:
                 case CKG_NO_GENERATE:
                     context->isFIPS = PR_FALSE;
                     break;
                 case CKG_GENERATE_RANDOM:
-                    if ((p->ulIvLen < 12) || (p->ulIvFixedBits != 0)) {
+                    if ((p->ulIvLen < 96/PR_BITS_PER_BYTE) ||
+                        (p->ulIvFixedBits != 0)) {
                         context->isFIPS = PR_FALSE;
                     }
                     break;
-                default:
-                    if ((p->ulIvLen < 12) || (p->ulIvFixedBits < 32)) {
+                case CKG_GENERATE_COUNTER_XOR:
+                    if ((p->ulIvLen != 96/PR_BITS_PER_BYTE) ||
+                        (p->ulIvFixedBits != 32)) {
+                        context->isFIPS = PR_FALSE;
+                    }
+                    break;
+                case CKG_GENERATE_COUNTER:
+                    if ((p->ulIvFixedBits < 32) ||
+                       ((p->ulIvLen*PR_BITS_PER_BYTE - p->ulIvFixedBits) < 32)) {
                         context->isFIPS = PR_FALSE;
                     }
             }
