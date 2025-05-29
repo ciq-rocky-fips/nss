@@ -1165,10 +1165,6 @@ main(int argc, char **argv)
             }
         }
     }
-    /* in FIPS mode default to encoding with pkcs5v2 for the MAC */
-    if (PK11_IsFIPS()) {
-        hash = SEC_OID_HMAC_SHA256;
-    }
     if (pk12util.options[opt_Mac].activated) {
         char *hashString = pk12util.options[opt_Mac].arg;
 
