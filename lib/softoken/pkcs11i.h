@@ -152,6 +152,16 @@ typedef enum {
 } SFTKFreeStatus;
 
 /*
+ * Source of various objects
+ */
+typedef enum {
+    SFTK_SOURCE_DEFAULT=0,
+    SFTK_SOURCE_KEA,
+    SFTK_SOURCE_HKDF_EXPAND,
+    SFTK_SOURCE_HKDF_EXTRACT
+} SFTKSource;
+
+/*
  * attribute values of an object.
  */
 struct SFTKAttributeStr {
@@ -194,6 +204,7 @@ struct SFTKObjectStr {
     void *objectInfo;
     SFTKFree infoFree;
     PRBool isFIPS;
+    SFTKSource source;
 };
 
 struct SFTKTokenObjectStr {
