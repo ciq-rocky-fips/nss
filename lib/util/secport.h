@@ -36,6 +36,9 @@
 #include <sys/types.h>
 
 #include <ctype.h>
+/* ask for Annex K for memset_s. will set the appropriate #define
+ * if Annex K is supported */
+#define __STDC_WANT_LIB_EXT1__ 1
 #include <string.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -181,6 +184,39 @@ SEC_END_PROTOS
 #define PORT_Memmove(s, ct, n) bcopy((ct), (s), (n))
 #endif /*SUNOS4*/
 #define PORT_Memset memset
+
+/* there are cases where the compiler optimizes away our attempt to clear
+ * out our stack variables. There are multiple solutions for this problem,
+ * but they aren't universally accepted on all platforms. This attempts
+ * to select the best solution available given our os, compilier, and libc */
+#ifdef __STDC_LIB_EXT1__
+/* if the os implements C11 annex K, use memset_s */
+#define PORT_SafeZero(p, n) memset_s(p, n, 0, n)
+#else
+#ifdef XP_WIN
+/* windows has a secure zero funtion */
+#define PORT_SafeZero(p, n) SecureZeroMemory(p, n)
+#else
+/* _DEFAULT_SORUCE  == BSD source in GCC based environments
+ * if other environmens support explicit_bzero, their defines
+ * should be added here */
+#if defined(_DEFAULT_SOURCE) || defined(_BSD_SOURCE)
+#define PORT_SafeZero(p, n) explicit_bzero(p, n)
+#else
+/* if the os doesn't support one of the above, but does support
+ * memset_explicit, you can add the definition for memset with the
+ * appropriate define check here */
+/* define an explicitly implementated Safe zero if the OS
+ * doesn't provide one */
+#define PORT_SafeZero(p, n)                                \
+    if (p != NULL) {                                       \
+        volatile unsigned char *__vl = (unsigned char *)p; \
+        size_t __nl = n;                                   \
+        while (__nl--) *__vl++ = 0;                        \
+    }
+#endif /* no explicit_bzero */
+#endif /* no windows SecureZeroMemory */
+#endif /* no memset_s */
 
 #define PORT_Strcasecmp PL_strcasecmp
 #define PORT_Strcat strcat
