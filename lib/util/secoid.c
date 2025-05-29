@@ -1890,6 +1890,12 @@ const static SECOidData oids[SEC_OID_TOTAL] = {
     ODE(SEC_OID_RC2_64_CBC, "RC2-64-CBC", CKM_RC2_CBC, INVALID_CERT_EXTENSION),
     ODE(SEC_OID_RC2_128_CBC, "RC2-128-CBC", CKM_RC2_CBC, INVALID_CERT_EXTENSION),
     ODE(SEC_OID_ECDH_KEA, "ECDH", CKM_ECDH1_DERIVE, INVALID_CERT_EXTENSION),
+
+    /* this will change upstream. for now apps shouldn't use it */
+    /* we need it for the policy code.  */
+    ODE(SEC_OID_PRIVATE_1,
+        "TLS Require EMS", CKM_INVALID_MECHANISM, INVALID_CERT_EXTENSION),
+
 };
 
 /* PRIVATE EXTENDED SECOID Table
@@ -2198,6 +2204,10 @@ SECOID_Init(void)
 
     /* turn off NSS_USE_POLICY_IN_SSL by default */
     xOids[SEC_OID_APPLY_SSL_POLICY].notPolicyFlags = NSS_USE_POLICY_IN_SSL;
+    /* turn off TLS REQUIRE EMS by default */
+    xOids[SEC_OID_PRIVATE_1].notPolicyFlags = ~0;
+
+
 
     envVal = PR_GetEnvSecure("NSS_HASH_ALG_SUPPORT");
     if (envVal)

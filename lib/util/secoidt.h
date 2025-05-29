@@ -530,6 +530,9 @@ typedef enum {
     SEC_OID_RC2_64_CBC = 385,
     SEC_OID_RC2_128_CBC = 386,
     SEC_OID_ECDH_KEA = 387,
+    /* this will change upstream. for now apps shouldn't use it */
+    /* give it an obscure name here */
+    SEC_OID_PRIVATE_1 = 388,
 
     SEC_OID_TOTAL
 } SECOidTag;
