@@ -2565,6 +2565,16 @@ sftk_handleSpecial(SFTKSlot *slot, CK_MECHANISM *mech,
                 }
             }
             return sftk_checkKeyLength(targetKeyLength, 112, 512, 1);
+        case SFTKFIPSRSAOAEP:;
+            CK_RSA_PKCS_OAEP_PARAMS *rsaoaep = (CK_RSA_PKCS_OAEP_PARAMS *)
+                                                mech->pParameter;
+
+            HASH_HashType hash_msg = sftk_GetHashTypeFromMechanism(rsaoaep->hashAlg);
+            HASH_HashType hash_pad = sftk_GetHashTypeFromMechanism(rsaoaep->mgf);
+            /* message hash and mask generation function must be the same */
+            if (hash_pad != hash_msg) return PR_FALSE;
+
+            return sftk_checkFIPSHash(rsaoaep->hashAlg, PR_FALSE, PR_FALSE);
         default:
             break;
     }
