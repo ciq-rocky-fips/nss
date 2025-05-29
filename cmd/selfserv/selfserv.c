@@ -43,6 +43,7 @@
 #include "certt.h"
 #include "ocsp.h"
 #include "nssb64.h"
+#include "zlib.h"
 
 #ifndef PORT_Strstr
 #define PORT_Strstr strstr
@@ -61,6 +62,7 @@ static const char inheritableSockName[] = { "SELFSERV_LISTEN_SOCKET" };
 
 #define MAX_VIRT_SERVER_NAME_ARRAY_INDEX 10
 #define MAX_CERT_NICKNAME_ARRAY_INDEX 10
+#define MAX_EXTERNAL_COMPRESSERS_INDEX 10
 
 #define DEFAULT_BULK_TEST 16384
 #define MAX_BULK_TEST 1048576 /* 1 MB */
@@ -167,7 +169,8 @@ PrintUsageHeader(const char *progName)
             "         [ T <good|revoked|unknown|badsig|corrupted|none|ocsp>] [-A ca]\n"
             "         [-C SSLCacheEntries] [-S dsa_nickname] [-Q]\n"
             "         [-I groups] [-J signatureschemes] [-e ec_nickname]\n"
-            "         -U [0|1] -H [0|1|2] -W [0|1] [-z externalPsk]\n"
+            "         -U [0|1] -H [0|1|2] -W [0|1] [-z externalPsk] -q\n"
+            "         [-K compression_spec]\n"
             "\n",
             progName);
 }
@@ -253,7 +256,18 @@ PrintParameterUsage()
         "         \"publicname:\". For example, \"publicname:example.com\". In this mode,\n"
         "         an ephemeral ECH keypair is generated and ECHConfigs are printed to stdout.\n"
         "      2. As a Base64 tuple of <ECHRawPrivateKey> || <ECHConfigs>. In this mode, the\n"
-        "         raw private key is used to bootstrap the HPKE context.\n",
+        "         raw private key is used to bootstrap the HPKE context.\n"
+        "-q Enable zlib certificate compression\n"
+        "-K compression_spec Enable certificate compression with an external\n"
+        "   compresser. The compression_spec value has the following format:\n"
+        "        id,name,dll,encode,decode\n"
+        "   where:\n"
+        "        id is an int matching the ssl spec for the compresser.\n"
+        "        name is a friendly name for the compresser.\n"
+        "        dll is the path to the implementation for the compresser.\n"
+        "        encode is the name of the encode function which will compress.\n"
+        "        decode is the name of the decode function which will decompress.\n",
+
         stderr);
 }
 
@@ -821,6 +835,7 @@ PRBool NoReuse = PR_FALSE;
 PRBool hasSidCache = PR_FALSE;
 PRBool disableLocking = PR_FALSE;
 PRBool enableSessionTickets = PR_FALSE;
+PRBool enableZlibCertificateCompression = PR_FALSE;
 PRBool failedToNegotiateName = PR_FALSE;
 PRBool enableExtendedMasterSecret = PR_FALSE;
 PRBool zeroRTT = PR_FALSE;
@@ -839,6 +854,9 @@ static int virtServerNameIndex = 1;
 
 static char *certNicknameArray[MAX_CERT_NICKNAME_ARRAY_INDEX];
 static int certNicknameIndex = 0;
+
+static secuExternalCompressionEntry externalCompressionValues[MAX_EXTERNAL_COMPRESSERS_INDEX];
+static int externalCompressionCount = 0;
 
 static const char stopCmd[] = { "GET /stop " };
 static const char getCmd[] = { "GET " };
@@ -2071,6 +2089,82 @@ configureEch(PRFileDesc *model_sock)
     return configureEchWithData(model_sock);
 }
 
+SECStatus zlibCertificateDecode(const SECItem* input, unsigned char* output,
+                                size_t outputLen, size_t* usedLen)
+{
+  SECStatus rv = SECFailure;
+  if (!input || !input->data || input->len == 0 || !output || outputLen == 0) {
+    PORT_SetError(SEC_ERROR_INVALID_ARGS);
+    return rv;
+  }
+
+  z_stream strm = {};
+
+  if (inflateInit(&strm) != Z_OK) {
+    PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+    return rv;
+  }
+
+  strm.avail_in = input->len;
+  strm.next_in = input->data;
+
+  strm.avail_out = outputLen;
+  strm.next_out = output;
+
+  int ret = inflate(&strm, Z_FINISH);
+  if (ret != Z_STREAM_END || strm.avail_in == 0 || strm.avail_out == 0) {
+    PORT_SetError(SEC_ERROR_BAD_DATA);
+    return rv;
+  }
+
+  *usedLen = strm.total_out;
+  rv = SECSuccess;
+  return rv;
+}
+
+SECStatus zlibCertificateEncode(const SECItem* input, SECItem *output)
+{
+  SECStatus rv = SECFailure;
+  if (!input || !input->data || input->len == 0 || !output ||
+      !output->data || output->len == 0) {
+    PORT_SetError(SEC_ERROR_INVALID_ARGS);
+    return rv;
+  }
+
+  z_stream strm = {};
+
+  if (deflateInit(&strm, 9) != Z_OK) {
+    PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+    return rv;
+  }
+
+  strm.avail_in = input->len;
+  strm.next_in = input->data;
+
+  strm.avail_out = output->len;
+  strm.next_out = output->data;
+
+  int ret = deflate(&strm, Z_FINISH);
+  if (ret != Z_STREAM_END || strm.avail_in == 0 || strm.avail_out == 0) {
+    PORT_SetError(SEC_ERROR_BAD_DATA);
+    return rv;
+  }
+
+  output->len = strm.total_out;
+  rv = SECSuccess;
+  return rv;
+}
+
+static SECStatus
+configureZlibCompression(PRFileDesc *model_sock)
+{
+    SSLCertificateCompressionAlgorithm zlibAlg = {1, "zlib",
+                                                  zlibCertificateEncode,
+                                                  zlibCertificateDecode};
+
+    return SSL_SetCertificateCompressionAlgorithm(model_sock, zlibAlg);
+}
+
 void
 server_main(
     PRFileDesc *listen_sock,
@@ -2124,6 +2218,22 @@ server_main(
         rv = SSL_OptionSet(model_sock, SSL_ENABLE_SESSION_TICKETS, PR_TRUE);
         if (rv != SECSuccess) {
             errExit("error enabling Session Ticket extension ");
+        }
+    }
+
+    if (enableZlibCertificateCompression) {
+        rv = configureZlibCompression(model_sock);
+        if (rv != SECSuccess) {
+            errExit("error enabling Zlib Certificate Compression");
+        }
+    }
+
+    for (i=0; i < externalCompressionCount; i++) {
+        secuExternalCompressionEntry *e = &externalCompressionValues[i];
+        SSLCertificateCompressionAlgorithm alg = e->compAlg;
+        rv = SSL_SetCertificateCompressionAlgorithm(model_sock, alg);
+        if (rv != SECSuccess) {
+            errExit("error enabling External Certificate Compression");
         }
     }
 
@@ -2537,7 +2647,7 @@ main(int argc, char **argv)
     ** XXX: 'B', and 'q' were used in the past but removed
     **      in 3.28, please leave some time before resuing those. */
     optstate = PL_CreateOptState(argc, argv,
-                                 "2:A:C:DEGH:I:J:L:M:NP:QRS:T:U:V:W:X:YZa:bc:d:e:f:g:hi:jk:lmn:op:rst:uvw:x:yz:");
+                                 "2:A:C:DEGH:I:J:K:L:M:NP:QRS:T:U:V:W:X:YZa:bc:d:e:f:g:hi:jk:lmn:op:rqst:uvw:x:yz:");
     while ((status = PL_GetNextOpt(optstate)) == PL_OPT_OK) {
         ++optionsFound;
         switch (optstate->option) {
@@ -2562,12 +2672,46 @@ main(int argc, char **argv)
                 enablePostHandshakeAuth = PR_TRUE;
                 break;
 
+            case 'G':
+                enableExtendedMasterSecret = PR_TRUE;
+                break;
+
             case 'H':
                 configureDHE = (PORT_Atoi(optstate->value) != 0);
                 break;
 
-            case 'G':
-                enableExtendedMasterSecret = PR_TRUE;
+            case 'I':
+                rv = parseGroupList(optstate->value, &enabledGroups, &enabledGroupsCount);
+                if (rv != SECSuccess) {
+                    PL_DestroyOptState(optstate);
+                    fprintf(stderr, "Bad group specified.\n");
+                    fprintf(stderr, "Run '%s -h' for usage information.\n", progName);
+                    exit(5);
+                }
+                break;
+
+            case 'J':
+                rv = parseSigSchemeList(optstate->value, &enabledSigSchemes, &enabledSigSchemeCount);
+                if (rv != SECSuccess) {
+                    PL_DestroyOptState(optstate);
+                    fprintf(stderr, "Bad signature scheme specified.\n");
+                    fprintf(stderr, "Run '%s -h' for usage information.\n", progName);
+                    exit(5);
+                }
+                break;
+
+            case 'K':
+                if (externalCompressionCount >= MAX_EXTERNAL_COMPRESSERS_INDEX) {
+                    Usage(progName);
+                    break;
+                }
+                rv = parseExternalCompessionString(&externalCompressionValues
+                                                  [externalCompressionCount++],
+                                                  optstate->value);
+                if (rv != SECSuccess) {
+                    Usage(progName);
+                    break;
+                }
                 break;
 
             case 'L':
@@ -2591,6 +2735,14 @@ main(int argc, char **argv)
 
             case 'N':
                 NoReuse = PR_TRUE;
+                break;
+
+            case 'P':
+                certPrefix = PORT_Strdup(optstate->value);
+                break;
+
+            case 'Q':
+                enableALPN = PR_TRUE;
                 break;
 
             case 'R':
@@ -2631,9 +2783,22 @@ main(int argc, char **argv)
                 configureWeakDHE = (PORT_Atoi(optstate->value) != 0);
                 break;
 
+            case 'X':
+                echParamsStr = PORT_Strdup(optstate->value);
+                if (echParamsStr == NULL) {
+                    PL_DestroyOptState(optstate);
+                    fprintf(stderr, "echParamsStr copy failed.\n");
+                    exit(5);
+                }
+                break;
+
             case 'Y':
                 PrintCipherUsage(progName);
                 exit(0);
+                break;
+
+            case 'Z':
+                zeroRTT = PR_TRUE;
                 break;
 
             case 'a':
@@ -2710,16 +2875,16 @@ main(int argc, char **argv)
                 virtServerNameArray[0] = PORT_Strdup(optstate->value);
                 break;
 
-            case 'P':
-                certPrefix = PORT_Strdup(optstate->value);
-                break;
-
             case 'o':
                 MakeCertOK = 1;
                 break;
 
             case 'p':
                 port = PORT_Atoi(optstate->value);
+                break;
+
+            case 'q':
+               enableZlibCertificateCompression = PR_TRUE;
                 break;
 
             case 'r':
@@ -2755,8 +2920,15 @@ main(int argc, char **argv)
                 debugCache = PR_TRUE;
                 break;
 
-            case 'Z':
-                zeroRTT = PR_TRUE;
+            case 'x':
+                rv = parseExporters(optstate->value,
+                                    &enabledExporters, &enabledExporterCount);
+                if (rv != SECSuccess) {
+                    PL_DestroyOptState(optstate);
+                    fprintf(stderr, "Bad exporter specified.\n");
+                    fprintf(stderr, "Run '%s -h' for usage information.\n", progName);
+                    exit(5);
+                }
                 break;
 
             case 'z':
@@ -2769,49 +2941,6 @@ main(int argc, char **argv)
                 }
                 break;
 
-            case 'Q':
-                enableALPN = PR_TRUE;
-                break;
-
-            case 'I':
-                rv = parseGroupList(optstate->value, &enabledGroups, &enabledGroupsCount);
-                if (rv != SECSuccess) {
-                    PL_DestroyOptState(optstate);
-                    fprintf(stderr, "Bad group specified.\n");
-                    fprintf(stderr, "Run '%s -h' for usage information.\n", progName);
-                    exit(5);
-                }
-                break;
-
-            case 'J':
-                rv = parseSigSchemeList(optstate->value, &enabledSigSchemes, &enabledSigSchemeCount);
-                if (rv != SECSuccess) {
-                    PL_DestroyOptState(optstate);
-                    fprintf(stderr, "Bad signature scheme specified.\n");
-                    fprintf(stderr, "Run '%s -h' for usage information.\n", progName);
-                    exit(5);
-                }
-                break;
-
-            case 'x':
-                rv = parseExporters(optstate->value,
-                                    &enabledExporters, &enabledExporterCount);
-                if (rv != SECSuccess) {
-                    PL_DestroyOptState(optstate);
-                    fprintf(stderr, "Bad exporter specified.\n");
-                    fprintf(stderr, "Run '%s -h' for usage information.\n", progName);
-                    exit(5);
-                }
-                break;
-
-            case 'X':
-                echParamsStr = PORT_Strdup(optstate->value);
-                if (echParamsStr == NULL) {
-                    PL_DestroyOptState(optstate);
-                    fprintf(stderr, "echParamsStr copy failed.\n");
-                    exit(5);
-                }
-                break;
             default:
             case '?':
                 fprintf(stderr, "Unrecognized or bad option specified: %c\n", optstate->option);
@@ -3135,6 +3264,11 @@ cleanup:
     SECITEM_ZfreeItem(&psk, PR_FALSE);
     SECITEM_ZfreeItem(&pskLabel, PR_FALSE);
     PORT_Free(echParamsStr);
+
+    for (i=0; i < externalCompressionCount; i++) {
+        secuFreeExternalCompressionEntry(&externalCompressionValues[i]);
+    }
+
     if (NSS_Shutdown() != SECSuccess) {
         SECU_PrintError(progName, "NSS_Shutdown");
         if (loggerThread) {

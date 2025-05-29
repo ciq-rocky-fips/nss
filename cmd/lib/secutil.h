@@ -424,6 +424,17 @@ SECStatus exportKeyingMaterials(PRFileDesc *fd,
                                 const secuExporter *exporters,
                                 unsigned int exporterCount);
 
+typedef struct {
+    PRLibrary *lib;
+    SSLCertificateCompressionAlgorithm compAlg;
+} secuExternalCompressionEntry;
+
+SECStatus
+parseExternalCompessionString(secuExternalCompressionEntry *, const char *opt);
+
+void
+secuFreeExternalCompressionEntry(secuExternalCompressionEntry *);
+
 SECStatus readPSK(const char *arg, SECItem *psk, SECItem *label);
 
 /*

@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
+#include <zlib.h>
 
 #include "nspr.h"
 #include "prio.h"
@@ -53,6 +54,7 @@
 #define MAX_WAIT_FOR_SERVER 600
 #define WAIT_INTERVAL 100
 #define ZERO_RTT_MAX (2 << 16)
+#define MAX_EXTERNAL_COMPRESSERS_INDEX 10
 
 #define EXIT_CODE_HANDSHAKE_FAILED 254
 
@@ -233,7 +235,7 @@ PrintUsageHeader()
             "  [-I groups] [-J signatureschemes]\n"
             "  [-A requestfile] [-L totalconnections] [-P {client,server}]\n"
             "  [-N echConfigs] [-Q] [-z externalPsk]\n"
-            "  [-i echGreaseSize]\n"
+            "  [-i echGreaseSize] [-j] [-k {compression_spec}]\n"
             "\n",
             progName);
 }
@@ -337,6 +339,17 @@ PrintParameterUsage()
             "%-20s 'Client_identity' will be used.\n",
             "-z externalPsk", "", "", "");
     fprintf(stderr, "%-20s Enable middlebox compatibility mode (TLS 1.3 only)\n", "-e");
+    fprintf(stderr, "%-20s Enable zlib certificate compression\n", "-j");
+    fprintf(stderr, "%-20s Enable certificate compression with an external\n", "-k {compression_spec}");
+    fprintf(stderr, "%-20s compresser. The compression_spec value has the following format:\n"
+    "%-20s    id,name,dll,encode,decode\n"
+    "%-20s where:\n"
+    "%-20s    %-10s is an int matching the ssl spec for the compresser.\n"
+    "%-20s    %-10s is a friendly name for the compresser.\n"
+    "%-20s    %-10s is the path to the implementation for the compresser.\n"
+    "%-20s    %-10s is the name of the encode function which will compress.\n"
+    "%-20s    %-10s is the name of the decode function which will decompress.\n", "", "", "", "", "id", "", "name", "", "dll", "", "encode", "", "decode");
+
 }
 
 static void
@@ -1042,6 +1055,7 @@ int multiplier = 0;
 SSLVersionRange enabledVersions;
 int disableLocking = 0;
 int enableSessionTickets = 0;
+int enableZlibCertificateCompression = 0;
 int enableFalseStart = 0;
 int enableCertStatus = 0;
 int enableSignedCertTimestamps = 0;
@@ -1078,6 +1092,9 @@ PRBool enablePostHandshakeAuth = PR_FALSE;
 PRBool enableDelegatedCredentials = PR_FALSE;
 const secuExporter *enabledExporters = NULL;
 unsigned int enabledExporterCount = 0;
+secuExternalCompressionEntry externalCompressionValues[MAX_EXTERNAL_COMPRESSERS_INDEX];
+int externalCompressionCount = 0;
+
 
 static int
 writeBytesToServer(PRFileDesc *s, const PRUint8 *buf, int nb)
@@ -1360,11 +1377,88 @@ printEchRetryConfigs(PRFileDesc *s)
     return SECSuccess;
 }
 
+SECStatus zlibCertificateDecode(const SECItem* input, unsigned char* output,
+                                size_t outputLen, size_t* usedLen)
+{
+  SECStatus rv = SECFailure;
+  if (!input || !input->data || input->len == 0 || !output || outputLen == 0) {
+    PORT_SetError(SEC_ERROR_INVALID_ARGS);
+    return rv;
+  }
+
+  z_stream strm = {};
+
+  if (inflateInit(&strm) != Z_OK) {
+    PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+    return rv;
+  }
+
+  strm.avail_in = input->len;
+  strm.next_in = input->data;
+
+  strm.avail_out = outputLen;
+  strm.next_out = output;
+
+  int ret = inflate(&strm, Z_FINISH);
+  if (ret != Z_STREAM_END || strm.avail_in == 0 || strm.avail_out == 0) {
+    PORT_SetError(SEC_ERROR_BAD_DATA);
+    return rv;
+  }
+
+  *usedLen = strm.total_out;
+  rv = SECSuccess;
+  return rv;
+}
+
+SECStatus zlibCertificateEncode(const SECItem* input, SECItem *output)
+{
+  SECStatus rv = SECFailure;
+  if (!input || !input->data || input->len == 0 || !output ||
+      !output->data || output->len == 0) {
+    PORT_SetError(SEC_ERROR_INVALID_ARGS);
+    return rv;
+  }
+
+  z_stream strm = {};
+
+  if (deflateInit(&strm, 9) != Z_OK) {
+    PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+    return rv;
+  }
+
+  strm.avail_in = input->len;
+  strm.next_in = input->data;
+
+  strm.avail_out = output->len;
+  strm.next_out = output->data;
+
+  int ret = deflate(&strm, Z_FINISH);
+  if (ret != Z_STREAM_END || strm.avail_in == 0 || strm.avail_out == 0) {
+    PORT_SetError(SEC_ERROR_BAD_DATA);
+    return rv;
+  }
+
+  output->len = strm.total_out;
+  rv = SECSuccess;
+  return rv;
+}
+
+static SECStatus
+configureZlibCompression(PRFileDesc *model_sock)
+{
+    SSLCertificateCompressionAlgorithm zlibAlg = {1, "zlib",
+                                                  zlibCertificateEncode,
+                                                  zlibCertificateDecode};
+
+    return SSL_SetCertificateCompressionAlgorithm(model_sock, zlibAlg);
+}
+
 static int
 run()
 {
     int headerSeparatorPtrnId = 0;
     int error = 0;
+    int i;
     SECStatus rv;
     PRStatus status;
     PRInt32 filesReady;
@@ -1512,6 +1606,26 @@ run()
         if (rv != SECSuccess) {
             SECU_PrintError(progName, "error forcing fallback scsv");
             error = 1;
+            goto done;
+        }
+    }
+
+    if (enableZlibCertificateCompression) {
+        rv = configureZlibCompression(s);
+        if (rv != SECSuccess) {
+            SECU_PrintError(progName, "error enabling Zlib Certificate Compression");
+            error=1;
+            goto done;
+        }
+    }
+
+    for (i=0; i < externalCompressionCount; i++) {
+        secuExternalCompressionEntry *e = &externalCompressionValues[i];
+        SSLCertificateCompressionAlgorithm alg = e->compAlg;
+        rv = SSL_SetCertificateCompressionAlgorithm(s, alg);
+        if (rv != SECSuccess) {
+            SECU_PrintError(progName, "error enabling External Certificate Compression");
+            error=1;
             goto done;
         }
     }
@@ -1900,6 +2014,7 @@ main(int argc, char **argv)
     char *rootModule = NULL;
     int numConnections = 1;
     PRFileDesc *s = NULL;
+    int i;
 
     serverCertAuth.shouldPause = PR_TRUE;
     serverCertAuth.isPaused = PR_FALSE;
@@ -1924,7 +2039,7 @@ main(int argc, char **argv)
     }
 
     optstate = PL_CreateOptState(argc, argv,
-                                 "46A:BCDEFGHI:J:KL:M:N:OP:QR:STUV:W:X:YZa:bc:d:efgh:i:m:n:op:qr:st:uvw:x:z:");
+                                 "46A:BCDEFGHI:J:KL:M:N:OP:QR:STUV:W:X:YZa:bc:d:efgh:i:jk:m:n:op:qr:st:uvw:x:z:");
     while ((optstatus = PL_GetNextOpt(optstate)) == PL_OPT_OK) {
         switch (optstate->option) {
             case '?':
@@ -1937,6 +2052,7 @@ main(int argc, char **argv)
                 if (!allowIPv4)
                     Usage();
                 break;
+
             case '6':
                 allowIPv4 = PR_FALSE;
                 if (!allowIPv6)
@@ -1979,9 +2095,22 @@ main(int argc, char **argv)
                 requireDHNamedGroups = PR_TRUE;
                 break;
 
-            case 'O':
-                clientCertAsyncSelect = PR_FALSE;
-                serverCertAuth.shouldPause = PR_FALSE;
+            case 'I':
+                rv = parseGroupList(optstate->value, &enabledGroups, &enabledGroupsCount);
+                if (rv != SECSuccess) {
+                    PL_DestroyOptState(optstate);
+                    fprintf(stderr, "Bad group specified.\n");
+                    Usage();
+                }
+                break;
+
+            case 'J':
+                rv = parseSigSchemeList(optstate->value, &enabledSigSchemes, &enabledSigSchemeCount);
+                if (rv != SECSuccess) {
+                    PL_DestroyOptState(optstate);
+                    fprintf(stderr, "Bad signature scheme specified.\n");
+                    Usage();
+                }
                 break;
 
             case 'K':
@@ -2014,12 +2143,9 @@ main(int argc, char **argv)
                 echConfigs = PORT_Strdup(optstate->value);
                 break;
 
-            case 'i':
-                echGreaseSize = PORT_Atoi(optstate->value);
-                if (!echGreaseSize || echGreaseSize > 255) {
-                    fprintf(stderr, "ECH Grease size must be within 1..255 (inclusive).\n");
-                    exit(-1);
-                }
+            case 'O':
+                clientCertAsyncSelect = PR_FALSE;
+                serverCertAuth.shouldPause = PR_FALSE;
                 break;
 
             case 'P':
@@ -2057,6 +2183,11 @@ main(int argc, char **argv)
                 versionString = PORT_Strdup(optstate->value);
                 break;
 
+            case 'W':
+                pwdata.source = PW_FROMFILE;
+                pwdata.data = PORT_Strdup(optstate->value);
+                break;
+
             case 'X':
                 if (!strcmp(optstate->value, "alt-server-hello")) {
                     enableAltServerHello = PR_TRUE;
@@ -2064,6 +2195,7 @@ main(int argc, char **argv)
                     Usage();
                 }
                 break;
+
             case 'Y':
                 PrintCipherUsage();
                 exit(0);
@@ -2096,10 +2228,6 @@ main(int argc, char **argv)
                 cipherString = PORT_Strdup(optstate->value);
                 break;
 
-            case 'g':
-                enableFalseStart = 1;
-                break;
-
             case 'd':
                 certDir = PORT_Strdup(optstate->value);
                 break;
@@ -2112,8 +2240,38 @@ main(int argc, char **argv)
                 clientSpeaksFirst = PR_TRUE;
                 break;
 
+            case 'g':
+                enableFalseStart = 1;
+                break;
+
             case 'h':
                 host = PORT_Strdup(optstate->value);
+                break;
+
+            case 'i':
+                echGreaseSize = PORT_Atoi(optstate->value);
+                if (!echGreaseSize || echGreaseSize > 255) {
+                    fprintf(stderr, "ECH Grease size must be within 1..255 (inclusive).\n");
+                    exit(-1);
+                }
+                break;
+
+            case 'j':
+                enableZlibCertificateCompression = PR_TRUE;
+                break;
+
+            case 'k':
+                if (externalCompressionCount >= MAX_EXTERNAL_COMPRESSERS_INDEX) {
+                    Usage(progName);
+                    break;
+                }
+                rv = parseExternalCompessionString(&externalCompressionValues
+                                                  [externalCompressionCount++],
+                                                  optstate->value);
+                if (rv != SECSuccess) {
+                    Usage(progName);
+                    break;
+                }
                 break;
 
             case 'm':
@@ -2138,6 +2296,10 @@ main(int argc, char **argv)
                 pingServerFirst = PR_TRUE;
                 break;
 
+            case 'r':
+                renegotiationsToDo = atoi(optstate->value);
+                break;
+
             case 's':
                 disableLocking = 1;
                 break;
@@ -2154,36 +2316,9 @@ main(int argc, char **argv)
                 verbose++;
                 break;
 
-            case 'r':
-                renegotiationsToDo = atoi(optstate->value);
-                break;
-
             case 'w':
                 pwdata.source = PW_PLAINTEXT;
                 pwdata.data = PORT_Strdup(optstate->value);
-                break;
-
-            case 'W':
-                pwdata.source = PW_FROMFILE;
-                pwdata.data = PORT_Strdup(optstate->value);
-                break;
-
-            case 'I':
-                rv = parseGroupList(optstate->value, &enabledGroups, &enabledGroupsCount);
-                if (rv != SECSuccess) {
-                    PL_DestroyOptState(optstate);
-                    fprintf(stderr, "Bad group specified.\n");
-                    Usage();
-                }
-                break;
-
-            case 'J':
-                rv = parseSigSchemeList(optstate->value, &enabledSigSchemes, &enabledSigSchemeCount);
-                if (rv != SECSuccess) {
-                    PL_DestroyOptState(optstate);
-                    fprintf(stderr, "Bad signature scheme specified.\n");
-                    Usage();
-                }
                 break;
 
             case 'x':
@@ -2415,6 +2550,10 @@ done:
     PORT_Free(echConfigs);
     SECITEM_ZfreeItem(&psk, PR_FALSE);
     SECITEM_ZfreeItem(&pskLabel, PR_FALSE);
+
+    for (i=0; i < externalCompressionCount; i++) {
+        secuFreeExternalCompressionEntry(&externalCompressionValues[i]);
+    }
 
     if (enabledGroups) {
         PORT_Free(enabledGroups);

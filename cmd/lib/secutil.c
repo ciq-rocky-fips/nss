@@ -4473,6 +4473,104 @@ done:
     return SECSuccess;
 }
 
+typedef SECStatus (*secuEncodeFunc) (const SECItem *, SECItem *);
+typedef SECStatus (*secuDecodeFunc) (const SECItem *, unsigned char *, size_t, size_t *);
+#define EXT_COMP_MAX_ARGS 5
+#define EXT_COMP_MIN_ARGS 4
+#define EXT_COMP_ID       0
+#define EXT_COMP_NAME     1
+#define EXT_COMP_LIB      2
+#define EXT_COMP_ENCODE   3
+#define EXT_COMP_DECODE   4
+SECStatus
+parseExternalCompessionString(secuExternalCompressionEntry *entry,
+                              const char *opt)
+{
+    SSLCertificateCompressionAlgorithm *alg = &entry->compAlg;
+    char *str = PORT_Strdup(opt);
+    char *save_ptr;
+    char *p;
+    char *args[EXT_COMP_MAX_ARGS] = { NULL };
+    int i, arg_count=0;
+    PRLibSpec libSpec;
+    SECStatus rv = SECFailure;
+
+    PORT_Memset(entry, 0, sizeof(secuExternalCompressionEntry));
+
+    if (!str) {
+        goto done;
+    }
+
+   for (p = strtok_r(str, ",", &save_ptr), i=0; p && (i < EXT_COMP_MAX_ARGS) ;
+       i++, p = strtok_r(NULL, ",", &save_ptr)) {
+       args[i] = PORT_Strdup(p);
+   }
+
+   arg_count = i;
+   if  (arg_count < EXT_COMP_MIN_ARGS) {
+       goto done;
+   }
+   libSpec.type = PR_LibSpec_Pathname;
+   libSpec.value.pathname = args[EXT_COMP_LIB];
+   entry->lib = PR_LoadLibraryWithFlags(libSpec, PR_LD_NOW|PR_LD_LOCAL);
+   if (entry->lib == NULL) {
+       goto done;
+   }
+   alg->id = atoi(args[EXT_COMP_ID]);
+   if (alg->id == 0) {
+       goto done;
+   }
+   alg->name = args[EXT_COMP_NAME];
+   args[EXT_COMP_NAME] = NULL;
+   if (args[EXT_COMP_ENCODE] && *args[EXT_COMP_ENCODE]) {
+       alg->encode = (secuEncodeFunc) PR_FindFunctionSymbol(entry->lib, args[EXT_COMP_ENCODE]);
+       if (alg->encode == NULL) {
+           goto done;
+       }
+   }
+   if (args[EXT_COMP_DECODE] && *args[EXT_COMP_DECODE]) {
+       alg->decode = (secuDecodeFunc) PR_FindFunctionSymbol(entry->lib, args[EXT_COMP_DECODE]);
+       if (alg->decode == NULL) {
+           goto done;
+       }
+   }
+   /* make sure at least one of these has been set */
+   if ((alg->encode == NULL) && (alg->decode == NULL)) {
+       goto done;
+   }
+   rv = SECSuccess;
+
+done:
+   for (i=0; i < arg_count; i ++) {
+       if (args[i]) {
+           PORT_Free(args[i]);
+       }
+   }
+   if (str) {
+       PORT_Free(str);
+   }
+
+   if (rv != SECSuccess) {
+       secuFreeExternalCompressionEntry(entry);
+   }
+   return rv;
+}
+
+void
+secuFreeExternalCompressionEntry(secuExternalCompressionEntry *entry)
+{
+    SSLCertificateCompressionAlgorithm *alg = &entry->compAlg;
+    if (entry->lib) {
+        PR_UnloadLibrary(entry->lib);
+        entry->lib = NULL;
+    }
+    if (alg->name)  {
+        PORT_Free((char *)alg->name);
+        alg->name = NULL;
+    }
+}
+
+
 static SECStatus
 exportKeyingMaterial(PRFileDesc *fd, const secuExporter *exporter)
 {

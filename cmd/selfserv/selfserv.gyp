@@ -16,6 +16,7 @@
       'dependencies': [
         '<(DEPTH)/exports.gyp:dbm_exports',
         '<(DEPTH)/exports.gyp:nss_exports'
+        '<(DEPTH)/lib/zlib/zlib.gyp:nss_zlib'
       ]
     }
   ],
