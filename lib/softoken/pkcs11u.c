@@ -2356,7 +2356,7 @@ sftk_getKeyLength(SFTKObject *source)
          * key length is CKA_VALUE, which is the default */
         keyType = CKK_INVALID_KEY_TYPE;
     }
-    if (keyType == CKK_EC) {
+    if (keyType == CKK_EC || keyType == CKK_EC_EDWARDS || keyType == CKK_EC_MONTGOMERY) {
         SECOidTag curve = sftk_quickGetECCCurveOid(source);
         switch (curve) {
             case SEC_OID_CURVE25519:
