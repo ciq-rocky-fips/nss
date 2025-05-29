@@ -1597,12 +1597,10 @@ ssl_run_tests()
     do
         case "${SSL_TEST}" in
         "policy")
-            if [ "${TEST_MODE}" = "SHARED_DB" ] ; then
-                ssl_policy_listsuites
-                ssl_policy_selfserv
-                ssl_policy_pkix_ocsp
-                ssl_policy
-            fi
+            ssl_policy_listsuites
+            ssl_policy_selfserv
+            ssl_policy_pkix_ocsp
+            ssl_policy
             ;;
         "crl")
             ssl_crl_ssl

@@ -872,8 +872,6 @@ smime_init
 smime_main
 smime_data_tb
 smime_p7
-if [ "${TEST_MODE}" = "SHARED_DB" ] ; then
-  smime_policy
-fi
+smime_policy
 smime_cleanup
 
