@@ -37,6 +37,7 @@ CTS_CreateContext(void *context, freeblCipherFunc cipher,
 void
 CTS_DestroyContext(CTSContext *cts, PRBool freeit)
 {
+    PORT_Memset(cts, 0, sizeof(CTSContext));
     if (freeit) {
         PORT_Free(cts);
     }
