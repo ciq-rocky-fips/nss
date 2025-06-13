@@ -1,0 +1,115 @@
+diff -up ./lib/smime/cmsasn1.c.restore_abi ./lib/smime/cmsasn1.c
+--- ./lib/smime/cmsasn1.c.restore_abi	2024-06-07 09:26:03.000000000 -0700
++++ ./lib/smime/cmsasn1.c	2024-09-06 18:05:27.808338289 -0700
+@@ -350,7 +350,7 @@ static const SEC_ASN1Template NSSCMSKeyA
+     { SEC_ASN1_OPTIONAL | SEC_ASN1_CONSTRUCTED | SEC_ASN1_EXPLICIT |
+           SEC_ASN1_CONTEXT_SPECIFIC | SEC_ASN1_XTRN | 1,
+       offsetof(NSSCMSKeyAgreeRecipientInfo, ukm),
+-      SEC_ASN1_SUB(SEC_OctetStringTemplate) },
++      SEC_ASN1_SUB(SEC_PointerToOctetStringTemplate) },
+     { SEC_ASN1_INLINE | SEC_ASN1_XTRN,
+       offsetof(NSSCMSKeyAgreeRecipientInfo, keyEncAlg),
+       SEC_ASN1_SUB(SECOID_AlgorithmIDTemplate) },
+diff -up ./lib/smime/cmslocal.h.restore_abi ./lib/smime/cmslocal.h
+--- ./lib/smime/cmslocal.h.restore_abi	2024-06-07 09:26:03.000000000 -0700
++++ ./lib/smime/cmslocal.h	2024-09-06 18:04:47.647863624 -0700
+@@ -174,7 +174,7 @@ NSS_CMSUtil_DecryptSymKey_RSA_OAEP(SECKE
+ 
+ extern SECStatus
+ NSS_CMSUtil_EncryptSymKey_ESECDH(PLArenaPool *poolp, CERTCertificate *cert, PK11SymKey *key,
+-                                 SECItem *encKey, PRBool genUkm, SECItem *ukm,
++                                 SECItem *encKey, PRBool genUkm, SECItem **ukm,
+                                  SECAlgorithmID *keyEncAlg, SECItem *originatorPubKey, void *wincx);
+ 
+ PK11SymKey *
+diff -up ./lib/smime/cmspubkey.c.restore_abi ./lib/smime/cmspubkey.c
+--- ./lib/smime/cmspubkey.c.restore_abi	2024-06-07 09:26:03.000000000 -0700
++++ ./lib/smime/cmspubkey.c	2024-09-06 18:04:47.647863624 -0700
+@@ -292,9 +292,15 @@ Create_ECC_CMS_SharedInfo(PLArenaPool *p
+     unsigned char suppPubInfo[4] = { 0 };
+ 
+     SI.keyInfo = keyInfo;
+-    SI.entityUInfo.type = ukm->type;
+-    SI.entityUInfo.data = ukm->data;
+-    SI.entityUInfo.len = ukm->len;
++    if (ukm) {
++        SI.entityUInfo.type = ukm->type;
++        SI.entityUInfo.data = ukm->data;
++        SI.entityUInfo.len = ukm->len;
++    } else {
++        SI.entityUInfo.type = siBuffer;
++        SI.entityUInfo.data = NULL;
++        SI.entityUInfo.len = 0;
++    }
+ 
+     SI.suppPubInfo.type = siBuffer;
+     SI.suppPubInfo.data = suppPubInfo;
+@@ -322,7 +328,7 @@ Create_ECC_CMS_SharedInfo(PLArenaPool *p
+ SECStatus
+ NSS_CMSUtil_EncryptSymKey_ESECDH(PLArenaPool *poolp, CERTCertificate *cert,
+                                  PK11SymKey *bulkkey, SECItem *encKey,
+-                                 PRBool genUkm, SECItem *ukm,
++                                 PRBool genUkm, SECItem **ukmp,
+                                  SECAlgorithmID *keyEncAlg, SECItem *pubKey,
+                                  void *wincx)
+ {
+@@ -337,10 +343,11 @@ NSS_CMSUtil_EncryptSymKey_ESECDH(PLArena
+     SECAlgorithmID keyWrapAlg;
+     SECOidTag keyEncAlgtag;
+     SECItem keyWrapAlg_params, *keyEncAlg_params, *SharedInfo;
++    SECItem *ukm = *ukmp;
+     CK_MECHANISM_TYPE keyDerivationType, keyWrapMech;
+     CK_ULONG kdf;
+ 
+-    if (genUkm && (ukm->len != 0 || ukm->data != NULL)) {
++    if (genUkm && (ukm != NULL)) {
+         PORT_SetError(PR_INVALID_ARGUMENT_ERROR);
+         return SECFailure;
+     }
+@@ -427,17 +434,17 @@ NSS_CMSUtil_EncryptSymKey_ESECDH(PLArena
+      * contain 512 bits for Diffie-Hellman key agreement. */
+ 
+     if (genUkm) {
+-        ukm->type = siBuffer;
+-        ukm->len = 64;
+-        ukm->data = (unsigned char *)PORT_ArenaAlloc(poolp, ukm->len);
+-
+-        if (ukm->data == NULL) {
++        ukm = SECITEM_AllocItem(poolp, NULL, 64);
++        if (ukm == NULL) {
+             goto loser;
+         }
++        ukm->type = siBuffer;
++
+         rv = PK11_GenerateRandom(ukm->data, ukm->len);
+         if (rv != SECSuccess) {
+             goto loser;
+         }
++        *ukmp = ukm; /* return it */
+     }
+ 
+     SharedInfo = Create_ECC_CMS_SharedInfo(poolp, &keyWrapAlg,
+diff -up ./lib/smime/cmsrecinfo.c.restore_abi ./lib/smime/cmsrecinfo.c
+--- ./lib/smime/cmsrecinfo.c.restore_abi	2024-06-07 09:26:03.000000000 -0700
++++ ./lib/smime/cmsrecinfo.c	2024-09-06 18:04:47.647863624 -0700
+@@ -582,7 +582,7 @@ NSS_CMSRecipientInfo_UnwrapBulkKey(NSSCM
+             parameters = &(ri->ri.keyAgreeRecipientInfo.keyEncAlg.parameters);
+             enckey = &(ri->ri.keyAgreeRecipientInfo.recipientEncryptedKeys[subIndex]->encKey);
+             oiok = &(ri->ri.keyAgreeRecipientInfo.originatorIdentifierOrKey);
+-            ukm = &(ri->ri.keyAgreeRecipientInfo.ukm);
++            ukm = ri->ri.keyAgreeRecipientInfo.ukm;
+             break;
+         case NSSCMSRecipientInfoID_KEK:
+             algid = &(ri->ri.kekRecipientInfo.keyEncAlg);
+diff -up ./lib/smime/cmst.h.restore_abi ./lib/smime/cmst.h
+--- ./lib/smime/cmst.h.restore_abi	2024-06-07 09:26:03.000000000 -0700
++++ ./lib/smime/cmst.h	2024-09-06 18:04:47.647863624 -0700
+@@ -376,7 +376,7 @@ typedef struct NSSCMSRecipientEncryptedK
+ struct NSSCMSKeyAgreeRecipientInfoStr {
+     SECItem version;
+     NSSCMSOriginatorIdentifierOrKey originatorIdentifierOrKey;
+-    SECItem ukm; /* optional */
++    SECItem *ukm; /* optional */
+     SECAlgorithmID keyEncAlg;
+     NSSCMSRecipientEncryptedKey **recipientEncryptedKeys;
+ };

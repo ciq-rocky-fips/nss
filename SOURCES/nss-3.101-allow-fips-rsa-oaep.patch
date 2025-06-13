@@ -1,0 +1,20 @@
+diff -up ./lib/softoken/pkcs11u.c.fipsrsaoaep ./lib/softoken/pkcs11u.c
+--- ./lib/softoken/pkcs11u.c.fipsrsaoaep	2024-10-24 09:27:17.971673855 +0200
++++ ./lib/softoken/pkcs11u.c	2024-10-24 09:23:35.006352872 +0200
+@@ -2565,6 +2565,16 @@ sftk_handleSpecial(SFTKSlot *slot, CK_ME
+                 }
+             }
+             return sftk_checkKeyLength(targetKeyLength, 112, 512, 1);
++        case SFTKFIPSRSAOAEP:;
++            CK_RSA_PKCS_OAEP_PARAMS *rsaoaep = (CK_RSA_PKCS_OAEP_PARAMS *)
++                                                mech->pParameter;
++
++            HASH_HashType hash_msg = sftk_GetHashTypeFromMechanism(rsaoaep->hashAlg);
++            HASH_HashType hash_pad = sftk_GetHashTypeFromMechanism(rsaoaep->mgf);
++            /* message hash and mask generation function must be the same */
++            if (hash_pad != hash_msg) return PR_FALSE;
++
++            return sftk_checkFIPSHash(rsaoaep->hashAlg, PR_FALSE, PR_FALSE);
+         default:
+             break;
+     }

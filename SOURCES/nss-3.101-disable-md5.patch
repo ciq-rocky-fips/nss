@@ -1,0 +1,81 @@
+diff -up ./lib/pk11wrap/pk11pars.c.no_md ./lib/pk11wrap/pk11pars.c
+--- ./lib/pk11wrap/pk11pars.c.no_md	2024-06-11 12:41:35.054654990 -0700
++++ ./lib/pk11wrap/pk11pars.c	2024-06-11 12:46:25.347979894 -0700
+@@ -329,14 +329,11 @@ static const oidValDef curveOptList[] =
+ static const oidValDef hashOptList[] = {
+     /* Hashes */
+     { CIPHER_NAME("MD2"), SEC_OID_MD2,
+-      NSS_USE_ALG_IN_SSL_KX | NSS_USE_ALG_IN_SIGNATURE | NSS_USE_ALG_IN_SMIME |
+-          NSS_USE_ALG_IN_PKCS12 },
++      NSS_USE_ALG_IN_SMIME_LEGACY | NSS_USE_ALG_IN_PKCS12_DECRYPT },
+     { CIPHER_NAME("MD4"), SEC_OID_MD4,
+-      NSS_USE_ALG_IN_SSL_KX | NSS_USE_ALG_IN_SIGNATURE | NSS_USE_ALG_IN_SMIME |
+-          NSS_USE_ALG_IN_PKCS12 },
++      NSS_USE_ALG_IN_SMIME_LEGACY | NSS_USE_ALG_IN_PKCS12_DECRYPT },
+     { CIPHER_NAME("MD5"), SEC_OID_MD5,
+-      NSS_USE_ALG_IN_SSL_KX | NSS_USE_ALG_IN_SIGNATURE | NSS_USE_ALG_IN_SMIME |
+-          NSS_USE_ALG_IN_PKCS12 },
++      NSS_USE_ALG_IN_SMIME_LEGACY | NSS_USE_ALG_IN_PKCS12_DECRYPT },
+     { CIPHER_NAME("SHA1"), SEC_OID_SHA1,
+       NSS_USE_ALG_IN_SSL_KX | NSS_USE_ALG_IN_SIGNATURE | NSS_USE_ALG_IN_SMIME |
+           NSS_USE_ALG_IN_PKCS12 },
+diff -up ./lib/util/secoid.c.no_md ./lib/util/secoid.c
+diff -r 699541a7793b lib/util/secoid.c
+--- a/lib/util/secoid.c	Tue Jun 16 23:03:22 2020 +0000
++++ b/lib/util/secoid.c	Thu Jun 25 14:33:09 2020 +0200
+@@ -2042,6 +2042,19 @@
+             int i;
+ 
+             for (i = 1; i < SEC_OID_TOTAL; i++) {
++                switch (i) {
++                case SEC_OID_MD2:
++                case SEC_OID_MD4:
++                case SEC_OID_MD5:
++                case SEC_OID_PKCS1_MD2_WITH_RSA_ENCRYPTION:
++                case SEC_OID_PKCS1_MD4_WITH_RSA_ENCRYPTION:
++                case SEC_OID_PKCS1_MD5_WITH_RSA_ENCRYPTION:
++                case SEC_OID_PKCS5_PBE_WITH_MD2_AND_DES_CBC:
++                case SEC_OID_PKCS5_PBE_WITH_MD5_AND_DES_CBC:
++                    continue;
++                default:
++                    break;
++                }
+                 if (oids[i].desc && strstr(arg, oids[i].desc)) {
+                     xOids[i].notPolicyFlags = notEnable |
+                                               (xOids[i].notPolicyFlags & ~(DEF_FLAGS));
+diff -up ./tests/tools/pkcs12policy.txt.disable_md5_test ./tests/tools/pkcs12policy.txt
+--- ./tests/tools/pkcs12policy.txt.disable_md5_test	2024-06-07 09:26:03.000000000 -0700
++++ ./tests/tools/pkcs12policy.txt	2024-06-19 11:15:46.666728170 -0700
+@@ -91,21 +91,21 @@
+   0 18 allow_all disallow=rc2 PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC4 PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC SHA-1  disallow rc2 (read), RC4 and RC2
+ # integrity policy check the various has based controls.
+ #  NOTE: md4, md2, and md5 are turned off by policy by default for encrypting
+-# (decrypting is fine). To be enabled, you must allow=all or allow=mdX on the
++# (decrypting is fine). To be enabled, you must allow=mdX/pkcs12 on the
+ # encryption side. These tests purposefully tests that the default fails to encrypt
+ # but succeeds when decrypting.
+  27  x allow=tls allow=tls PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Use default policy with multiple hashes
+-  0  0 allow=all allow=tls PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Allow all encrypt, use default decrypt with multiple hashes
+-  0  0 allow=all allow=all PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Allow all with multiple hashes
+- 28  x disallow=sha1_allow=md2 allow=all PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha1 on write
++  0  0 allow=md2/pkcs12 allow=tls PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Allow all encrypt, use default decrypt with multiple hashes
++  0  0 allow=md2/pkcs12 allow=all PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Allow all with multiple hashes
++ 28  x disallow=sha1_allow=md2/pkcs12 allow=all PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha1 on write
+  27  x disallow=md2 allow=all PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow md2 on write
+- 29  x disallow=sha256_allow=md2 allow=all PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha256 on write
+-  0 19 allow=all disallow=sha1 PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha1 on read
+-  0 18 allow=all disallow=md2 PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow md2 on read
+-  0 17 allow=all disallow=sha256 PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha256 on read
+-  0  0 allow=all disallow=md2/pkcs12-encrypt PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow md2 on read
+-  0  0 allow=all disallow=sha1/pkcs12-encrypt PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha1 on read
+-  0  0 allow=all disallow=sha256/pkcs12-encrypt PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha256 on read
++ 29  x disallow=sha256_allow=md2/pkcs12 allow=all PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha256 on write
++  0 19 allow=all:md2/pkcs12 disallow=sha1 PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha1 on read
++  0 18 allow=md2/pkcs12 disallow=md2 PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow md2 on read
++  0 17 allow=md2/pkcs12 disallow=sha256 PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha256 on read
++  0  0 allow=md2/pkcs12 disallow=md2/pkcs12-encrypt PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow md2 on read
++  0  0 allow=md2/pkcs12 disallow=sha1/pkcs12-encrypt PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha1 on read
++  0  0 allow=md2/pkcs12 disallow=sha256/pkcs12-encrypt PKCS_#12_V2_PBE_With_SHA-1_And_128_Bit_RC2_CBC PKCS_#5_Password_Based_Encryption_with_MD2_and_DES-CBC SHA-256 Disallow sha256 on read
+   0  0 allow=all allow=all AES-128-CBC AES-128-CBC HMAC_SHA-256
+  29  x disallow=hmac-sha256 allow=all AES-128-CBC AES-128-CBC HMAC_SHA-256
+   0 18 allow=all disallow=hmac-sha256 AES-128-CBC AES-128-CBC HMAC_SHA-256

@@ -1,0 +1,190 @@
+diff -up ./lib/softoken/pkcs11c.c.fips_indicators ./lib/softoken/pkcs11c.c
+--- ./lib/softoken/pkcs11c.c.fips_indicators	2024-06-12 13:38:15.995811284 -0700
++++ ./lib/softoken/pkcs11c.c	2024-06-12 13:41:30.008188930 -0700
+@@ -453,7 +453,7 @@ sftk_InitGeneric(SFTKSession *session, C
+     context->blockSize = 0;
+     context->maxLen = 0;
+     context->isFIPS = sftk_operationIsFIPS(session->slot, pMechanism,
+-                                           operation, key);
++                                           operation, key, 0);
+     *contextPtr = context;
+     return CKR_OK;
+ }
+@@ -4885,7 +4885,7 @@ NSC_GenerateKey(CK_SESSION_HANDLE hSessi
+     crv = sftk_handleObject(key, session);
+     /* we need to do this check at the end, so we can check the generated
+      * key length against fips requirements */
+-    key->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_NSS_GENERATE, key);
++    key->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_NSS_GENERATE, key, 0);
+     session->lastOpWasFIPS = key->isFIPS;
+     sftk_FreeSession(session);
+     if (crv == CKR_OK && sftk_isTrue(key, CKA_SENSITIVE)) {
+@@ -6020,7 +6020,7 @@ NSC_GenerateKeyPair(CK_SESSION_HANDLE hS
+         return crv;
+     }
+     /* we need to do this check at the end to make sure the generated key meets the key length requirements */
+-    privateKey->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_NSS_GENERATE_KEY_PAIR, privateKey);
++    privateKey->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_NSS_GENERATE_KEY_PAIR, privateKey, 0);
+     publicKey->isFIPS = privateKey->isFIPS;
+     session->lastOpWasFIPS = privateKey->isFIPS;
+     sftk_FreeSession(session);
+@@ -7220,6 +7220,10 @@ sftk_HKDF(CK_HKDF_PARAMS_PTR params, CK_
+         return CKR_TEMPLATE_INCONSISTENT;
+     }
+ 
++    if (!params->bExpand) {
++        keySize = hashLen;
++    }
++
+     /* sourceKey is NULL if we are called from the POST, skip the
+      * sensitiveCheck */
+     if (sourceKey != NULL) {
+@@ -7269,7 +7273,8 @@ sftk_HKDF(CK_HKDF_PARAMS_PTR params, CK_
+                     mech.pParameter = params;
+                     mech.ulParameterLen = sizeof(*params);
+                     key->isFIPS = sftk_operationIsFIPS(saltKey->slot, &mech,
+-                                                       CKA_DERIVE, saltKey);
++                                                       CKA_DERIVE, saltKey,
++                                                       keySize);
+                 }
+                 saltKeySource = saltKey->source;
+                 saltKey_att = sftk_FindAttribute(saltKey, CKA_VALUE);
+@@ -7336,7 +7341,7 @@ sftk_HKDF(CK_HKDF_PARAMS_PTR params, CK_
+     /* HKDF-Expand */
+     if (!params->bExpand) {
+         okm = prk;
+-        keySize = genLen = hashLen;
++        genLen = hashLen;
+     } else {
+         /* T(1) = HMAC-Hash(prk, "" | info | 0x01)
+          * T(n) = HMAC-Hash(prk, T(n-1) | info | n
+@@ -7583,7 +7588,8 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession
+             return CKR_KEY_HANDLE_INVALID;
+         }
+     }
+-    key->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_DERIVE, sourceKey);
++    key->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_DERIVE, sourceKey,
++                                       keySize);
+ 
+     switch (mechanism) {
+         /* get a public key from a private key. nsslowkey_ConvertToPublickey()
+diff -up ./lib/softoken/pkcs11i.h.fips_indicators ./lib/softoken/pkcs11i.h
+--- ./lib/softoken/pkcs11i.h.fips_indicators	2024-06-12 13:38:15.988811198 -0700
++++ ./lib/softoken/pkcs11i.h	2024-06-12 13:38:15.996811296 -0700
+@@ -979,7 +979,8 @@ CK_FLAGS sftk_AttributeToFlags(CK_ATTRIB
+ /* check the FIPS table to determine if this current operation is allowed by
+  * FIPS security policy */
+ PRBool sftk_operationIsFIPS(SFTKSlot *slot, CK_MECHANISM *mech,
+-                            CK_ATTRIBUTE_TYPE op, SFTKObject *source);
++                            CK_ATTRIBUTE_TYPE op, SFTKObject *source,
++                            CK_ULONG targetKeySize);
+ /* add validation objects to the slot */
+ CK_RV sftk_CreateValidationObjects(SFTKSlot *slot);
+ 
+diff -up ./lib/softoken/pkcs11u.c.fips_indicators ./lib/softoken/pkcs11u.c
+--- ./lib/softoken/pkcs11u.c.fips_indicators	2024-06-12 13:38:15.990811223 -0700
++++ ./lib/softoken/pkcs11u.c	2024-06-12 13:38:15.996811296 -0700
+@@ -2336,7 +2336,7 @@ sftk_quickGetECCCurveOid(SFTKObject *sou
+ static CK_ULONG
+ sftk_getKeyLength(SFTKObject *source)
+ {
+-    CK_KEY_TYPE keyType = CK_INVALID_HANDLE;
++    CK_KEY_TYPE keyType = CKK_INVALID_KEY_TYPE;
+     CK_ATTRIBUTE_TYPE keyAttribute;
+     CK_ULONG keyLength = 0;
+     SFTKAttribute *attribute;
+@@ -2398,13 +2398,29 @@ sftk_getKeyLength(SFTKObject *source)
+     return keyLength;
+ }
+ 
++PRBool
++sftk_CheckFIPSHash(CK_MECHANISM_TYPE hash)
++{
++    switch (hash) {
++        case CKM_SHA256:
++        case CKG_MGF1_SHA256:
++        case CKM_SHA384:
++        case CKG_MGF1_SHA384:
++        case CKM_SHA512:
++        case CKG_MGF1_SHA512:
++            return PR_TRUE;
++    }
++    return PR_FALSE;
++}
++
+ /*
+  * handle specialized FIPS semantics that are too complicated to
+  * handle with just a table. NOTE: this means any additional semantics
+  * would have to be coded here before they can be added to the table */
+ static PRBool
+ sftk_handleSpecial(SFTKSlot *slot, CK_MECHANISM *mech,
+-                   SFTKFIPSAlgorithmList *mechInfo, SFTKObject *source)
++                   SFTKFIPSAlgorithmList *mechInfo, SFTKObject *source,
++                   CK_ULONG keyLength, CK_ULONG targetKeyLength)
+ {
+     switch (mechInfo->special) {
+         case SFTKFIPSDH: {
+@@ -2464,10 +2480,15 @@ sftk_handleSpecial(SFTKSlot *slot, CK_ME
+             if (hashObj == NULL) {
+                 return PR_FALSE;
+             }
++            /* cap the salt for legacy keys */
++            if ((keyLength <= 1024) && (pss->sLen > 63)) {
++                return PR_FALSE;
++            }
++            /* cap the salt for based on the hash */
+             if (pss->sLen > hashObj->length) {
+                 return PR_FALSE;
+             }
+-            return PR_TRUE;
++            return sftk_CheckFIPSHash(pss->hashAlg);
+         }
+         case SFTKFIPSPBKDF2: {
+             /* PBKDF2 must have the following addition restrictions
+@@ -2492,6 +2513,13 @@ sftk_handleSpecial(SFTKSlot *slot, CK_ME
+              }
+              return PR_TRUE;
+         }
++        /* check the hash mechanisms to make sure they themselves are FIPS */
++        case SFTKFIPSChkHash:
++            if (mech->ulParameterLen < mechInfo->offset +sizeof(CK_ULONG)) {
++                return PR_FALSE;
++            }
++            return sftk_CheckFIPSHash(*(CK_ULONG *)(((char *)mech->pParameter)
++                        + mechInfo->offset));
+         default:
+             break;
+     }
+@@ -2502,7 +2530,7 @@ sftk_handleSpecial(SFTKSlot *slot, CK_ME
+ 
+ PRBool
+ sftk_operationIsFIPS(SFTKSlot *slot, CK_MECHANISM *mech, CK_ATTRIBUTE_TYPE op,
+-                     SFTKObject *source)
++                     SFTKObject *source, CK_ULONG targetKeyLength)
+ {
+ #ifndef NSS_HAS_FIPS_INDICATORS
+     return PR_FALSE;
+@@ -2534,13 +2562,17 @@ sftk_operationIsFIPS(SFTKSlot *slot, CK_
+         SFTKFIPSAlgorithmList *mechs = &sftk_fips_mechs[i];
+         /* if we match the number of records exactly, then we are an
+          * approved algorithm in the approved mode with an approved key */
+-        if (((mech->mechanism == mechs->type) &&
+-             (opFlags == (mechs->info.flags & opFlags)) &&
+-             (keyLength <= mechs->info.ulMaxKeySize) &&
+-             (keyLength >= mechs->info.ulMinKeySize) &&
+-             ((keyLength - mechs->info.ulMinKeySize) % mechs->step) == 0) &&
++        if ((mech->mechanism == mechs->type) &&
++            (opFlags == (mechs->info.flags & opFlags)) &&
++            (keyLength <= mechs->info.ulMaxKeySize) &&
++            (keyLength >= mechs->info.ulMinKeySize) &&
++            (((keyLength - mechs->info.ulMinKeySize) % mechs->step) == 0) &&
++            ((targetKeyLength == 0) ||
++             ((targetKeyLength <= mechs->info.ulMaxKeySize) &&
++             (targetKeyLength >= mechs->info.ulMinKeySize) &&
++             ((targetKeyLength - mechs->info.ulMinKeySize) % mechs->step) == 0)) &&
+             ((mechs->special == SFTKFIPSNone) ||
+-             sftk_handleSpecial(slot, mech, mechs, source))) {
++             sftk_handleSpecial(slot, mech, mechs, source, keyLength, targetKeyLength))) {
+             return PR_TRUE;
+         }
+     }

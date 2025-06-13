@@ -1,0 +1,12 @@
+diff -up ./tests/dbtests/dbtests.sh.extend ./tests/dbtests/dbtests.sh
+--- ./tests/dbtests/dbtests.sh.extend	2023-11-15 13:17:50.651020458 -0800
++++ ./tests/dbtests/dbtests.sh	2023-11-15 13:18:57.091608850 -0800
+@@ -366,7 +366,7 @@ dbtest_main()
+       RARRAY=($dtime)
+       TIMEARRAY=(${RARRAY[1]//./ })
+       echo "${TIMEARRAY[0]} seconds"
+-      test ${TIMEARRAY[0]} -lt 5
++      test ${TIMEARRAY[0]} -lt ${NSS_DB_DUMP_TIME-5}
+       ret=$?
+       html_msg ${ret} 0 "certutil dump keys with explicit default trust flags"
+     fi

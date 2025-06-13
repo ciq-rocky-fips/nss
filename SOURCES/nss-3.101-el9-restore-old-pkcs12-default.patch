@@ -1,0 +1,14 @@
+diff -up ./cmd/pk12util/pk12util.c.no_pkcs12_macpbe_default ./cmd/pk12util/pk12util.c
+--- ./cmd/pk12util/pk12util.c.no_pkcs12_macpbe_default	2024-07-18 08:26:35.773248450 -0700
++++ ./cmd/pk12util/pk12util.c	2024-07-18 08:27:05.796595554 -0700
+@@ -1165,10 +1165,6 @@ main(int argc, char **argv)
+             }
+         }
+     }
+-    /* in FIPS mode default to encoding with pkcs5v2 for the MAC */
+-    if (PK11_IsFIPS()) {
+-        hash = SEC_OID_HMAC_SHA256;
+-    }
+     if (pk12util.options[opt_Mac].activated) {
+         char *hashString = pk12util.options[opt_Mac].arg;
+ 

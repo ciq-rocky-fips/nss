@@ -1,0 +1,12 @@
+diff -up ./lib/softoken/pkcs11u.c.fips_check_curver25519 ./lib/softoken/pkcs11u.c
+--- ./lib/softoken/pkcs11u.c.fips_check_curver25519	2024-11-11 11:24:25.186654635 +0100
++++ ./lib/softoken/pkcs11u.c	2024-11-07 10:26:03.806562274 +0100
+@@ -2356,7 +2356,7 @@ sftk_getKeyLength(SFTKObject *source)
+          * key length is CKA_VALUE, which is the default */
+         keyType = CKK_INVALID_KEY_TYPE;
+     }
+-    if (keyType == CKK_EC) {
++    if (keyType == CKK_EC || keyType == CKK_EC_EDWARDS || keyType == CKK_EC_MONTGOMERY) {
+         SECOidTag curve = sftk_quickGetECCCurveOid(source);
+         switch (curve) {
+             case SEC_OID_CURVE25519:

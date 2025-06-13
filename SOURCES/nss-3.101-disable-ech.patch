@@ -1,0 +1,81 @@
+diff -up ./gtests/ssl_gtest/manifest.mn.disable_ech ./gtests/ssl_gtest/manifest.mn
+--- ./gtests/ssl_gtest/manifest.mn.disable_ech	2024-06-12 13:29:17.162207862 -0700
++++ ./gtests/ssl_gtest/manifest.mn	2024-06-12 13:30:25.699047788 -0700
+@@ -59,7 +59,6 @@ CPPSRCS = \
+       tls_protect.cc \
+       tls_psk_unittest.cc \
+       tls_subcerts_unittest.cc \
+-      tls_ech_unittest.cc \
+       tls_xyber_unittest.cc \
+       $(SSLKEYLOGFILE_FILES) \
+       $(NULL)
+diff -up ./lib/ssl/sslsock.c.disable_ech ./lib/ssl/sslsock.c
+--- ./lib/ssl/sslsock.c.disable_ech	2024-06-07 09:26:03.000000000 -0700
++++ ./lib/ssl/sslsock.c	2024-06-12 13:29:17.162207862 -0700
+@@ -4415,17 +4415,23 @@ ssl_ClearPRCList(PRCList *list, void (*f
+ SECStatus
+ SSLExp_EnableTls13GreaseEch(PRFileDesc *fd, PRBool enabled)
+ {
++#ifdef notdef
+     sslSocket *ss = ssl_FindSocket(fd);
+     if (!ss) {
+         return SECFailure;
+     }
+     ss->opt.enableTls13GreaseEch = enabled;
+     return SECSuccess;
++#else
++    PORT_SetError(SSL_ERROR_UNSUPPORTED_EXPERIMENTAL_API);
++    return SECFailure;
++#endif
+ }
+ 
+ SECStatus
+ SSLExp_SetTls13GreaseEchSize(PRFileDesc *fd, PRUint8 size)
+ {
++#ifdef notdef
+     sslSocket *ss = ssl_FindSocket(fd);
+     if (!ss || size == 0) {
+         return SECFailure;
+@@ -4439,28 +4445,42 @@ SSLExp_SetTls13GreaseEchSize(PRFileDesc
+     ssl_Release1stHandshakeLock(ss);
+ 
+     return SECSuccess;
++#else
++    PORT_SetError(SSL_ERROR_UNSUPPORTED_EXPERIMENTAL_API);
++    return SECFailure;
++#endif
+ }
+ 
+ SECStatus
+ SSLExp_EnableTls13BackendEch(PRFileDesc *fd, PRBool enabled)
+ {
++#ifdef notdef
+     sslSocket *ss = ssl_FindSocket(fd);
+     if (!ss) {
+         return SECFailure;
+     }
+     ss->opt.enableTls13BackendEch = enabled;
+     return SECSuccess;
++#else
++    PORT_SetError(SSL_ERROR_UNSUPPORTED_EXPERIMENTAL_API);
++    return SECFailure;
++#endif
+ }
+ 
+ SECStatus
+ SSLExp_CallExtensionWriterOnEchInner(PRFileDesc *fd, PRBool enabled)
+ {
++#ifdef notdef
+     sslSocket *ss = ssl_FindSocket(fd);
+     if (!ss) {
+         return SECFailure;
+     }
+     ss->opt.callExtensionWriterOnEchInner = enabled;
+     return SECSuccess;
++#else
++    PORT_SetError(SSL_ERROR_UNSUPPORTED_EXPERIMENTAL_API);
++    return SECFailure;
++#endif
+ }
+ 
+ SECStatus

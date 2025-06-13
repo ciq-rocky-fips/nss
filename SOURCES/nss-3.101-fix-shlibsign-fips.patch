@@ -1,0 +1,12 @@
+diff -up ./cmd/shlibsign/shlibsign.c.shlibsign ./cmd/shlibsign/shlibsign.c
+--- ./cmd/shlibsign/shlibsign.c.shlibsign	2024-06-07 09:26:03.000000000 -0700
++++ ./cmd/shlibsign/shlibsign.c	2024-10-31 10:49:28.637449054 -0700
+@@ -1426,7 +1426,7 @@ main(int argc, char **argv)
+     } else {
+         /* NON FIPS mode  == C_GetFunctionList */
+         pC_GetFunctionList = (CK_C_GetFunctionList)
+-            PR_FindFunctionSymbol(lib, "C_GetFunctionList");
++            PR_FindFunctionSymbol(lib, "NSC_GetFunctionList");
+     }
+     assert(pC_GetFunctionList != NULL);
+     if (!pC_GetFunctionList) {

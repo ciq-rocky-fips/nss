@@ -1,0 +1,578 @@
+diff --git a/lib/freebl/config.mk b/lib/freebl/config.mk
+--- a/lib/freebl/config.mk
++++ b/lib/freebl/config.mk
+@@ -85,9 +85,13 @@ EXTRA_SHARED_LIBS += \
+ 	$(NULL)
+ endif
+ endif
+ 
+ ifeq ($(OS_ARCH), Darwin)
+ EXTRA_SHARED_LIBS += -dylib_file @executable_path/libplc4.dylib:$(DIST)/lib/libplc4.dylib -dylib_file @executable_path/libplds4.dylib:$(DIST)/lib/libplds4.dylib
+ endif
+ 
++ifdef NSS_FIPS_140_3
++DEFINES += -DNSS_FIPS_140_3
+ endif
++
++endif
+diff --git a/lib/freebl/unix_urandom.c b/lib/freebl/unix_urandom.c
+--- a/lib/freebl/unix_urandom.c
++++ b/lib/freebl/unix_urandom.c
+@@ -20,53 +20,110 @@ RNG_SystemInfoForRNG(void)
+     if (!numBytes) {
+         /* error is set */
+         return;
+     }
+     RNG_RandomUpdate(bytes, numBytes);
+     PORT_Memset(bytes, 0, sizeof bytes);
+ }
+ 
++#ifdef NSS_FIPS_140_3
++#include <sys/random.h>
++#include "prinit.h"
++
++static int rng_grndFlags= 0;
++static PRCallOnceType rng_KernelFips;
++
++static PRStatus
++rng_getKernelFips()
++{
++#ifdef LINUX
++    FILE *f;
++    char d;
++    size_t size;
++
++    f = fopen("/proc/sys/crypto/fips_enabled", "r");
++    if (!f)
++        return PR_FAILURE;
++
++    size = fread(&d, 1, 1, f);
++    fclose(f);
++    if (size != 1)
++        return PR_SUCCESS;
++    if (d != '1')
++        return PR_SUCCESS;
++    /* if the kernel is in FIPS mode, set the GRND_RANDOM flag */
++    rng_grndFlags = GRND_RANDOM;
++#endif /* LINUX */
++    return PR_SUCCESS;
++}
++#endif
++
+ size_t
+ RNG_SystemRNG(void *dest, size_t maxLen)
+ {
++    size_t fileBytes = 0;
++    unsigned char *buffer = dest;
++#ifndef NSS_FIPS_140_3
+     int fd;
+     int bytes;
+-    size_t fileBytes = 0;
+-    unsigned char *buffer = dest;
++#else
++    PR_CallOnce(&rng_KernelFips, rng_getKernelFips);
++#endif
+ 
+ #if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 1200000) || (defined(LINUX) && defined(__GLIBC__) && ((__GLIBC__ > 2) || ((__GLIBC__ == 2) && (__GLIBC_MINOR__ >= 25))))
+     int result;
+-
+     while (fileBytes < maxLen) {
+         size_t getBytes = maxLen - fileBytes;
+         if (getBytes > GETENTROPY_MAX_BYTES) {
+             getBytes = GETENTROPY_MAX_BYTES;
+         }
++#ifdef NSS_FIPS_140_3
++        /* FIP 140-3 requires full kernel reseeding for chained entropy sources
++         * so we need to use getrandom with GRND_RANDOM.
++         * getrandom returns -1 on failure, otherwise returns
++         * the number of bytes, which can be less than getBytes */
++        result = getrandom(buffer, getBytes, rng_grndFlags);
++        if (result < 0) {
++            break;
++        }
++        fileBytes += result;
++        buffer += result;
++#else
++        /* get entropy returns 0 on success and always return
++         * getBytes on success */
+         result = getentropy(buffer, getBytes);
+         if (result == 0) { /* success */
+             fileBytes += getBytes;
+             buffer += getBytes;
+         } else {
+             break;
+         }
++#endif
+     }
+     if (fileBytes == maxLen) { /* success */
+         return maxLen;
+     }
++#ifdef NSS_FIPS_140_3
++    /* in FIPS 104-3 we don't fallback, just fail */
++    PORT_SetError(SEC_ERROR_NEED_RANDOM);
++    return 0;
++#else
+     /* If we failed with an error other than ENOSYS, it means the destination
+      * buffer is not writeable. We don't need to try writing to it again. */
+     if (errno != ENOSYS) {
+         PORT_SetError(SEC_ERROR_NEED_RANDOM);
+         return 0;
+     }
++#endif /*!NSS_FIPS_140_3 */
++#endif /* platorm has getentropy */
++#ifndef NSS_FIPS_140_3
+     /* ENOSYS means the kernel doesn't support getentropy()/getrandom().
+      * Reset the number of bytes to get and fall back to /dev/urandom. */
+     fileBytes = 0;
+-#endif
+     fd = open("/dev/urandom", O_RDONLY);
+     if (fd < 0) {
+         PORT_SetError(SEC_ERROR_NEED_RANDOM);
+         return 0;
+     }
+     while (fileBytes < maxLen) {
+         bytes = read(fd, buffer, maxLen - fileBytes);
+         if (bytes <= 0) {
+@@ -76,9 +133,10 @@ RNG_SystemRNG(void *dest, size_t maxLen)
+         buffer += bytes;
+     }
+     (void)close(fd);
+     if (fileBytes != maxLen) {
+         PORT_SetError(SEC_ERROR_NEED_RANDOM);
+         return 0;
+     }
+     return fileBytes;
++#endif
+ }
+diff --git a/lib/softoken/config.mk b/lib/softoken/config.mk
+--- a/lib/softoken/config.mk
++++ b/lib/softoken/config.mk
+@@ -58,8 +58,12 @@ endif
+ ifdef NSS_ENABLE_FIPS_INDICATORS
+ DEFINES += -DNSS_ENABLE_FIPS_INDICATORS
+ endif
+ 
+ ifdef NSS_FIPS_MODULE_ID
+ DEFINES += -DNSS_FIPS_MODULE_ID=\"${NSS_FIPS_MODULE_ID}\"
+ endif
+ 
++ifdef NSS_FIPS_140_3
++DEFINES += -DNSS_FIPS_140_3
++endif
++
+diff --git a/lib/softoken/lowpbe.c b/lib/softoken/lowpbe.c
+--- a/lib/softoken/lowpbe.c
++++ b/lib/softoken/lowpbe.c
+@@ -1766,16 +1766,20 @@ sftk_fips_pbkdf_PowerUpSelfTests(void)
+     unsigned char iteration_count = 5;
+     unsigned char keyLen = 64;
+     char *inKeyData = TEST_KEY;
+-    static const unsigned char saltData[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07 };
++    static const unsigned char saltData[] = {
++        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
++        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f
++    };
++
+     static const unsigned char pbkdf_known_answer[] = {
+-        0x31, 0xf0, 0xe5, 0x39, 0x9f, 0x39, 0xb9, 0x29,
+-        0x68, 0xac, 0xf2, 0xe9, 0x53, 0x9b, 0xb4, 0x9c,
+-        0x28, 0x59, 0x8b, 0x5c, 0xd8, 0xd4, 0x02, 0x37,
+-        0x18, 0x22, 0xc1, 0x92, 0xd0, 0xfa, 0x72, 0x90,
+-        0x2c, 0x8d, 0x19, 0xd4, 0x56, 0xfb, 0x16, 0xfa,
+-        0x8d, 0x5c, 0x06, 0x33, 0xd1, 0x5f, 0x17, 0xb1,
+-        0x22, 0xd9, 0x9c, 0xaf, 0x5e, 0x3f, 0xf3, 0x66,
+-        0xc6, 0x14, 0xfe, 0x83, 0xfa, 0x1a, 0x2a, 0xc5
++        0x73, 0x8c, 0xfa, 0x02, 0xe8, 0xdb, 0x43, 0xe4,
++        0x99, 0xc5, 0xfd, 0xd9, 0x4d, 0x8e, 0x3e, 0x7b,
++        0xc4, 0xda, 0x22, 0x1b, 0xe1, 0xae, 0x23, 0x7a,
++        0x21, 0x27, 0xbd, 0xcc, 0x78, 0xc4, 0xe6, 0xc5,
++        0x33, 0x38, 0x35, 0xe0, 0x68, 0x1a, 0x1e, 0x06,
++        0xad, 0xaf, 0x7f, 0xd7, 0x3f, 0x0e, 0xc0, 0x90,
++        0x17, 0x97, 0x73, 0x75, 0x7b, 0x88, 0x49, 0xd8,
++        0x6f, 0x78, 0x5a, 0xde, 0x50, 0x20, 0x55, 0x33
+     };
+
+     sftk_PBELockInit();
+diff --git a/lib/softoken/pkcs11c.c b/lib/softoken/pkcs11c.c
+--- a/lib/softoken/pkcs11c.c
++++ b/lib/softoken/pkcs11c.c
+@@ -4609,16 +4609,17 @@ NSC_GenerateKey(CK_SESSION_HANDLE hSessi
+         goto loser;
+     }
+ 
+     /* make sure we don't have any class, key_type, or value fields */
+     sftk_DeleteAttributeType(key, CKA_CLASS);
+     sftk_DeleteAttributeType(key, CKA_KEY_TYPE);
+     sftk_DeleteAttributeType(key, CKA_VALUE);
+ 
++
+     /* Now Set up the parameters to generate the key (based on mechanism) */
+     key_gen_type = nsc_bulk; /* bulk key by default */
+     switch (pMechanism->mechanism) {
+         case CKM_CDMF_KEY_GEN:
+         case CKM_DES_KEY_GEN:
+         case CKM_DES2_KEY_GEN:
+         case CKM_DES3_KEY_GEN:
+             checkWeak = PR_TRUE;
+@@ -4812,16 +4813,19 @@ NSC_GenerateKey(CK_SESSION_HANDLE hSessi
+     crv = sftk_handleObject(key, session);
+     sftk_FreeSession(session);
+     if (crv == CKR_OK && sftk_isTrue(key, CKA_SENSITIVE)) {
+         crv = sftk_forceAttribute(key, CKA_ALWAYS_SENSITIVE, &cktrue, sizeof(CK_BBOOL));
+     }
+     if (crv == CKR_OK && !sftk_isTrue(key, CKA_EXTRACTABLE)) {
+         crv = sftk_forceAttribute(key, CKA_NEVER_EXTRACTABLE, &cktrue, sizeof(CK_BBOOL));
+     }
++    /* we need to do this check at the end, so we can check the generated key length against
++     * fips requirements */
++    key->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_NSS_GENERATE, key);
+     if (crv == CKR_OK) {
+         *phKey = key->handle;
+     }
+ loser:
+     PORT_Memset(buf, 0, sizeof buf);
+     sftk_FreeObject(key);
+     return crv;
+ }
+@@ -5780,16 +5784,19 @@ NSC_GenerateKeyPair(CK_SESSION_HANDLE hS
+ 
+     if (crv != CKR_OK) {
+         NSC_DestroyObject(hSession, publicKey->handle);
+         sftk_FreeObject(publicKey);
+         NSC_DestroyObject(hSession, privateKey->handle);
+         sftk_FreeObject(privateKey);
+         return crv;
+     }
++    /* we need to do this check at the end to make sure the generated key meets the key length requirements */
++    privateKey->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_NSS_GENERATE_KEY_PAIR, privateKey);
++    publicKey->isFIPS = privateKey->isFIPS;
+ 
+     *phPrivateKey = privateKey->handle;
+     *phPublicKey = publicKey->handle;
+     sftk_FreeObject(publicKey);
+     sftk_FreeObject(privateKey);
+ 
+     return CKR_OK;
+ }
+@@ -6990,16 +6997,17 @@ sftk_HKDF(CK_HKDF_PARAMS_PTR params, CK_
+     }
+ 
+     /* HKDF-Extract(salt, base key value) */
+     if (params->bExtract) {
+         CK_BYTE *salt;
+         CK_ULONG saltLen;
+         HMACContext *hmac;
+         unsigned int bufLen;
++        SFTKSource saltKeySource = SFTK_SOURCE_DEFAULT;
+ 
+         switch (params->ulSaltType) {
+             case CKF_HKDF_SALT_NULL:
+                 saltLen = hashLen;
+                 salt = hashbuf;
+                 memset(salt, 0, saltLen);
+                 break;
+             case CKF_HKDF_SALT_DATA:
+@@ -7026,29 +7034,54 @@ sftk_HKDF(CK_HKDF_PARAMS_PTR params, CK_
+                 if (isFIPS && (key->isFIPS == 0) && (saltKey->isFIPS == 1)) {
+                     CK_MECHANISM mech;
+                     mech.mechanism = CKM_HKDF_DERIVE;
+                     mech.pParameter = params;
+                     mech.ulParameterLen = sizeof(*params);
+                     key->isFIPS = sftk_operationIsFIPS(saltKey->slot, &mech,
+                                                        CKA_DERIVE, saltKey);
+                 }
++                saltKeySource = saltKey->source;
+                 saltKey_att = sftk_FindAttribute(saltKey, CKA_VALUE);
+                 if (saltKey_att == NULL) {
+                     sftk_FreeObject(saltKey);
+                     return CKR_KEY_HANDLE_INVALID;
+                 }
+                 /* save the resulting salt */
+                 salt = saltKey_att->attrib.pValue;
+                 saltLen = saltKey_att->attrib.ulValueLen;
+                 break;
+             default:
+                 return CKR_MECHANISM_PARAM_INVALID;
+                 break;
+         }
++        /* only TLS style usage is FIPS approved,
++         * turn off the FIPS indicator for other usages */
++        if (isFIPS && key && sourceKey) {
++            PRBool fipsOK = PR_FALSE;
++            /* case one: mix the kea with a previous or default
++             * salt */
++            if ((sourceKey->source == SFTK_SOURCE_KEA) &&
++                (saltKeySource == SFTK_SOURCE_HKDF_EXPAND) &&
++                (saltLen == rawHash->length)) {
++                fipsOK = PR_TRUE;
++            }
++            /* case two: restart, remix the previous secret as a salt */
++            if ((sourceKey->objclass == CKO_DATA) &&
++                (NSS_SecureMemcmpZero(sourceKeyBytes, sourceKeyLen) == 0) &&
++                (sourceKeyLen == rawHash->length) &&
++                (saltKeySource == SFTK_SOURCE_HKDF_EXPAND) &&
++                (saltLen == rawHash->length)) {
++                fipsOK = PR_TRUE;
++            }
++            if (!fipsOK) {
++                key->isFIPS = PR_FALSE;
++            }
++        }
++        if (key) key->source = SFTK_SOURCE_HKDF_EXTRACT;
+ 
+         hmac = HMAC_Create(rawHash, salt, saltLen, isFIPS);
+         if (saltKey_att) {
+             sftk_FreeAttribute(saltKey_att);
+         }
+         if (saltKey) {
+             sftk_FreeObject(saltKey);
+         }
+@@ -7076,16 +7109,40 @@ sftk_HKDF(CK_HKDF_PARAMS_PTR params, CK_
+         /* T(1) = HMAC-Hash(prk, "" | info | 0x01)
+          * T(n) = HMAC-Hash(prk, T(n-1) | info | n
+          * key material = T(1) | ... | T(n)
+          */
+         HMACContext *hmac;
+         CK_BYTE bi;
+         unsigned iterations;
+ 
++        /* only TLS style usage is FIPS approved,
++         * turn off the FIPS indicator for other usages */
++        if (isFIPS && key && key->isFIPS && sourceKey) {
++            unsigned char *info=&params->pInfo[3];
++            /* only one case,
++             *  1) Expand only
++             *  2) with a key whose source was
++             *  SFTK_SOURCE_HKDF_EXPAND or SFTK_SOURCE_HKDF_EXTRACT
++             *  3) source key length == rawHash->length
++             *  4) Info has tls or dtls
++             * If any of those conditions aren't met, then we turn
++             * off the fips indicator */
++            if (params->bExtract ||
++               ((sourceKey->source != SFTK_SOURCE_HKDF_EXTRACT) &&
++                (sourceKey->source != SFTK_SOURCE_HKDF_EXPAND)) ||
++               (sourceKeyLen != rawHash->length) ||
++               (params->ulInfoLen < 7) ||
++               ((PORT_Memcmp(info,"tls",3) != 0) &&
++               (PORT_Memcmp(info,"dtls",4) != 0))) {
++               key->isFIPS = PR_FALSE;
++            }
++        }
++        if (key) key->source = SFTK_SOURCE_HKDF_EXPAND;
++
+         genLen = PR_ROUNDUP(keySize, hashLen);
+         iterations = genLen / hashLen;
+ 
+         if (genLen > sizeof(keyBlock)) {
+             keyBlockAlloc = PORT_Alloc(genLen);
+             if (keyBlockAlloc == NULL) {
+                 return CKR_HOST_MEMORY;
+             }
+@@ -8434,16 +8491,17 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession
+ 
+             /* calculate private value - oct */
+             rv = DH_Derive(&dhPublic, &dhPrime, &dhValue, &derived, keySize);
+ 
+             SECITEM_ZfreeItem(&dhPrime, PR_FALSE);
+             SECITEM_ZfreeItem(&dhValue, PR_FALSE);
+ 
+             if (rv == SECSuccess) {
++                key->source = SFTK_SOURCE_KEA;
+                 sftk_forceAttribute(key, CKA_VALUE, derived.data, derived.len);
+                 SECITEM_ZfreeItem(&derived, PR_FALSE);
+                 crv = CKR_OK;
+             } else
+                 crv = CKR_HOST_MEMORY;
+ 
+             break;
+         }
+@@ -8564,16 +8622,17 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession
+                     }
+                     PORT_Memcpy(&keyData[keySize - secretlen], secret, secretlen);
+                     secret = keyData;
+                 } else {
+                     secret += (secretlen - keySize);
+                 }
+                 secretlen = keySize;
+             }
++            key->source = SFTK_SOURCE_KEA;
+ 
+             sftk_forceAttribute(key, CKA_VALUE, secret, secretlen);
+             PORT_ZFree(tmp.data, tmp.len);
+             if (keyData) {
+                 PORT_ZFree(keyData, keySize);
+             }
+             break;
+ 
+diff --git a/lib/softoken/pkcs11i.h b/lib/softoken/pkcs11i.h
+--- a/lib/softoken/pkcs11i.h
++++ b/lib/softoken/pkcs11i.h
+@@ -147,16 +147,26 @@ typedef enum {
+  */
+ typedef enum {
+     SFTK_DestroyFailure,
+     SFTK_Destroyed,
+     SFTK_Busy
+ } SFTKFreeStatus;
+ 
+ /*
++ * Source of various objects
++ */
++typedef enum {
++    SFTK_SOURCE_DEFAULT=0,
++    SFTK_SOURCE_KEA,
++    SFTK_SOURCE_HKDF_EXPAND,
++    SFTK_SOURCE_HKDF_EXTRACT
++} SFTKSource;
++
++/*
+  * attribute values of an object.
+  */
+ struct SFTKAttributeStr {
+     SFTKAttribute *next;
+     SFTKAttribute *prev;
+     PRBool freeAttr;
+     PRBool freeData;
+     /*must be called handle to make sftkqueue_find work */
+@@ -189,16 +199,17 @@ struct SFTKObjectStr {
+     CK_OBJECT_CLASS objclass;
+     CK_OBJECT_HANDLE handle;
+     int refCount;
+     PZLock *refLock;
+     SFTKSlot *slot;
+     void *objectInfo;
+     SFTKFree infoFree;
+     PRBool isFIPS;
++    SFTKSource source;
+ };
+ 
+ struct SFTKTokenObjectStr {
+     SFTKObject obj;
+     SECItem dbKey;
+ };
+ 
+ struct SFTKSessionObjectStr {
+diff --git a/lib/softoken/pkcs11u.c b/lib/softoken/pkcs11u.c
+--- a/lib/softoken/pkcs11u.c
++++ b/lib/softoken/pkcs11u.c
+@@ -1090,16 +1090,17 @@ sftk_NewObject(SFTKSlot *slot)
+         sessObject->attrList[i].freeData = PR_FALSE;
+     }
+     sessObject->optimizeSpace = slot->optimizeSpace;
+ 
+     object->handle = 0;
+     object->next = object->prev = NULL;
+     object->slot = slot;
+     object->isFIPS = sftk_isFIPS(slot->slotID);
++    object->source = SFTK_SOURCE_DEFAULT;
+ 
+     object->refCount = 1;
+     sessObject->sessionList.next = NULL;
+     sessObject->sessionList.prev = NULL;
+     sessObject->sessionList.parent = object;
+     sessObject->session = NULL;
+     sessObject->wasDerived = PR_FALSE;
+     if (!hasLocks)
+@@ -1674,16 +1675,17 @@ fail:
+ CK_RV
+ sftk_CopyObject(SFTKObject *destObject, SFTKObject *srcObject)
+ {
+     SFTKAttribute *attribute;
+     SFTKSessionObject *src_so = sftk_narrowToSessionObject(srcObject);
+     unsigned int i;
+ 
+     destObject->isFIPS = srcObject->isFIPS;
++    destObject->source = srcObject->source;
+     if (src_so == NULL) {
+         return sftk_CopyTokenObject(destObject, srcObject);
+     }
+ 
+     PZ_Lock(src_so->attributeLock);
+     for (i = 0; i < src_so->hashSize; i++) {
+         attribute = src_so->head[i];
+         do {
+@@ -2059,16 +2061,17 @@ sftk_NewTokenObject(SFTKSlot *slot, SECI
+     /* every object must have a class, if we can't get it, the object
+      * doesn't exist */
+     crv = handleToClass(slot, handle, &object->objclass);
+     if (crv != CKR_OK) {
+         goto loser;
+     }
+     object->slot = slot;
+     object->isFIPS = sftk_isFIPS(slot->slotID);
++    object->source = SFTK_SOURCE_DEFAULT;
+     object->objectInfo = NULL;
+     object->infoFree = NULL;
+     if (!hasLocks) {
+         object->refLock = PZ_NewLock(nssILockRefLock);
+     }
+     if (object->refLock == NULL) {
+         goto loser;
+     }
+@@ -2225,16 +2228,25 @@ sftk_AttributeToFlags(CK_ATTRIBUTE_TYPE 
+             break;
+         case CKA_DERIVE:
+             flags = CKF_DERIVE;
+             break;
+         /* fake attribute to select digesting */
+         case CKA_DIGEST:
+             flags = CKF_DIGEST;
+             break;
++        /* fake attribute to select key gen */
++         case CKA_NSS_GENERATE:
++            flags = CKF_GENERATE;
++            break;
++        /* fake attribute to select key pair gen */
++        case CKA_NSS_GENERATE_KEY_PAIR:
++            flags = CKF_GENERATE_KEY_PAIR;
++            break;
++        /* fake attributes to to handle MESSAGE* flags */
+         case CKA_NSS_MESSAGE | CKA_ENCRYPT:
+             flags = CKF_MESSAGE_ENCRYPT;
+             break;
+         case CKA_NSS_MESSAGE | CKA_DECRYPT:
+             flags = CKF_MESSAGE_DECRYPT;
+             break;
+         case CKA_NSS_MESSAGE | CKA_SIGN:
+             flags = CKF_MESSAGE_SIGN;
+@@ -2278,17 +2290,17 @@ sftk_quickGetECCCurveOid(SFTKObject *sou
+ }
+ 
+ /* This function currently only returns valid lengths for
+  * FIPS approved ECC curves. If we want to make this generic
+  * in the future, that Curve determination can be done in
+  * the sftk_handleSpecial. Since it's currently only used
+  * in FIPS indicators, it's currently only compiled with
+  * the FIPS indicator code */
+-static int
++static CK_ULONG
+ sftk_getKeyLength(SFTKObject *source)
+ {
+     CK_KEY_TYPE keyType = CK_INVALID_HANDLE;
+     CK_ATTRIBUTE_TYPE keyAttribute;
+     CK_ULONG keyLength = 0;
+     SFTKAttribute *attribute;
+     CK_RV crv;
+ 
+diff --git a/lib/util/pkcs11n.h b/lib/util/pkcs11n.h
+--- a/lib/util/pkcs11n.h
++++ b/lib/util/pkcs11n.h
+@@ -58,16 +58,18 @@
+ /*
+  * NSS-defined certificate types
+  *
+  */
+ #define CKC_NSS (CKC_VENDOR_DEFINED | NSSCK_VENDOR_NSS)
+ 
+ /* FAKE PKCS #11 defines */
+ #define CKA_DIGEST 0x81000000L
++#define CKA_NSS_GENERATE 0x81000001L
++#define CKA_NSS_GENERATE_KEY_PAIR 0x81000002L
+ #define CKA_NSS_MESSAGE 0x82000000L
+ #define CKA_NSS_MESSAGE_MASK 0xff000000L
+ #define CKA_FLAGS_ONLY 0 /* CKA_CLASS */
+ 
+ /*
+  * NSS-defined object attributes
+  *
+  */

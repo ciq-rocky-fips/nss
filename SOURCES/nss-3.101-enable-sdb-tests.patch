@@ -1,0 +1,63 @@
+diff -up ./tests/cert/cert.sh.no_dbm_tests ./tests/cert/cert.sh
+--- ./tests/cert/cert.sh.no_dbm_tests	2024-06-20 17:08:03.146169243 -0700
++++ ./tests/cert/cert.sh	2024-06-20 17:08:23.282404259 -0700
+@@ -2662,9 +2662,7 @@ cert_test_password
+ cert_test_distrust
+ cert_test_ocspresp
+ cert_test_rsapss
+-if [ "${TEST_MODE}" = "SHARED_DB" ] ; then
+-  cert_test_rsapss_policy
+-fi
++cert_test_rsapss_policy
+ cert_test_token_uri
+ 
+ if [ -z "$NSS_TEST_DISABLE_CRL" ] ; then
+diff -up ./tests/smime/smime.sh.no_dbm_tests ./tests/smime/smime.sh
+--- ./tests/smime/smime.sh.no_dbm_tests	2024-06-20 17:08:45.147659448 -0700
++++ ./tests/smime/smime.sh	2024-06-20 17:09:05.313894814 -0700
+@@ -872,8 +872,6 @@ smime_init
+ smime_main
+ smime_data_tb
+ smime_p7
+-if [ "${TEST_MODE}" = "SHARED_DB" ] ; then
+-  smime_policy
+-fi
++smime_policy
+ smime_cleanup
+ 
+diff -up ./tests/ssl/ssl.sh.no_dbm_tests ./tests/ssl/ssl.sh
+--- ./tests/ssl/ssl.sh.no_dbm_tests	2024-06-20 17:09:28.588166454 -0700
++++ ./tests/ssl/ssl.sh	2024-06-20 17:09:54.351467232 -0700
+@@ -1600,12 +1600,10 @@ ssl_run_tests()
+     do
+         case "${SSL_TEST}" in
+         "policy")
+-            if [ "${TEST_MODE}" = "SHARED_DB" ] ; then
+-                ssl_policy_listsuites
+-                ssl_policy_selfserv
+-                ssl_policy_pkix_ocsp
+-                ssl_policy
+-            fi
++            ssl_policy_listsuites
++            ssl_policy_selfserv
++            ssl_policy_pkix_ocsp
++            ssl_policy
+             ;;
+         "crl")
+             ssl_crl_ssl
+diff -up ./tests/tools/tools.sh.no_dbm_tests ./tests/tools/tools.sh
+--- ./tests/tools/tools.sh.no_dbm_tests	2024-06-20 17:10:13.828694981 -0700
++++ ./tests/tools/tools.sh	2024-06-20 17:10:31.051896368 -0700
+@@ -584,10 +584,8 @@ tools_p12()
+   tools_p12_export_with_invalid_ciphers
+   tools_p12_import_old_files
+   tools_p12_import_pbmac1_samples
+-  if [ "${TEST_MODE}" = "SHARED_DB" ] ; then
+-    tools_p12_import_rsa_pss_private_key
+-    tools_p12_policy
+-  fi
++  tools_p12_import_rsa_pss_private_key
++  tools_p12_policy
+ }
+ 
+ ############################## tools_sign ##############################

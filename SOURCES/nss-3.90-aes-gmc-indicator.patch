@@ -1,0 +1,42 @@
+diff --git a/lib/softoken/sftkmessage.c b/lib/softoken/sftkmessage.c
+--- a/lib/softoken/sftkmessage.c
++++ b/lib/softoken/sftkmessage.c
+@@ -146,16 +146,38 @@ sftk_CryptMessage(CK_SESSION_HANDLE hSes
+ 
+     CHECK_FORK();
+ 
+     /* make sure we're legal */
+     crv = sftk_GetContext(hSession, &context, contextType, PR_TRUE, NULL);
+     if (crv != CKR_OK)
+         return crv;
+ 
++    if (context->isFIPS && (contextType == SFTK_MESSAGE_ENCRYPT)) {
++        if ((pParameter == NULL) || (ulParameterLen != sizeof(CK_GCM_MESSAGE_PARAMS))) {
++            context->isFIPS = PR_FALSE;
++        } else {
++            CK_GCM_MESSAGE_PARAMS *p = (CK_GCM_MESSAGE_PARAMS *)pParameter;
++            switch (p->ivGenerator) {
++                case CKG_NO_GENERATE:
++                    context->isFIPS = PR_FALSE;
++                    break;
++                case CKG_GENERATE_RANDOM:
++                    if ((p->ulIvLen < 12) || (p->ulIvFixedBits != 0)) {
++                        context->isFIPS = PR_FALSE;
++                    }
++                    break;
++                default:
++                    if ((p->ulIvLen < 12) || (p->ulIvFixedBits < 32)) {
++                        context->isFIPS = PR_FALSE;
++                    }
++            }
++        }
++    }
++
+     if (!pOuttext) {
+         *pulOuttextLen = ulIntextLen;
+         return CKR_OK;
+     }
+     rv = (*context->aeadUpdate)(context->cipherInfo, pOuttext, &outlen,
+                                 maxout, pIntext, ulIntextLen,
+                                 pParameter, ulParameterLen,
+                                 pAssociatedData, ulAssociatedDataLen);

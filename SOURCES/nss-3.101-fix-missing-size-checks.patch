@@ -1,0 +1,126 @@
+diff --git a/gtests/ssl_gtest/tls_subcerts_unittest.cc b/gtests/ssl_gtest/tls_subcerts_unittest.cc
+--- a/gtests/ssl_gtest/tls_subcerts_unittest.cc
++++ b/gtests/ssl_gtest/tls_subcerts_unittest.cc
+@@ -371,16 +371,21 @@ static void GenerateWeakRsaKey(ScopedSEC
+ // Fail to connect with a weak RSA key.
+ TEST_P(TlsConnectTls13, DCWeakKey) {
+   Reset(kPssDelegatorId);
+   EnsureTlsSetup();
+   static const SSLSignatureScheme kSchemes[] = {ssl_sig_rsa_pss_rsae_sha256,
+                                                 ssl_sig_rsa_pss_pss_sha256};
+   client_->SetSignatureSchemes(kSchemes, PR_ARRAY_SIZE(kSchemes));
+   server_->SetSignatureSchemes(kSchemes, PR_ARRAY_SIZE(kSchemes));
++  PRInt32 keySizeFlags;
++  ASSERT_EQ(SECSuccess, NSS_OptionGet(NSS_KEY_SIZE_POLICY_FLAGS, &keySizeFlags));
++  // turn off the signing key sizes so we actually test the ssl tests
++  ASSERT_EQ(SECSuccess,
++            NSS_OptionSet(NSS_KEY_SIZE_POLICY_FLAGS, NSS_KEY_SIZE_POLICY_SSL_FLAG ));
+ #if RSA_MIN_MODULUS_BITS > RSA_WEAK_KEY
+   // save the MIN POLICY length.
+   PRInt32 minRsa;
+ 
+   ASSERT_EQ(SECSuccess, NSS_OptionGet(NSS_RSA_MIN_KEY_SIZE, &minRsa));
+ #if RSA_MIN_MODULUS_BITS >= 2048
+   ASSERT_EQ(SECSuccess,
+             NSS_OptionSet(NSS_RSA_MIN_KEY_SIZE, RSA_MIN_MODULUS_BITS + 1024));
+@@ -408,16 +413,17 @@ TEST_P(TlsConnectTls13, DCWeakKey) {
+   client_->EnableDelegatedCredentials();
+ 
+   auto cfilter = MakeTlsFilter<TlsExtensionCapture>(
+       client_, ssl_delegated_credentials_xtn);
+   ConnectExpectAlert(client_, kTlsAlertInsufficientSecurity);
+ #if RSA_MIN_MODULUS_BITS > RSA_WEAK_KEY
+   ASSERT_EQ(SECSuccess, NSS_OptionSet(NSS_RSA_MIN_KEY_SIZE, minRsa));
+ #endif
++  ASSERT_EQ(SECSuccess, NSS_OptionSet(NSS_KEY_SIZE_POLICY_FLAGS, keySizeFlags));
+ }
+ 
+ class ReplaceDCSigScheme : public TlsHandshakeFilter {
+  public:
+   ReplaceDCSigScheme(const std::shared_ptr<TlsAgent>& a)
+       : TlsHandshakeFilter(a, {ssl_hs_certificate_verify}) {}
+ 
+  protected:
+diff --git a/lib/cryptohi/seckey.c b/lib/cryptohi/seckey.c
+--- a/lib/cryptohi/seckey.c
++++ b/lib/cryptohi/seckey.c
+@@ -1134,22 +1134,31 @@ SECKEY_PrivateKeyStrengthInBits(const SE
+         return 0;
+     }
+ 
+     /* interpret modulus length as key strength */
+     switch (privk->keyType) {
+         case rsaKey:
+         case rsaPssKey:
+         case rsaOaepKey:
+-            /* some tokens don't export CKA_MODULUS on the private key,
+-             * PK11_SignatureLen works around this if necessary */
+-            bitSize = PK11_SignatureLen((SECKEYPrivateKey *)privk) * PR_BITS_PER_BYTE;
+-            if (bitSize == -1) {
+-                bitSize = 0;
++            rv = PK11_ReadAttribute(privk->pkcs11Slot, privk->pkcs11ID,
++                                    CKA_MODULUS, NULL, &params);
++            if ((rv != SECSuccess) || (params.data == NULL)) {
++                /* some tokens don't export CKA_MODULUS on the private key,
++                 * PK11_SignatureLen works around this if necessary. This
++                 * method is less percise because it returns bytes instead
++                 * bits, so we only do it if we can't get the modulus */
++                bitSize = PK11_SignatureLen((SECKEYPrivateKey *)privk) * PR_BITS_PER_BYTE;
++                if (bitSize == -1) {
++                    return 0;
++                }
++                return bitSize;
+             }
++            bitSize = SECKEY_BigIntegerBitLength(&params);
++            PORT_Free(params.data);
+             return bitSize;
+         case dsaKey:
+         case fortezzaKey:
+         case dhKey:
+         case keaKey:
+             rv = PK11_ReadAttribute(privk->pkcs11Slot, privk->pkcs11ID,
+                                     CKA_PRIME, NULL, &params);
+             if ((rv != SECSuccess) || (params.data == NULL)) {
+diff --git a/lib/ssl/ssl3con.c b/lib/ssl/ssl3con.c
+--- a/lib/ssl/ssl3con.c
++++ b/lib/ssl/ssl3con.c
+@@ -1277,27 +1277,39 @@ ssl3_SignHashesWithPrivKey(SSL3Hashes *h
+             PORT_SetError(SEC_ERROR_INVALID_KEY);
+             goto done;
+     }
+     PRINT_BUF(60, (NULL, "hash(es) to be signed", hashItem.data, hashItem.len));
+ 
+     if (useRsaPss || hash->hashAlg == ssl_hash_none) {
+         CK_MECHANISM_TYPE mech = PK11_MapSignKeyType(key->keyType);
+         int signatureLen = PK11_SignatureLen(key);
++        PRInt32 optval;
+ 
+         SECItem *params = NULL;
+         CK_RSA_PKCS_PSS_PARAMS pssParams;
+         SECItem pssParamsItem = { siBuffer,
+                                   (unsigned char *)&pssParams,
+                                   sizeof(pssParams) };
+ 
+         if (signatureLen <= 0) {
+             PORT_SetError(SEC_ERROR_INVALID_KEY);
+             goto done;
+         }
++        /* since we are calling PK11_SignWithMechanism directly, we need to check the
++         * key policy ourselves (which is already checked in SGN_Digest */
++        rv = NSS_OptionGet(NSS_KEY_SIZE_POLICY_FLAGS, &optval);
++        if ((rv == SECSuccess) &&
++            ((optval & NSS_KEY_SIZE_POLICY_SIGN_FLAG) == NSS_KEY_SIZE_POLICY_SIGN_FLAG)) {
++            rv = SECKEY_EnforceKeySize(key->keyType, SECKEY_PrivateKeyStrengthInBits(key),
++                                       SEC_ERROR_SIGNATURE_ALGORITHM_DISABLED);
++            if (rv != SECSuccess) {
++                goto done; /* error code already set */
++            }
++        }
+ 
+         buf->len = (unsigned)signatureLen;
+         buf->data = (unsigned char *)PORT_Alloc(signatureLen);
+         if (!buf->data)
+             goto done; /* error code was set. */
+ 
+         if (useRsaPss) {
+             pssParams.hashAlg = ssl3_GetHashMechanismByHashType(hash->hashAlg);

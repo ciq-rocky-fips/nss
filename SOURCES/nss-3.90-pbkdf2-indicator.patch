@@ -1,0 +1,42 @@
+diff -up ./lib/softoken/pkcs11u.c.pkcs12_indicator ./lib/softoken/pkcs11u.c
+--- ./lib/softoken/pkcs11u.c.pkcs12_indicator	2023-08-03 10:50:37.067109367 -0700
++++ ./lib/softoken/pkcs11u.c	2023-08-03 11:41:55.641541953 -0700
+@@ -2429,7 +2429,7 @@ sftk_handleSpecial(SFTKSlot *slot, CK_ME
+             return PR_FALSE;
+         case SFTKFIPSECC:
+             /* we've already handled the curve selection in the 'getlength'
+-          * function */
++             * function */
+             return PR_TRUE;
+         case SFTKFIPSAEAD: {
+             if (mech->ulParameterLen == 0) {
+@@ -2463,6 +2463,29 @@ sftk_handleSpecial(SFTKSlot *slot, CK_ME
+             }
+             return PR_TRUE;
+         }
++        case SFTKFIPSPBKDF2: {
++            /* PBKDF2 must have the following addition restrictions
++             * (independent of keysize).
++             *    1. iteration count must be at least 1000.
++             *    2. salt must be at least 128 bits (16 bytes).
++             *    3. password must match the length specified in the SP
++             */
++             CK_PKCS5_PBKD2_PARAMS *pbkdf2 = (CK_PKCS5_PBKD2_PARAMS *)
++                                                    mech->pParameter;
++             if (mech->ulParameterLen != sizeof(*pbkdf2)) {
++                 return PR_FALSE;
++             }
++             if (pbkdf2->iterations < 1000) {
++                 return PR_FALSE;
++             }
++             if (pbkdf2->ulSaltSourceDataLen < 16) {
++                 return PR_FALSE;
++             }
++             if (*(pbkdf2->ulPasswordLen) < SFTKFIPS_PBKDF2_MIN_PW_LEN) {
++                 return PR_FALSE;
++             }
++             return PR_TRUE;
++        }
+         default:
+             break;
+     }

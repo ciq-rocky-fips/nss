@@ -1,0 +1,36 @@
+diff -up ./lib/freebl/Makefile.ppc_no_init ./lib/freebl/Makefile
+--- ./lib/freebl/Makefile.ppc_no_init	2024-06-03 14:12:24.216755903 -0700
++++ ./lib/freebl/Makefile	2024-06-03 14:11:36.464234903 -0700
+@@ -303,7 +303,7 @@ endif
+ ifeq ($(CPU_ARCH),ppc)
+     EXTRA_SRCS += gcm-ppc.c
+ ifdef USE_64
+-    DEFINES += -DNSS_NO_INIT_SUPPORT
++#    DEFINES += -DNSS_NO_INIT_SUPPORT
+     PPC_ABI := $(shell $(CC) -dM -E - < /dev/null | awk '$$2 == "_CALL_ELF" {print $$3}')
+     ifeq ($(PPC_ABI),2)
+         ASFILES += sha512-p8.s
+diff -up ./lib/softoken/Makefile.ppc_no_init ./lib/softoken/Makefile
+--- ./lib/softoken/Makefile.ppc_no_init	2024-06-03 14:12:44.664979003 -0700
++++ ./lib/softoken/Makefile	2024-06-03 14:10:26.703473806 -0700
+@@ -23,13 +23,13 @@ include $(CORE_DEPTH)/coreconf/config.mk
+ ifdef NSS_NO_INIT_SUPPORT
+     DEFINES += -DNSS_NO_INIT_SUPPORT
+ endif
+-ifeq ($(OS_TARGET),Linux)
+-ifeq ($(CPU_ARCH),ppc)
+-ifdef USE_64
+-    DEFINES += -DNSS_NO_INIT_SUPPORT
+-endif # USE_64
+-endif # ppc
+-endif # Linux
++#ifeq ($(OS_TARGET),Linux)
++#ifeq ($(CPU_ARCH),ppc)
++#ifdef USE_64
++#    DEFINES += -DNSS_NO_INIT_SUPPORT
++#endif # USE_64
++#endif # ppc
++#endif # Linux
+ 
+ 
+ #######################################################################

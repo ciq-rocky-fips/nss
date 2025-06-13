@@ -1,0 +1,12 @@
+diff -r c75b4e36b7e8 pr/src/misc/prnetdb.c
+--- a/pr/src/misc/prnetdb.c     Wed May 25 23:39:48 2022 +0200
++++ b/pr/src/misc/prnetdb.c     Tue Jun 14 18:48:03 2022 -0400
+@@ -2204,6 +2204,7 @@
+ 
+     memset(&hints, 0, sizeof(hints));
+ 
++    hints.ai_flags = AI_PASSIVE;
+     rv = GETADDRINFO(NULL, tmpBuf, &hints, &res);
+     if (rv == 0) {
+         PRBool result_still_empty = PR_TRUE;
+

@@ -1,0 +1,490 @@
+diff -up ./lib/freebl/dh.c.fips-review ./lib/freebl/dh.c
+--- ./lib/freebl/dh.c.fips-review	2024-06-07 09:26:03.000000000 -0700
++++ ./lib/freebl/dh.c	2024-06-12 12:04:10.639360404 -0700
+@@ -445,7 +445,7 @@ cleanup:
+ PRBool
+ KEA_Verify(SECItem *Y, SECItem *prime, SECItem *subPrime)
+ {
+-    mp_int p, q, y, r;
++    mp_int p, q, y, r, psub1;
+     mp_err err;
+     int cmp = 1; /* default is false */
+     if (!Y || !prime || !subPrime) {
+@@ -456,13 +456,30 @@ KEA_Verify(SECItem *Y, SECItem *prime, S
+     MP_DIGITS(&q) = 0;
+     MP_DIGITS(&y) = 0;
+     MP_DIGITS(&r) = 0;
++    MP_DIGITS(&psub1) = 0;
+     CHECK_MPI_OK(mp_init(&p));
+     CHECK_MPI_OK(mp_init(&q));
+     CHECK_MPI_OK(mp_init(&y));
+     CHECK_MPI_OK(mp_init(&r));
++    CHECK_MPI_OK(mp_init(&psub1));
+     SECITEM_TO_MPINT(*prime, &p);
+     SECITEM_TO_MPINT(*subPrime, &q);
+     SECITEM_TO_MPINT(*Y, &y);
++    CHECK_MPI_OK(mp_sub_d(&p, 1, &psub1));
++    /*
++     * We check that the public value isn't zero (which isn't in the
++     * group), one (subgroup of order one) or p-1 (subgroup of order 2). We
++     * also check that the public value is less than p, to avoid being fooled
++     * by values like p+1 or 2*p-1.
++     * This check is required by SP-800-56Ar3. It's also done in derive,
++     * but this is only called in various FIPS cases, so put it here to help
++     * reviewers find it.
++     */
++    if (mp_cmp_d(&y, 1) <= 0 ||
++        mp_cmp(&y, &psub1) >= 0) {
++        err = MP_BADARG;
++        goto cleanup;
++    }
+     /* compute r = y**q mod p */
+     CHECK_MPI_OK(mp_exptmod(&y, &q, &p, &r));
+     /* compare to 1 */
+@@ -472,6 +489,7 @@ cleanup:
+     mp_clear(&q);
+     mp_clear(&y);
+     mp_clear(&r);
++    mp_clear(&psub1);
+     if (err) {
+         MP_TO_SEC_ERROR(err);
+         return PR_FALSE;
+diff -up ./lib/softoken/pkcs11c.c.fips-review ./lib/softoken/pkcs11c.c
+--- ./lib/softoken/pkcs11c.c.fips-review	2024-06-12 12:04:10.638360392 -0700
++++ ./lib/softoken/pkcs11c.c	2024-06-12 13:06:35.410551333 -0700
+@@ -43,6 +43,7 @@
+ 
+ #include "prprf.h"
+ #include "prenv.h"
++#include "prerror.h"
+ 
+ #define __PASTE(x, y) x##y
+ #define BAD_PARAM_CAST(pMech, typeSize) (!pMech->pParameter || pMech->ulParameterLen < typeSize)
+@@ -4882,6 +4883,10 @@ NSC_GenerateKey(CK_SESSION_HANDLE hSessi
+      * handle the base object stuff
+      */
+     crv = sftk_handleObject(key, session);
++    /* we need to do this check at the end, so we can check the generated
++     * key length against fips requirements */
++    key->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_NSS_GENERATE, key);
++    session->lastOpWasFIPS = key->isFIPS;
+     sftk_FreeSession(session);
+     if (crv == CKR_OK && sftk_isTrue(key, CKA_SENSITIVE)) {
+         crv = sftk_forceAttribute(key, CKA_ALWAYS_SENSITIVE, &cktrue, sizeof(CK_BBOOL));
+@@ -4889,9 +4894,6 @@ NSC_GenerateKey(CK_SESSION_HANDLE hSessi
+     if (crv == CKR_OK && !sftk_isTrue(key, CKA_EXTRACTABLE)) {
+         crv = sftk_forceAttribute(key, CKA_NEVER_EXTRACTABLE, &cktrue, sizeof(CK_BBOOL));
+     }
+-    /* we need to do this check at the end, so we can check the generated key length against
+-     * fips requirements */
+-    key->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_NSS_GENERATE, key);
+     if (crv == CKR_OK) {
+         *phKey = key->handle;
+     }
+@@ -5199,60 +5201,68 @@ sftk_PairwiseConsistencyCheck(CK_SESSION
+ 
+     if (isDerivable) {
+         SFTKAttribute *pubAttribute = NULL;
+-        CK_OBJECT_HANDLE newKey;
+         PRBool isFIPS = sftk_isFIPS(slot->slotID);
+-        CK_RV crv2;
+-        CK_OBJECT_CLASS secret = CKO_SECRET_KEY;
+-        CK_KEY_TYPE generic = CKK_GENERIC_SECRET;
+-        CK_ULONG keyLen = 128;
+-        CK_BBOOL ckTrue = CK_TRUE;
+-        CK_ATTRIBUTE template[] = {
+-            { CKA_CLASS, &secret, sizeof(secret) },
+-            { CKA_KEY_TYPE, &generic, sizeof(generic) },
+-            { CKA_VALUE_LEN, &keyLen, sizeof(keyLen) },
+-            { CKA_DERIVE, &ckTrue, sizeof(ckTrue) }
+-        };
+-        CK_ULONG templateCount = PR_ARRAY_SIZE(template);
+-        CK_ECDH1_DERIVE_PARAMS ecParams;
++        NSSLOWKEYPrivateKey *lowPrivKey = NULL;
++        ECPrivateKey *ecPriv;
++        SECItem *lowPubValue = NULL;
++        SECItem item;
++        SECStatus rv;
+ 
+         crv = CKR_OK; /*paranoia, already get's set before we drop to the end */
+-        /* FIPS 140-2 requires we verify that the resulting key is a valid key.
+-         * The easiest way to do this is to do a derive operation, which checks
+-         * the validity of the key */
+-
++        /* FIPS 140-3 requires we verify that the resulting key is a valid key
++         * by recalculating the public can an compare it to our own public
++         * key. */
++        lowPrivKey = sftk_GetPrivKey(privateKey, keyType, &crv);
++        if (lowPrivKey == NULL) {
++            return sftk_MapCryptError(PORT_GetError());
++        }
++        /* recalculate the public key from the private key */
+         switch (keyType) {
+-            case CKK_DH:
+-                mech.mechanism = CKM_DH_PKCS_DERIVE;
+-                pubAttribute = sftk_FindAttribute(publicKey, CKA_VALUE);
+-                if (pubAttribute == NULL) {
+-                    return CKR_DEVICE_ERROR;
+-                }
+-                mech.pParameter = pubAttribute->attrib.pValue;
+-                mech.ulParameterLen = pubAttribute->attrib.ulValueLen;
+-                break;
+-            case CKK_EC:
+-                mech.mechanism = CKM_ECDH1_DERIVE;
+-                pubAttribute = sftk_FindAttribute(publicKey, CKA_EC_POINT);
+-                if (pubAttribute == NULL) {
+-                    return CKR_DEVICE_ERROR;
+-                }
+-                ecParams.kdf = CKD_NULL;
+-                ecParams.ulSharedDataLen = 0;
+-                ecParams.pSharedData = NULL;
+-                ecParams.ulPublicDataLen = pubAttribute->attrib.ulValueLen;
+-                ecParams.pPublicData = pubAttribute->attrib.pValue;
+-                mech.pParameter = &ecParams;
+-                mech.ulParameterLen = sizeof(ecParams);
+-                break;
+-            default:
+-                return CKR_DEVICE_ERROR;
++        case CKK_DH:
++            rv = DH_Derive(&lowPrivKey->u.dh.base, &lowPrivKey->u.dh.prime,
++                           &lowPrivKey->u.dh.privateValue, &item, 0);
++            if (rv != SECSuccess) {
++                return CKR_GENERAL_ERROR;
++            }
++            lowPubValue = SECITEM_DupItem(&item);
++            SECITEM_ZfreeItem(&item, PR_FALSE);
++            pubAttribute = sftk_FindAttribute(publicKey, CKA_VALUE);
++            break;
++        case CKK_EC:
++            rv = EC_NewKeyFromSeed(&lowPrivKey->u.ec.ecParams, &ecPriv,
++                                   lowPrivKey->u.ec.privateValue.data,
++                                   lowPrivKey->u.ec.privateValue.len);
++            if (rv != SECSuccess) {
++                return CKR_GENERAL_ERROR;
++            }
++            /* make sure it has the same encoding */
++            if (PR_GetEnvSecure("NSS_USE_DECODED_CKA_EC_POINT") ||
++                lowPrivKey->u.ec.ecParams.type != ec_params_named) {
++              lowPubValue = SECITEM_DupItem(&ecPriv->publicValue);
++            } else {
++              lowPubValue = SEC_ASN1EncodeItem(NULL, NULL, &ecPriv->publicValue,
++                                               SEC_ASN1_GET(SEC_OctetStringTemplate));;
++            }
++            pubAttribute = sftk_FindAttribute(publicKey, CKA_EC_POINT);
++            /* clear out our generated private key */
++            PORT_FreeArena(ecPriv->ecParams.arena, PR_TRUE);
++            break;
++        default:
++            return CKR_DEVICE_ERROR;
+         }
+ 
+-        crv = NSC_DeriveKey(hSession, &mech, privateKey->handle, template, templateCount, &newKey);
+-        if (crv != CKR_OK) {
+-            sftk_FreeAttribute(pubAttribute);
+-            return crv;
++        /* now compare new public key with our already generated key */
++        if ((pubAttribute == NULL) || (lowPubValue == NULL) ||
++            (pubAttribute->attrib.ulValueLen != lowPubValue->len) ||
++            (PORT_Memcmp(pubAttribute->attrib.pValue, lowPubValue->data,
++                        lowPubValue->len) != 0)) {
++            if (pubAttribute) sftk_FreeAttribute(pubAttribute);
++            if (lowPubValue) SECITEM_ZfreeItem(lowPubValue, PR_TRUE);
++            PORT_SetError(SEC_ERROR_BAD_KEY);
++            return CKR_GENERAL_ERROR;
+         }
++        SECITEM_ZfreeItem(lowPubValue, PR_TRUE);
++
+         /* FIPS requires full validation, but in fipx mode NSC_Derive
+          * only does partial validation with approved primes, now handle
+          * full validation */
+@@ -5260,44 +5270,78 @@ sftk_PairwiseConsistencyCheck(CK_SESSION
+             SECItem pubKey;
+             SECItem prime;
+             SECItem subPrime;
++            SECItem base;
++            SECItem generator;
+             const SECItem *subPrimePtr = &subPrime;
+ 
+             pubKey.data = pubAttribute->attrib.pValue;
+             pubKey.len = pubAttribute->attrib.ulValueLen;
+-            prime.data = subPrime.data = NULL;
+-            prime.len = subPrime.len = 0;
++            base.data = prime.data = subPrime.data = NULL;
++            base.len = prime.len = subPrime.len = 0;
+             crv = sftk_Attribute2SecItem(NULL, &prime, privateKey, CKA_PRIME);
+             if (crv != CKR_OK) {
+                 goto done;
+             }
+-            crv = sftk_Attribute2SecItem(NULL, &prime, privateKey, CKA_PRIME);
++            crv = sftk_Attribute2SecItem(NULL, &base, privateKey, CKA_BASE);
++            if (crv != CKR_OK) {
++                goto done;
++            }
+             /* we ignore the return code an only look at the length */
+-            if (subPrime.len == 0) {
+-                /* subprime not supplied, In this case look it up.
+-                 * This only works with approved primes, but in FIPS mode
+-                 * that's the only kine of prime that will get here */
+-                subPrimePtr = sftk_VerifyDH_Prime(&prime, isFIPS);
+-                if (subPrimePtr == NULL) {
+-                    crv = CKR_GENERAL_ERROR;
++            /* do we have a known prime ? */
++            subPrimePtr = sftk_VerifyDH_Prime(&prime, &generator, isFIPS);
++            if (subPrimePtr == NULL) {
++                if (subPrime.len == 0) {
++                    /* if not a known prime, subprime must be supplied */
++                    crv = CKR_ATTRIBUTE_VALUE_INVALID;
++                    goto done;
++                } else {
++                    /* not a known prime, check for primality of prime
++                     * and subPrime */
++                    if (!KEA_PrimeCheck(&prime)) {
++                        crv = CKR_ATTRIBUTE_VALUE_INVALID;
++                        goto done;
++                    }
++                    if (!KEA_PrimeCheck(&subPrime)) {
++                        crv = CKR_ATTRIBUTE_VALUE_INVALID;
++                        goto done;
++                    }
++                    /* if we aren't using a defined group, make sure base is in the
++                     * subgroup. If it's not, then our key could fail or succeed sometimes.
++                     * This makes the failure reliable */
++                    if (!KEA_Verify(&base, &prime, (SECItem *)subPrimePtr)) {
++                        crv = CKR_ATTRIBUTE_VALUE_INVALID;
++                    }
++                }
++                subPrimePtr = &subPrime;
++            } else {
++                /* we're using a known group, make sure we are using the known generator for that group */
++                if (SECITEM_CompareItem(&generator, &base) != 0) {
++                    crv = CKR_ATTRIBUTE_VALUE_INVALID;
+                     goto done;
+                 }
++                if (subPrime.len != 0) {
++                    /* we have a known prime and a supplied subPrime,
++                     * make sure the subPrime matches the subPrime for
++                     * the known Prime */
++                     if (SECITEM_CompareItem(subPrimePtr, &subPrime) != 0) {
++                        crv = CKR_ATTRIBUTE_VALUE_INVALID;
++                        goto done;
++                     }
++                 }
+             }
+             if (!KEA_Verify(&pubKey, &prime, (SECItem *)subPrimePtr)) {
+-                crv = CKR_GENERAL_ERROR;
++                crv = CKR_ATTRIBUTE_VALUE_INVALID;
+             }
+         done:
++            SECITEM_ZfreeItem(&base, PR_FALSE);
+             SECITEM_ZfreeItem(&subPrime, PR_FALSE);
+             SECITEM_ZfreeItem(&prime, PR_FALSE);
+         }
+         /* clean up before we return */
+         sftk_FreeAttribute(pubAttribute);
+-        crv2 = NSC_DestroyObject(hSession, newKey);
+         if (crv != CKR_OK) {
+             return crv;
+         }
+-        if (crv2 != CKR_OK) {
+-            return crv2;
+-        }
+     }
+ 
+     return CKR_OK;
+@@ -5925,8 +5969,8 @@ NSC_GenerateKeyPair(CK_SESSION_HANDLE hS
+      * created and linked.
+      */
+     crv = sftk_handleObject(publicKey, session);
+-    sftk_FreeSession(session);
+     if (crv != CKR_OK) {
++        sftk_FreeSession(session);
+         sftk_FreeObject(publicKey);
+         NSC_DestroyObject(hSession, privateKey->handle);
+         sftk_FreeObject(privateKey);
+@@ -5968,6 +6012,7 @@ NSC_GenerateKeyPair(CK_SESSION_HANDLE hS
+     }
+ 
+     if (crv != CKR_OK) {
++        sftk_FreeSession(session);
+         NSC_DestroyObject(hSession, publicKey->handle);
+         sftk_FreeObject(publicKey);
+         NSC_DestroyObject(hSession, privateKey->handle);
+@@ -5977,6 +6022,8 @@ NSC_GenerateKeyPair(CK_SESSION_HANDLE hS
+     /* we need to do this check at the end to make sure the generated key meets the key length requirements */
+     privateKey->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_NSS_GENERATE_KEY_PAIR, privateKey);
+     publicKey->isFIPS = privateKey->isFIPS;
++    session->lastOpWasFIPS = privateKey->isFIPS;
++    sftk_FreeSession(session);
+ 
+     *phPrivateKey = privateKey->handle;
+     *phPublicKey = publicKey->handle;
+@@ -8610,7 +8657,7 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession
+ 
+             /* if the prime is an approved prime, we can skip all the other
+              * checks. */
+-            subPrime = sftk_VerifyDH_Prime(&dhPrime, isFIPS);
++            subPrime = sftk_VerifyDH_Prime(&dhPrime, NULL, isFIPS);
+             if (subPrime == NULL) {
+                 SECItem dhSubPrime;
+                 /* If the caller set the subprime value, it means that
+@@ -8792,6 +8839,7 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession
+                 secretlen = tmp.len;
+             } else {
+                 secretlen = keySize;
++                key->isFIPS = PR_FALSE;
+                 crv = sftk_ANSI_X9_63_kdf(&secret, keySize,
+                                           &tmp, mechParams->pSharedData,
+                                           mechParams->ulSharedDataLen, mechParams->kdf);
+diff -up ./lib/softoken/pkcs11i.h.fips-review ./lib/softoken/pkcs11i.h
+--- ./lib/softoken/pkcs11i.h.fips-review	2024-06-12 12:04:10.638360392 -0700
++++ ./lib/softoken/pkcs11i.h	2024-06-12 12:04:10.640360416 -0700
+@@ -971,7 +971,7 @@ char **NSC_ModuleDBFunc(unsigned long fu
+ /* dh verify functions */
+ /* verify that dhPrime matches one of our known primes, and if so return
+  * it's subprime value */
+-const SECItem *sftk_VerifyDH_Prime(SECItem *dhPrime, PRBool isFIPS);
++const SECItem *sftk_VerifyDH_Prime(SECItem *dhPrime, SECItem *generator, PRBool isFIPS);
+ /* check if dhSubPrime claims dhPrime is a safe prime. */
+ SECStatus sftk_IsSafePrime(SECItem *dhPrime, SECItem *dhSubPrime, PRBool *isSafe);
+ /* map an operation Attribute to a Mechanism flag */
+diff -up ./lib/softoken/pkcs11u.c.fips-review ./lib/softoken/pkcs11u.c
+--- ./lib/softoken/pkcs11u.c.fips-review	2024-06-12 12:04:10.638360392 -0700
++++ ./lib/softoken/pkcs11u.c	2024-06-12 12:04:10.640360416 -0700
+@@ -2409,15 +2409,27 @@ sftk_handleSpecial(SFTKSlot *slot, CK_ME
+     switch (mechInfo->special) {
+         case SFTKFIPSDH: {
+             SECItem dhPrime;
++            SECItem dhBase;
++            SECItem dhGenerator;
++            PRBool val = PR_FALSE;
+             const SECItem *dhSubPrime;
+             CK_RV crv = sftk_Attribute2SecItem(NULL, &dhPrime,
+                                                source, CKA_PRIME);
+             if (crv != CKR_OK) {
+                 return PR_FALSE;
+             }
+-            dhSubPrime = sftk_VerifyDH_Prime(&dhPrime, PR_TRUE);
++            crv = sftk_Attribute2SecItem(NULL, &dhBase, source, CKA_BASE);
++            if (crv != CKR_OK) {
++                return PR_FALSE;
++            }
++            dhSubPrime = sftk_VerifyDH_Prime(&dhPrime, &dhGenerator, PR_TRUE);
++            val = (dhSubPrime) ? PR_TRUE : PR_FALSE;
++            if (val && (SECITEM_CompareItem(&dhBase, &dhGenerator) != 0)) {
++                val = PR_FALSE;
++            }
+             SECITEM_ZfreeItem(&dhPrime, PR_FALSE);
+-            return (dhSubPrime) ? PR_TRUE : PR_FALSE;
++            SECITEM_ZfreeItem(&dhBase, PR_FALSE);
++            return val;
+         }
+         case SFTKFIPSNone:
+             return PR_FALSE;
+diff -up ./lib/softoken/sftkdhverify.c.fips-review ./lib/softoken/sftkdhverify.c
+--- ./lib/softoken/sftkdhverify.c.fips-review	2024-06-07 09:26:03.000000000 -0700
++++ ./lib/softoken/sftkdhverify.c	2024-06-12 12:04:10.641360427 -0700
+@@ -6726,11 +6726,20 @@ static const SECItem subprime_tls_8192 =
+                                            (unsigned char *)subprime_tls_8192_data,
+                                            sizeof(subprime_tls_8192_data) };
+ 
++/* generator for all the groups is 2 */
++static const unsigned char generator_2_data[] = { 2 };
++
++
++static const SECItem generator_2 =
++    { siBuffer,
++      (unsigned char *)generator_2_data,
++      sizeof(generator_2_data) };
++
+ /*
+  * verify that dhPrime matches one of our known primes
+  */
+ const SECItem *
+-sftk_VerifyDH_Prime(SECItem *dhPrime, PRBool isFIPS)
++sftk_VerifyDH_Prime(SECItem *dhPrime, SECItem *g, PRBool isFIPS)
+ {
+     /* use the length to decide which primes to check */
+     switch (dhPrime->len) {
+@@ -6741,56 +6750,67 @@ sftk_VerifyDH_Prime(SECItem *dhPrime, PR
+             }
+             if (PORT_Memcmp(dhPrime->data, prime_ike_1536,
+                             sizeof(prime_ike_1536)) == 0) {
++                if (g) *g = generator_2;
+                 return &subprime_ike_1536;
+             }
+             break;
+         case 2048 / PR_BITS_PER_BYTE:
+             if (PORT_Memcmp(dhPrime->data, prime_tls_2048,
+                             sizeof(prime_tls_2048)) == 0) {
++                if (g) *g = generator_2;
+                 return &subprime_tls_2048;
+             }
+             if (PORT_Memcmp(dhPrime->data, prime_ike_2048,
+                             sizeof(prime_ike_2048)) == 0) {
++                if (g) *g = generator_2;
+                 return &subprime_ike_2048;
+             }
+             break;
+         case 3072 / PR_BITS_PER_BYTE:
+             if (PORT_Memcmp(dhPrime->data, prime_tls_3072,
+                             sizeof(prime_tls_3072)) == 0) {
++                if (g) *g = generator_2;
+                 return &subprime_tls_3072;
+             }
+             if (PORT_Memcmp(dhPrime->data, prime_ike_3072,
+                             sizeof(prime_ike_3072)) == 0) {
++                if (g) *g = generator_2;
+                 return &subprime_ike_3072;
+             }
+             break;
+         case 4096 / PR_BITS_PER_BYTE:
+             if (PORT_Memcmp(dhPrime->data, prime_tls_4096,
+                             sizeof(prime_tls_4096)) == 0) {
++                if (g) *g = generator_2;
+                 return &subprime_tls_4096;
+             }
+             if (PORT_Memcmp(dhPrime->data, prime_ike_4096,
+                             sizeof(prime_ike_4096)) == 0) {
++                if (g) *g = generator_2;
+                 return &subprime_ike_4096;
+             }
+             break;
+         case 6144 / PR_BITS_PER_BYTE:
+             if (PORT_Memcmp(dhPrime->data, prime_tls_6144,
+                             sizeof(prime_tls_6144)) == 0) {
++                if (g) *g = generator_2;
+                 return &subprime_tls_6144;
+             }
+             if (PORT_Memcmp(dhPrime->data, prime_ike_6144,
+                             sizeof(prime_ike_6144)) == 0) {
++                if (g) *g = generator_2;
+                 return &subprime_ike_6144;
+             }
+             break;
+         case 8192 / PR_BITS_PER_BYTE:
+             if (PORT_Memcmp(dhPrime->data, prime_tls_8192,
+                             sizeof(prime_tls_8192)) == 0) {
++                if (g) *g = generator_2;
+                 return &subprime_tls_8192;
+             }
+             if (PORT_Memcmp(dhPrime->data, prime_ike_8192,
+                             sizeof(prime_ike_8192)) == 0) {
++                if (g) *g = generator_2;
+                 return &subprime_ike_8192;
+             }
+             break;
+diff -up ./lib/softoken/sftkike.c.fips-review ./lib/softoken/sftkike.c
+--- ./lib/softoken/sftkike.c.fips-review	2024-06-07 09:26:03.000000000 -0700
++++ ./lib/softoken/sftkike.c	2024-06-12 12:04:10.641360427 -0700
+@@ -516,6 +516,11 @@ sftk_ike_prf(CK_SESSION_HANDLE hSession,
+             goto fail;
+         }
+     } else {
++        /* ikev1 isn't validated, if we use this function in ikev1 mode,
++         * mark the resulting key as not FIPS */
++        if (!params->bRekey) {
++            outKey->isFIPS = PR_FALSE;
++        }
+         crv = prf_init(&context, inKey->attrib.pValue,
+                        inKey->attrib.ulValueLen);
+         if (crv != CKR_OK) {

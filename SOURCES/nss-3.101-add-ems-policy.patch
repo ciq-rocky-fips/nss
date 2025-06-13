@@ -1,0 +1,107 @@
+diff -up ./lib/pk11wrap/pk11pars.c.ems ./lib/pk11wrap/pk11pars.c
+--- ./lib/pk11wrap/pk11pars.c.ems	2024-06-11 13:09:25.956760476 -0700
++++ ./lib/pk11wrap/pk11pars.c	2024-06-11 13:09:52.837067481 -0700
+@@ -433,6 +433,8 @@ static const oidValDef kxOptList[] = {
+     { CIPHER_NAME("ECDHE-RSA"), SEC_OID_TLS_ECDHE_RSA, NSS_USE_ALG_IN_SSL_KX },
+     { CIPHER_NAME("ECDH-ECDSA"), SEC_OID_TLS_ECDH_ECDSA, NSS_USE_ALG_IN_SSL_KX },
+     { CIPHER_NAME("ECDH-RSA"), SEC_OID_TLS_ECDH_RSA, NSS_USE_ALG_IN_SSL_KX },
++    { CIPHER_NAME("TLS-REQUIRE-EMS"), SEC_OID_TLS_REQUIRE_EMS, NSS_USE_ALG_IN_SSL_KX },
++
+ };
+ 
+ static const oidValDef smimeKxOptList[] = {
+diff -up ./lib/pk11wrap/secmodti.h.add_ems_policy ./lib/pk11wrap/secmodti.h
+--- ./lib/pk11wrap/secmodti.h.add_ems_policy	2023-06-04 01:42:53.000000000 -0700
++++ ./lib/pk11wrap/secmodti.h	2023-06-12 17:18:35.129938514 -0700
+@@ -202,4 +202,10 @@ struct PK11GenericObjectStr {
+ /* This mask includes all CK_FLAGs with an equivalent CKA_ attribute. */
+ #define CKF_KEY_OPERATION_FLAGS 0x000e7b00UL
+ 
++/* this oid value could change values if it's added after other new
++ * upstream oids. We protect applications by hiding the define in a private
++ * header file that only NSS sees. Currently it's only available through
++ * the policy code */
++#define SEC_OID_TLS_REQUIRE_EMS SEC_OID_PRIVATE_1
++
+ #endif /* _SECMODTI_H_ */
+diff -up ./lib/ssl/ssl3con.c.add_ems_policy ./lib/ssl/ssl3con.c
+--- ./lib/ssl/ssl3con.c.add_ems_policy	2023-06-04 01:42:53.000000000 -0700
++++ ./lib/ssl/ssl3con.c	2023-06-12 17:18:35.130938525 -0700
+@@ -36,6 +36,7 @@
+ #include "pk11func.h"
+ #include "secmod.h"
+ #include "blapi.h"
++#include "secmodti.h" /* until SEC_OID_TLS_REQUIRE_EMS is upstream */
+ 
+ #include <stdio.h>
+ 
+@@ -3480,6 +3481,29 @@ ssl3_ComputeMasterSecretInt(sslSocket *s
+     CK_TLS12_MASTER_KEY_DERIVE_PARAMS master_params;
+     unsigned int master_params_len;
+ 
++    /* if we are using TLS and we aren't using the extended master secret,
++     * and SEC_OID_TLS_REQUIRE_EMS policy is true, fail. The caller will
++     * send and alert (eventually). In the RSA Server case, the alert
++     * won't happen until Finish time because the upper level code
++     * can't tell a difference between this failure and an RSA decrypt
++     * failure, so it will proceed with a faux key */
++    if (isTLS) {
++        PRUint32 policy;
++        SECStatus rv;
++
++        /* first fetch the policy for this algorithm */
++        rv = NSS_GetAlgorithmPolicy(SEC_OID_TLS_REQUIRE_EMS, &policy);
++        /* we only look at the policy if we can fetch it. */
++        if (rv == SECSuccess) {
++            if (policy & NSS_USE_ALG_IN_SSL_KX) {
++                /* just set the error, we don't want to map any errors
++                 * set by NSS_GetAlgorithmPolicy here */
++                PORT_SetError(SSL_ERROR_UNSUPPORTED_VERSION);
++                return SECFailure;
++            }
++        }
++    }
++
+     if (isTLS12) {
+         if (isDH)
+             master_derive = CKM_TLS12_MASTER_KEY_DERIVE_DH;
+diff -up ./lib/util/secoid.c.ems ./lib/util/secoid.c
+--- ./lib/util/secoid.c.ems	2024-06-11 13:11:28.078155282 -0700
++++ ./lib/util/secoid.c	2024-06-11 13:12:58.511188172 -0700
+@@ -1890,6 +1890,12 @@ const static SECOidData oids[SEC_OID_TOT
+     ODE(SEC_OID_RC2_64_CBC, "RC2-64-CBC", CKM_RC2_CBC, INVALID_CERT_EXTENSION),
+     ODE(SEC_OID_RC2_128_CBC, "RC2-128-CBC", CKM_RC2_CBC, INVALID_CERT_EXTENSION),
+     ODE(SEC_OID_ECDH_KEA, "ECDH", CKM_ECDH1_DERIVE, INVALID_CERT_EXTENSION),
++
++    /* this will change upstream. for now apps shouldn't use it */
++    /* we need it for the policy code.  */
++    ODE(SEC_OID_PRIVATE_1,
++        "TLS Require EMS", CKM_INVALID_MECHANISM, INVALID_CERT_EXTENSION),
++
+ };
+
+ /* PRIVATE EXTENDED SECOID Table
+@@ -2198,6 +2204,10 @@ SECOID_Init(void)
+
+     /* turn off NSS_USE_POLICY_IN_SSL by default */
+     xOids[SEC_OID_APPLY_SSL_POLICY].notPolicyFlags = NSS_USE_POLICY_IN_SSL;
++    /* turn off TLS REQUIRE EMS by default */
++    xOids[SEC_OID_PRIVATE_1].notPolicyFlags = ~0;
++
++
+
+     envVal = PR_GetEnvSecure("NSS_HASH_ALG_SUPPORT");
+     if (envVal)
+diff -up ./lib/util/secoidt.h.ems ./lib/util/secoidt.h
+--- ./lib/util/secoidt.h.ems	2024-06-11 13:16:13.212411967 -0700
++++ ./lib/util/secoidt.h	2024-06-11 13:16:48.098810434 -0700
+@@ -530,6 +530,9 @@ typedef enum {
+     SEC_OID_RC2_64_CBC = 385,
+     SEC_OID_RC2_128_CBC = 386,
+     SEC_OID_ECDH_KEA = 387,
++    /* this will change upstream. for now apps shouldn't use it */
++    /* give it an obscure name here */
++    SEC_OID_PRIVATE_1 = 388,
+ 
+     SEC_OID_TOTAL
+ } SECOidTag;

@@ -1,0 +1,12 @@
+diff -up ./lib/pkcs12/p12local.c.long_pw_fix ./lib/pkcs12/p12local.c
+--- ./lib/pkcs12/p12local.c.long_pw_fix	2024-09-06 17:58:39.905517185 -0700
++++ ./lib/pkcs12/p12local.c	2024-09-06 17:59:19.568985976 -0700
+@@ -102,7 +102,7 @@ sec_pkcs12_integrity_key(PK11SlotInfo *s
+         *hmacMech = PK11_AlgtagToMechanism(hmacAlg);
+         /* pkcs12v2 hmac uses UTF8 rather than unicode */
+         if (!sec_pkcs12_convert_item_to_unicode(NULL, &utf8Pw, pwitem,
+-                                                PR_TRUE, PR_FALSE, PR_FALSE)) {
++                                                PR_FALSE, PR_FALSE, PR_FALSE)) {
+             return NULL;
+         }
+         symKey = PK11_PBEKeyGen(slot, prfAlgid, &utf8Pw, PR_FALSE, pwarg);

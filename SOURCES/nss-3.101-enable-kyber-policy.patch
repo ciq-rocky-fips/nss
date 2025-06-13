@@ -1,0 +1,13 @@
+diff -up ./lib/pk11wrap/pk11pars.c.enable_kyber_policy ./lib/pk11wrap/pk11pars.c
+--- ./lib/pk11wrap/pk11pars.c.enable_kyber_policy	2024-06-12 14:44:24.680338868 -0700
++++ ./lib/pk11wrap/pk11pars.c	2024-06-12 14:44:48.368609356 -0700
+@@ -245,7 +245,8 @@ static const oidValDef curveOptList[] =
+       NSS_USE_ALG_IN_SSL_KX | NSS_USE_ALG_IN_CERT_SIGNATURE },
+     { CIPHER_NAME("CURVE25519"), SEC_OID_CURVE25519,
+       NSS_USE_ALG_IN_SSL_KX | NSS_USE_ALG_IN_CERT_SIGNATURE },
+-    { CIPHER_NAME("XYBER768D00"), SEC_OID_XYBER768D00, 0 },
++    { CIPHER_NAME("XYBER768D00"), SEC_OID_XYBER768D00, 
++      NSS_USE_ALG_IN_SSL_KX },
+     /* ANSI X9.62 named elliptic curves (characteristic two field) */
+     { CIPHER_NAME("C2PNB163V1"), SEC_OID_ANSIX962_EC_C2PNB163V1,
+       NSS_USE_ALG_IN_SSL_KX | NSS_USE_ALG_IN_CERT_SIGNATURE },

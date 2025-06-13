@@ -1,0 +1,83 @@
+diff -up ./lib/pkcs12/p12plcy.c.no_p12_smime_policy ./lib/pkcs12/p12plcy.c
+--- ./lib/pkcs12/p12plcy.c.no_p12_smime_policy	2024-06-07 09:26:03.000000000 -0700
++++ ./lib/pkcs12/p12plcy.c	2024-07-17 11:26:00.334836451 -0700
+@@ -37,6 +37,7 @@ static pkcs12SuiteMap pkcs12SuiteMaps[]
+ static PRBool
+ sec_PKCS12Allowed(SECOidTag alg, PRUint32 needed)
+ {
++#ifdef notdef
+     PRUint32 policy;
+     SECStatus rv;
+ 
+@@ -48,6 +49,9 @@ sec_PKCS12Allowed(SECOidTag alg, PRUint3
+         return PR_TRUE;
+     }
+     return PR_FALSE;
++#else
++    return PR_TRUE;
++#endif
+ }
+ 
+ PRBool
+diff -up ./lib/smime/smimeutil.c.no_p12_smime_policy ./lib/smime/smimeutil.c
+--- ./lib/smime/smimeutil.c.no_p12_smime_policy	2024-06-07 09:26:03.000000000 -0700
++++ ./lib/smime/smimeutil.c	2024-07-17 11:27:04.716617111 -0700
+@@ -202,6 +202,7 @@ smime_get_policy_tag_from_key_length(SEC
+ PRBool
+ smime_allowed_by_policy(SECOidTag algtag, PRUint32 neededPolicy)
+ {
++#ifdef notdef
+     PRUint32 policyFlags;
+ 
+     /* some S/MIME algs map to the same underlying KEA mechanism,
+@@ -221,6 +222,7 @@ smime_allowed_by_policy(SECOidTag algtag
+         PORT_SetError(SEC_ERROR_BAD_EXPORT_ALGORITHM);
+         return PR_FALSE;
+     }
++#endif
+     return PR_TRUE;
+ }
+ 
+@@ -485,6 +487,7 @@ smime_init_once(void *arg)
+         return PR_FAILURE;
+     }
+ 
++#ifdef notdef
+     /* At initialization time, we need to set up the defaults. We first
+      * look to see if the system or application has set up certain algorithms
+      * by policy. If they have set up values by policy we'll only allow those
+@@ -497,6 +500,11 @@ smime_init_once(void *arg)
+         PORT_Free(tags);
+         tags = NULL;
+     }
++#else
++    /* just initialize the old maps */
++    rv = SECSuccess;
++    tagCount = 0;
++#endif
+     if ((rv != SECSuccess) || (tagCount == 0)) {
+         /* No algorithms have been enabled by policy (either by the system
+          * or by the application, we then will use the traditional default
+diff -up ./tests/smime/smime.sh.no_p12_smime_policy ./tests/smime/smime.sh
+--- ./tests/smime/smime.sh.no_p12_smime_policy	2024-07-17 11:26:00.303836075 -0700
++++ ./tests/smime/smime.sh	2024-07-17 11:26:00.334836451 -0700
+@@ -872,6 +872,6 @@ smime_init
+ smime_main
+ smime_data_tb
+ smime_p7
+-smime_policy
++#smime_policy
+ smime_cleanup
+ 
+diff -up ./tests/tools/tools.sh.no_p12_smime_policy ./tests/tools/tools.sh
+--- ./tests/tools/tools.sh.no_p12_smime_policy	2024-07-17 11:26:00.304836087 -0700
++++ ./tests/tools/tools.sh	2024-07-17 11:26:00.334836451 -0700
+@@ -585,7 +585,7 @@ tools_p12()
+   tools_p12_import_old_files
+   tools_p12_import_pbmac1_samples
+   tools_p12_import_rsa_pss_private_key
+-  tools_p12_policy
++  #tools_p12_policy
+ }
+ 
+ ############################## tools_sign ##############################

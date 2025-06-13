@@ -1,0 +1,26 @@
+diff --git a/gtests/ssl_gtest/tls_subcerts_unittest.cc b/gtests/ssl_gtest/tls_subcerts_unittest.cc
+--- a/gtests/ssl_gtest/tls_subcerts_unittest.cc
++++ b/gtests/ssl_gtest/tls_subcerts_unittest.cc
+@@ -15,13 +15,22 @@
+ #include "gtest_utils.h"
+ #include "tls_agent.h"
+ #include "tls_connect.h"
++#define LTO
+
+ namespace nss_test {
+
++#ifndef LTO
++// sigh this construction breaks LTO
+ const std::string kEcdsaDelegatorId = TlsAgent::kDelegatorEcdsa256;
+ const std::string kRsaeDelegatorId = TlsAgent::kDelegatorRsae2048;
+ const std::string kPssDelegatorId = TlsAgent::kDelegatorRsaPss2048;
+ const std::string kDCId = TlsAgent::kServerEcdsa256;
++#else
++#define kEcdsaDelegatorId TlsAgent::kDelegatorEcdsa256
++#define kRsaeDelegatorId TlsAgent::kDelegatorRsae2048
++#define kPssDelegatorId TlsAgent::kDelegatorRsaPss2048
++#define kDCId  TlsAgent::kServerEcdsa256
++#endif
+ const SSLSignatureScheme kDCScheme = ssl_sig_ecdsa_secp256r1_sha256;
+ const PRUint32 kDCValidFor = 60 * 60 * 24 * 7 /* 1 week (seconds) */;
+
