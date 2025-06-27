@@ -2,6 +2,7 @@
 %global nspr_version 4.35.0
 %global baserelease 10
 %global nss_release %baserelease
+%global ciq_release 1.1
 # NOTE: To avoid NVR clashes of nspr* packages:
 # use "%%global nspr_release %%[%%baserelease+n]" to handle offsets when
 # release number between nss and nspr are different.
@@ -75,7 +76,7 @@ print(string.sub(hash, 0, 16))
 Summary:          Network Security Services
 Name:             nss
 Version:          %{nss_version}
-Release:          %{nss_release}%{?dist}
+Release:          %{nss_release}%{?dist}.{ciq_release}
 License:          MPLv2.0
 URL:              http://www.mozilla.org/projects/security/pki/nss/
 Requires:         nspr >= %{nspr_version}
@@ -213,6 +214,8 @@ Patch120:         nspr-4.34-server-passive.patch
 # NSS reverse patches
 Patch300:         nss-3.79-distrusted-certs.patch
 
+# CIQ FIPS patch
+Patch400:         0001-Applying-fips-updates.patch
 
 %description
 Network Security Services (NSS) is a set of libraries designed to
@@ -223,7 +226,7 @@ v3 certificates, and other security standards.
 
 %package tools
 Summary:          Tools for the Network Security Services
-Requires:         %{name}%{?_isa} = %{nss_version}-%{nss_release}%{dist}
+Requires:         %{name}%{?_isa} = {nss_version}-%{nss_release}%{dist}.%{ciq_release}
 
 %description tools
 Network Security Services (NSS) is a set of libraries designed to
@@ -240,7 +243,7 @@ Summary:          System NSS Initialization
 # providing nss-system-init without version so that it can
 # be replaced by a better one, e.g. supplied by the os vendor
 Provides:         nss-system-init
-Requires:         nss%{?_isa} = %{nss_version}-%{nss_release}%{dist}
+Requires:         nss%{?_isa} = {nss_version}-%{nss_release}%{dist}.%{ciq_release}
 Requires(post):   coreutils, sed
 
 %description sysinit
@@ -251,8 +254,8 @@ any system or user configured modules.
 
 %package devel
 Summary:          Development libraries for Network Security Services
-Provides:         nss-static = %{nss_version}-%{nss_release}%{dist}
-Requires:         nss%{?_isa} = %{nss_version}-%{nss_release}%{dist}
+Provides:         nss-static = %{nss_version}-%{nss_release}%{dist}.%{ciq_release}
+Requires:         nss%{?_isa} = {nss_version}-%{nss_release}%{dist}.%{ciq_release}
 Requires:         nss-util-devel
 Requires:         nss-softokn-devel
 Requires:         nspr-devel >= %{nspr_version}
@@ -265,9 +268,9 @@ Header and Library files for doing development with Network Security Services.
 
 %package pkcs11-devel
 Summary:          Development libraries for PKCS #11 (Cryptoki) using NSS
-Provides:         nss-pkcs11-devel-static = %{nss_version}-%{nss_release}%{dist}
-Requires:         nss-devel = %{nss_version}-%{nss_release}%{dist}
-Requires:         nss-softokn-freebl-devel = %{nss_version}-%{nss_release}%{dist}
+Provides:         nss-pkcs11-devel-static = %{nss_version}-%{nss_release}%{dist}.%{ciq_release}
+Requires:         nss-devel = %{nss_version}-%{nss_release}%{dist}.%{ciq_release}
+Requires:         nss-softokn-freebl-devel = %{nss_version}-%{nss_release}%{dist}.%{ciq_release}
 
 %description pkcs11-devel
 Library files for developing PKCS #11 modules using basic NSS
@@ -283,7 +286,8 @@ Utilities for Network Security Services and the Softoken module
 
 %package util-devel
 Summary:          Development libraries for Network Security Services Utilities
-Requires:         nss-util%{?_isa} = %{nss_version}-%{nss_release}%{dist}
+Requires:         nss-util%{?_isa} = %{nss_version}-%{nss_release}%{dist}.%{ciq_release}
+
 Requires:         nspr-devel >= %{nspr_version}
 Requires:         pkgconfig
 
@@ -294,8 +298,8 @@ Header and library files for doing development with Network Security Services.
 %package softokn
 Summary:          Network Security Services Softoken Module
 Requires:         nspr >= %{nspr_version}
-Requires:         nss-util >= %{nss_version}-%{nss_release}%{dist}
-Requires:         nss-softokn-freebl%{_isa} >= %{nss_version}-%{nss_release}%{dist}
+Requires:         nss-util >= {nss_version}-%{nss_release}%{dist}.%{ciq_release}
+Requires:         nss-softokn-freebl%{_isa} >= {nss_version}-%{nss_release}%{dist}.%{ciq_release}
 
 %description softokn
 Network Security Services Softoken Cryptographic Module
@@ -316,8 +320,8 @@ Install the nss-softokn-freebl package if you need the freebl library.
 
 %package softokn-freebl-devel
 Summary:          Header and Library files for doing development with the Freebl library for NSS
-Provides:         nss-softokn-freebl-static = %{nss_version}-%{nss_release}%{dist}
-Requires:         nss-softokn-freebl%{?_isa} = %{nss_version}-%{nss_release}%{dist}
+Provides:         nss-softokn-freebl-static = %{nss_version}-%{nss_release}%{dist}.%{ciq_release}
+Requires:         nss-softokn-freebl%{?_isa} = {nss_version}-%{nss_release}%{dist}.%{ciq_release}
 
 %description softokn-freebl-devel
 NSS Softoken Cryptographic Module Freebl Library Development Tools
@@ -328,10 +332,10 @@ Developers should rely only on the officially supported NSS public API.
 
 %package softokn-devel
 Summary:          Development libraries for Network Security Services
-Requires:         nss-softokn%{?_isa} = %{nss_version}-%{nss_release}%{dist}
-Requires:         nss-softokn-freebl-devel%{?_isa} = %{nss_version}-%{nss_release}%{dist}
+Requires:         nss-softokn%{?_isa} = {nss_version}-%{nss_release}%{dist}.%{ciq_release}
+Requires:         nss-softokn-freebl-devel%{?_isa} = {nss_version}-%{nss_release}%{dist}.%{ciq_release}
 Requires:         nspr-devel >= %{nspr_version}
-Requires:         nss-util-devel >= %{nss_version}-%{nss_release}%{dist}
+Requires:         nss-util-devel >= {nss_version}-%{nss_release}%{dist}.%{ciq_release}
 Requires:         pkgconfig
 
 %description softokn-devel
@@ -340,7 +344,7 @@ Header and library files for doing development with Network Security Services.
 %package -n nspr
 Summary:        Netscape Portable Runtime
 Version:        %{nspr_version}
-Release:        %{nspr_release}%{?dist}
+Release:        %{nspr_release}%{?dist}.%{ciq_release}
 License:        MPLv2.0
 URL:            http://www.mozilla.org/projects/nspr/
 Conflicts:      filesystem < 3
@@ -356,7 +360,7 @@ memory management (malloc and free) and shared library linking.
 Summary:        Development libraries for the Netscape Portable Runtime
 Version:        %{nspr_version}
 Release:        %{nspr_release}%{?dist}
-Requires:       nspr%{?_isa} = %{nspr_version}-%{nspr_release}%{?dist}
+Requires:       nspr%{?_isa} = {nspr_version}-%{nspr_release}%{?dist}.%{ciq_release}
 Requires:       pkgconfig
 BuildRequires:  xmlto
 Conflicts:      filesystem < 3
@@ -460,10 +464,10 @@ export IN_TREE_FREEBL_HEADERS_FIRST=1
 
 # FIPS related defines
 export NSS_FORCE_FIPS=1
-export NSS_FIPS_VERSION="%{name}\ %{nss_version}-%{srpmhash}"
+export NSS_FIPS_VERSION="rocky9.20250620\ %{nss_version}-%{srpmhash}"
 eval $(sed -n 's/^\(\(NAME\|VERSION_ID\)=.*\)/OS_\1/p' /etc/os-release | sed -e 's/ /\\ /g')
 export FIPS_MODULE_OS="$OS_NAME\ ${OS_VERSION_ID%%.*}"
-export NSS_FIPS_MODULE_ID="${FIPS_MODULE_OS}\ ${NSS_FIPS_VERSION}"
+export NSS_FIPS_MODULE_ID="Rocky\ Linux\ 9\ NSS\ Cryptographic\ Module\ ${NSS_FIPS_VERSION}"
 # remove when the infrastructure is fixed
 export NSS_FIPS_140_3=1
 export NSS_ENABLE_FIPS_INDICATORS=1
@@ -1203,6 +1207,9 @@ update-crypto-policies &> /dev/null || :
 
 
 %changelog
+* Fri Jun 20 2025 Jeremy Allison <jallison@ciq.com> - 3.101.0-10.1.1
+- Add CIQ FIPS patches.
+
 * Mon Nov 11 2024 Frantisek Krenzelok <krenzelok.frantisek@gmail.com> - 3.101.0-10
 - Allow RSA-OAEP in FIPS mode
 
