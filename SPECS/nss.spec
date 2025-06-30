@@ -76,7 +76,7 @@ print(string.sub(hash, 0, 16))
 Summary:          Network Security Services
 Name:             nss
 Version:          %{nss_version}
-Release:          %{nss_release}%{?dist}.{ciq_release}
+Release:          %{nss_release}%{?dist}.%{ciq_release}
 License:          MPLv2.0
 URL:              http://www.mozilla.org/projects/security/pki/nss/
 Requires:         nspr >= %{nspr_version}
@@ -226,7 +226,7 @@ v3 certificates, and other security standards.
 
 %package tools
 Summary:          Tools for the Network Security Services
-Requires:         %{name}%{?_isa} = {nss_version}-%{nss_release}%{dist}.%{ciq_release}
+Requires:         %{name}%{?_isa} = %{nss_version}-%{nss_release}%{dist}.%{ciq_release}
 
 %description tools
 Network Security Services (NSS) is a set of libraries designed to
@@ -243,7 +243,7 @@ Summary:          System NSS Initialization
 # providing nss-system-init without version so that it can
 # be replaced by a better one, e.g. supplied by the os vendor
 Provides:         nss-system-init
-Requires:         nss%{?_isa} = {nss_version}-%{nss_release}%{dist}.%{ciq_release}
+Requires:         nss%{?_isa} = %{nss_version}-%{nss_release}%{dist}.%{ciq_release}
 Requires(post):   coreutils, sed
 
 %description sysinit
@@ -255,7 +255,7 @@ any system or user configured modules.
 %package devel
 Summary:          Development libraries for Network Security Services
 Provides:         nss-static = %{nss_version}-%{nss_release}%{dist}.%{ciq_release}
-Requires:         nss%{?_isa} = {nss_version}-%{nss_release}%{dist}.%{ciq_release}
+Requires:         nss%{?_isa} = %{nss_version}-%{nss_release}%{dist}.%{ciq_release}
 Requires:         nss-util-devel
 Requires:         nss-softokn-devel
 Requires:         nspr-devel >= %{nspr_version}
@@ -298,8 +298,8 @@ Header and library files for doing development with Network Security Services.
 %package softokn
 Summary:          Network Security Services Softoken Module
 Requires:         nspr >= %{nspr_version}
-Requires:         nss-util >= {nss_version}-%{nss_release}%{dist}.%{ciq_release}
-Requires:         nss-softokn-freebl%{_isa} >= {nss_version}-%{nss_release}%{dist}.%{ciq_release}
+Requires:         nss-util >= %{nss_version}-%{nss_release}%{dist}.%{ciq_release}
+Requires:         nss-softokn-freebl%{_isa} >= %{nss_version}-%{nss_release}%{dist}.%{ciq_release}
 
 %description softokn
 Network Security Services Softoken Cryptographic Module
@@ -321,7 +321,7 @@ Install the nss-softokn-freebl package if you need the freebl library.
 %package softokn-freebl-devel
 Summary:          Header and Library files for doing development with the Freebl library for NSS
 Provides:         nss-softokn-freebl-static = %{nss_version}-%{nss_release}%{dist}.%{ciq_release}
-Requires:         nss-softokn-freebl%{?_isa} = {nss_version}-%{nss_release}%{dist}.%{ciq_release}
+Requires:         nss-softokn-freebl%{?_isa} = %{nss_version}-%{nss_release}%{dist}.%{ciq_release}
 
 %description softokn-freebl-devel
 NSS Softoken Cryptographic Module Freebl Library Development Tools
@@ -332,10 +332,10 @@ Developers should rely only on the officially supported NSS public API.
 
 %package softokn-devel
 Summary:          Development libraries for Network Security Services
-Requires:         nss-softokn%{?_isa} = {nss_version}-%{nss_release}%{dist}.%{ciq_release}
-Requires:         nss-softokn-freebl-devel%{?_isa} = {nss_version}-%{nss_release}%{dist}.%{ciq_release}
+Requires:         nss-softokn%{?_isa} = %{nss_version}-%{nss_release}%{dist}.%{ciq_release}
+Requires:         nss-softokn-freebl-devel%{?_isa} = %{nss_version}-%{nss_release}%{dist}.%{ciq_release}
 Requires:         nspr-devel >= %{nspr_version}
-Requires:         nss-util-devel >= {nss_version}-%{nss_release}%{dist}.%{ciq_release}
+Requires:         nss-util-devel >= %{nss_version}-%{nss_release}%{dist}.%{ciq_release}
 Requires:         pkgconfig
 
 %description softokn-devel
@@ -360,7 +360,7 @@ memory management (malloc and free) and shared library linking.
 Summary:        Development libraries for the Netscape Portable Runtime
 Version:        %{nspr_version}
 Release:        %{nspr_release}%{?dist}
-Requires:       nspr%{?_isa} = {nspr_version}-%{nspr_release}%{?dist}.%{ciq_release}
+Requires:       nspr%{?_isa} = %{nspr_version}-%{nspr_release}%{?dist}.%{ciq_release}
 Requires:       pkgconfig
 BuildRequires:  xmlto
 Conflicts:      filesystem < 3
