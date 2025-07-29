@@ -465,6 +465,26 @@ mpp_make_prime_ext_random(mp_int *start, mp_size nBits, mp_size strong, mpp_rand
     } else
         num_tests = 50;
 
+    /* FIPS 186-4 mandates more M-R tests for probable primes generation - make
+     * sure the minimums are observed (see Appendix C, tables C.1 and C.2).
+     * For DSA this is handled in pqg_ParamGen() through the use of
+     * prime_testcount_p() and prime_testcount_q() respectively.
+     * For RSA this unfortunately seems to be the right place to prevent larger
+     * code changes. On the other hand, it seems to generally speed things up,
+     * since there are measurably less errors while calculating inverse modulo in
+     * rsa_build_from_primes().
+     *
+     * NB. Add these tests in when not in FIPS mode, as they do not
+     * hurt the non-FIPS case.
+     */
+    if (nBits >= 1536)
+        i = 4;
+    else
+        i = 5;
+    if (i > num_tests)
+        num_tests = i;
+    i = 0;
+
     if (strong)
         --nBits;
     MP_CHECKOK(mpl_set_bit(start, nBits - 1, 1));
