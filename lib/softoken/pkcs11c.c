@@ -5009,6 +5009,18 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
         if (keyType != CKK_RSA) {
             return CKR_DEVICE_ERROR;
         }
+        if (sftk_isFIPS(slot->slotID)) {
+            SECStatus sret;
+	    /* Check public key for SP800-56B compliance. */
+            NSSLOWKEYPublicKey *pubKey = sftk_GetPubKey(publicKey, CKK_RSA, &crv);
+            if (pubKey == NULL) {
+                return CKR_KEY_HANDLE_INVALID;
+            }
+            sret = RSA_FIPS_CheckPublicKey(&pubKey->u.rsa);
+	    if (sret != SECSuccess) {
+                return CKR_GENERAL_ERROR;
+	    }
+	}
         bytes_encrypted = modulusLen;
         mech.mechanism = CKM_RSA_PKCS_OAEP;
         CK_RSA_PKCS_OAEP_PARAMS oaepParams;

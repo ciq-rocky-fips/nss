@@ -2882,3 +2882,11 @@ ED_DerivePublicKey(const SECItem *privateKey, SECItem *publicKey)
         return SECFailure;
     return (vector->p_ED_DerivePublicKey)(privateKey, publicKey);
 }
+
+SECStatus
+RSA_FIPS_CheckPublicKey(RSAPublicKey *publicKey)
+{
+    if (!vector && PR_SUCCESS != freebl_RunLoaderOnce())
+        return SECFailure;
+    return (vector->p_RSA_FIPS_CheckPublicKey)(publicKey);
+}

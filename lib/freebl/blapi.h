@@ -1942,6 +1942,11 @@ extern SECStatus ED_VerifyMessage(ECPublicKey *key, const SECItem *signature,
  */
 extern SECStatus ED_DerivePublicKey(const SECItem *privateKey, SECItem *publicKey);
 
+/*
+ * FIPS check an RSA public key.
+ */
+extern SECStatus RSA_FIPS_CheckPublicKey(RSAPublicKey *pubKey);
+
 SEC_END_PROTOS
 
 #endif /* _BLAPI_H_ */
