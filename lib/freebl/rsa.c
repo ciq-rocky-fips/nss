@@ -1783,7 +1783,7 @@ cleanup:
 
 SECStatus RSA_FIPS_CheckPublicKey(RSAPublicKey *publicKey)
 {
-    unsigned int modLen, expLen;
+    unsigned int modLen, expLen, modLenBits, expLenBits;
     mp_int mp_modulus, mp_exponent;
     mp_digit np;
     mp_err err = MP_OKAY;
@@ -1802,7 +1802,16 @@ SECStatus RSA_FIPS_CheckPublicKey(RSAPublicKey *publicKey)
     expLen = rsa_modulusLen(&publicKey->publicExponent);
 
     /* Check if the modulus is an approved size. */
-    switch (modLen) {
+    modLenBits = modLen * 8;
+    /* Check that modlenBits is not less than modLen to
+     * prevent integer overflow in the multiplication above.
+     */
+    if (modLenBits < modLen) {
+	PORT_SetError(SEC_ERROR_INVALID_ARGS);
+	rv = SECFailure;
+	goto cleanup;
+    }
+    switch (modLenBits) {
         case 2048:
         case 3072:
         case 4096:
@@ -1851,10 +1860,19 @@ SECStatus RSA_FIPS_CheckPublicKey(RSAPublicKey *publicKey)
         goto cleanup;
     }
 
+    expLenBits = expLen * 8;
+    /* Check that explenBits is not less than expLen to
+     * prevent integer overflow in the multiplication above.
+     */
+    if (expLenBits < expLen) {
+	PORT_SetError(SEC_ERROR_INVALID_ARGS);
+	rv = SECFailure;
+	goto cleanup;
+    }
     /* Check exponent length is in the range [17, 256]. */
     /* NB. This check is redundent due to the BAD_RSA_KEY_SIZE check
      * above but it is kept for compatibility with OpenSSL. */
-    if (expLen < 17 || expLen > 256) {
+    if (expLenBits < 17 || expLenBits > 256) {
         PORT_SetError(SEC_ERROR_INVALID_KEY);
         rv = SECFailure;
         goto cleanup;
