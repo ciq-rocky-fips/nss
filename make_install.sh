@@ -4,6 +4,10 @@
 # Build NSPR
 #
 
+## Uncomment to disable optimizations
+#RPM_OPT_FLAGS=`echo $RPM_OPT_FLAGS | sed -e 's/-O2/-g/g'`
+export RPM_OPT_FLAGS="-g"
+
 export nspr_version="4.35.0"
 mkdir -p ../build
 BUILD_DIR=$PWD
@@ -16,7 +20,7 @@ $BUILD_DIR/nspr/configure \
                  --with-dist-prefix=$PWD/../dist \
                  --enable-64bit \
                  --enable-optimize="$RPM_OPT_FLAGS" \
-                 --disable-debug
+                 --enable-debug
 
 # The assembly files are only for legacy atomics, to which we prefer GCC atomics
 #%ifarch i686 x86_64
@@ -60,15 +64,12 @@ export NSS_FIPS_MODULE_ID="${FIPS_MODULE_OS}\ ${NSS_FIPS_VERSION}"
 export NSS_FIPS_140_3=1
 export NSS_ENABLE_FIPS_INDICATORS=1
 #
-## Enable compiler optimizations and disable debugging code
-export BUILD_OPT=1
+## Disable compiler optimizations and enable debugging code
+export BUILD_OPT=0
 #
-## Uncomment to disable optimizations
-##RPM_OPT_FLAGS=`echo $RPM_OPT_FLAGS | sed -e 's/-O2/-O0/g'`
-##export RPM_OPT_FLAGS
 #
 ## Generate symbolic info for debuggers
-#export XCFLAGS=$RPM_OPT_FLAGS
+export XCFLAGS=$RPM_OPT_FLAGS
 #
 ## Work around false-positive warnings with gcc 10:
 ## https://bugzilla.redhat.com/show_bug.cgi?id=1803029
@@ -110,6 +111,12 @@ export POLICY_FILE="nss.config"
 ## location of the policy file
 export POLICY_PATH="/etc/crypto-policies/back-ends"
 #
+
+export MOZ_OPTIMIZE=0
+export MOZ_DEBUG_SYMBOLS=1
+export BUILD_OPT=0
+export OPTIMIZER=0
+export CFLAGS=-g
 
 make clean
 #%{__make} -C ./nss all
