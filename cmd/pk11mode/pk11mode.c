@@ -82,7 +82,7 @@ typedef struct CK_C_INITIALIZE_ARGS_NSS {
 
 #include "pkcs11u.h"
 
-#define MAX_SIG_SZ 128
+#define MAX_SIG_SZ 256
 #define MAX_CIPHER_SZ 128
 #define MAX_DATA_SZ 64
 #define MAX_DIGEST_SZ 64
@@ -811,7 +811,7 @@ PKM_KeyTests(CK_FUNCTION_LIST_PTR pFunctionList,
     CK_KEY_TYPE rsatype = CKK_RSA;
     CK_MECHANISM rsaKeyPairGenMech;
     CK_BYTE subject[] = { "RSA Private Key" };
-    CK_ULONG modulusBits = 1024;
+    CK_ULONG modulusBits = 2048;
     CK_BYTE publicExponent[] = { 0x01, 0x00, 0x01 };
     CK_BYTE id[] = { "RSA123" };
     CK_ATTRIBUTE rsaPubKeyTemplate[9];
@@ -4454,7 +4454,7 @@ PKM_wrapUnwrap(CK_FUNCTION_LIST_PTR pFunctionList,
 {
     CK_RV crv = CKR_OK;
     CK_OBJECT_HANDLE hSecretKeyUnwrapped = CK_INVALID_HANDLE;
-    CK_BYTE wrappedKey[128];
+    CK_BYTE wrappedKey[256];
     CK_ULONG ulWrappedKeyLen = 0;
 
     NUMTESTS++; /* increment NUMTESTS */
