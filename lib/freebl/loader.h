@@ -10,7 +10,7 @@
 
 #include "blapi.h"
 
-#define FREEBL_VERSION 0x0331
+#define FREEBL_VERSION 0x0332
 
 struct FREEBLVectorStr {
 
@@ -940,6 +940,9 @@ struct FREEBLVectorStr {
     SECStatus (*p_MLDSA_VerifyFinal)(MLDSAContext *ctx, const SECItem *signature);
     /* Version 3.031 came to here */
 
+    SECStatus (*p_RSA_FIPS_CheckPublicKey)(RSAPublicKey *publicKey);
+
+    /* Version 3.032 came to here */
     /* Add new function pointers at the end of this struct and bump
      * FREEBL_VERSION at the beginning of this file. */
 };

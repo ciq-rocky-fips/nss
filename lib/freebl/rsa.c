@@ -1776,6 +1776,144 @@ cleanup:
     return rv;
 }
 
+/*
+ * An implementation of ossl_rsa_sp800_56b_check_public(const RSA *rsa)
+ * from openSSL.
+ *
+ * SP800-56Br1 6.4.2.2 Partial Public Key Validation for RSA refers to
+ * SP800-89 5.3.3 (Explicit) Partial Public Key Validation for RSA
+ * caveat is that the modulus must be as specified in SP800-56Br1
+ */
+
+SECStatus RSA_FIPS_CheckPublicKey(RSAPublicKey *publicKey)
+{
+    unsigned int modLen, expLen, modLenBits, expLenBits;
+    mp_int mp_modulus, mp_exponent;
+    mp_digit np;
+    mp_err err = MP_OKAY;
+    SECStatus rv = SECFailure;
+
+    if (!publicKey) {
+        PORT_SetError(SEC_ERROR_INVALID_ARGS);
+        return SECFailure;
+    }
+    MP_DIGITS(&mp_modulus) = 0;
+    MP_DIGITS(&mp_exponent) = 0;
+    CHECK_MPI_OK(mp_init(&mp_modulus));
+    CHECK_MPI_OK(mp_init(&mp_exponent));
+
+    modLen = rsa_modulusLen(&publicKey->modulus);
+    expLen = rsa_modulusLen(&publicKey->publicExponent);
+
+    /* Check if the modulus is an approved size. */
+    modLenBits = modLen * 8;
+    /* Check that modlenBits is not less than modLen to
+     * prevent integer overflow in the multiplication above.
+     */
+    if (modLenBits < modLen) {
+	PORT_SetError(SEC_ERROR_INVALID_ARGS);
+	rv = SECFailure;
+	goto cleanup;
+    }
+    switch (modLenBits) {
+        case 2048:
+        case 3072:
+        case 4096:
+        case 6144:
+        case 8192:
+            break;
+        default:
+            PORT_SetError(SEC_ERROR_INVALID_ARGS);
+            rv = SECFailure;
+            goto cleanup;
+    }
+
+    /* Obtain public key (modulus, exponent) */
+    if (BAD_RSA_KEY_SIZE(modLen, expLen)) {
+        PORT_SetError(SEC_ERROR_INVALID_KEY);
+        rv = SECFailure;
+        goto cleanup;
+    }
+    SECITEM_TO_MPINT(publicKey->modulus, &mp_modulus);
+    SECITEM_TO_MPINT(publicKey->publicExponent, &mp_exponent);
+    if (mp_exponent.used > mp_modulus.used) {
+        /* exponent should not be greater than modulus */
+        PORT_SetError(SEC_ERROR_INVALID_KEY);
+        rv = SECFailure;
+        goto cleanup;
+    }
+
+    /* Check modulus value is odd. */
+    if (!mp_isodd(&mp_modulus)) {
+        PORT_SetError(SEC_ERROR_INVALID_KEY);
+        rv = SECFailure;
+        goto cleanup;
+    }
+
+    /* Check exponent value is odd. */
+    if (!mp_isodd(&mp_exponent)) {
+        PORT_SetError(SEC_ERROR_INVALID_KEY);
+        rv = SECFailure;
+        goto cleanup;
+    }
+
+    /* Check that the exponent is not smaller than 65537  */
+    if (mp_cmp_d(&mp_exponent, 0x10001) < 0) {
+        PORT_SetError(SEC_ERROR_INVALID_KEY);
+        rv = SECFailure;
+        goto cleanup;
+    }
+
+    expLenBits = expLen * 8;
+    /* Check that explenBits is not less than expLen to
+     * prevent integer overflow in the multiplication above.
+     */
+    if (expLenBits < expLen) {
+	PORT_SetError(SEC_ERROR_INVALID_ARGS);
+	rv = SECFailure;
+	goto cleanup;
+    }
+    /* Check exponent length is in the range [17, 256]. */
+    /* NB. This check is redundent due to the BAD_RSA_KEY_SIZE check
+     * above but it is kept for compatibility with OpenSSL. */
+    if (expLenBits < 17 || expLenBits > 256) {
+        PORT_SetError(SEC_ERROR_INVALID_KEY);
+        rv = SECFailure;
+        goto cleanup;
+    }
+
+    /* Test modulus for small prime divisors. */
+    np = prime_tab_size;
+    /*
+     * mpp_divis_primes returns MP_YES if the number is divisible by
+     * a small prime number, MP_NO if it is not. It must not be.
+     */
+    if (mpp_divis_primes(&mp_modulus, &np) != MP_NO) {
+        PORT_SetError(SEC_ERROR_INVALID_KEY);
+        rv = SECFailure;
+        goto cleanup;
+    }
+
+    /* modulus must be a composite number, not a prime */
+    if (mpp_pprime_secure(&mp_modulus, 5) != MP_NO) {
+        PORT_SetError(SEC_ERROR_INVALID_KEY);
+        rv = SECFailure;
+        goto cleanup;
+    }
+    rv = SECSuccess;
+
+  cleanup:
+
+    mp_clear(&mp_modulus);
+    mp_clear(&mp_exponent);
+    if (err) {
+        MP_TO_SEC_ERROR(err);
+        rv = SECFailure;
+    }
+
+    return rv;
+}
+
 SECStatus
 RSA_Init(void)
 {

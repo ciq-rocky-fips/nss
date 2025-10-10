@@ -459,6 +459,8 @@ static const struct FREEBLVectorStr vector = {
     MLDSA_VerifyFinal,
     /* End of version 3.031 */
 
+    RSA_FIPS_CheckPublicKey,
+    /* End of version 3.032 */
 };
 
 const FREEBLVector*
