@@ -115,9 +115,9 @@ endif
 
 ifdef BUILD_OPT
 ifeq (11,$(ALLOW_OPT_CODE_SIZE)$(OPT_CODE_SIZE))
-	OPTIMIZER = -Os
+	OPTIMIZER = -g
 else
-	OPTIMIZER = -O2
+	OPTIMIZER = -g
 endif
 ifdef MOZ_DEBUG_SYMBOLS
 	ifdef MOZ_DEBUG_FLAGS
