@@ -1969,6 +1969,11 @@ SECStatus MLDSA_VerifyFinal(MLDSAContext *ctx, const SECItem *signature);
  */
 SECStatus EC_DecompressPublicKey(const SECItem *publicCompressed, const ECParams *params, SECItem *publicUncompressed);
 
+/*
+ * FIPS check an RSA public key.
+ */
+extern SECStatus RSA_FIPS_CheckPublicKey(RSAPublicKey *pubKey);
+
 SEC_END_PROTOS
 
 #endif /* _BLAPI_H_ */
