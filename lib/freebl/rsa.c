@@ -17,6 +17,7 @@
 #include "prinit.h"
 #include "blapi.h"
 #include "mpi.h"
+#include "mpi-priv.h"
 #include "mpprime.h"
 #include "mplogic.h"
 #include "secmpi.h"
@@ -36,6 +37,16 @@
 #define BAD_RSA_KEY_SIZE(modLen, expLen)                           \
     ((expLen) > (modLen) || (modLen) > RSA_MAX_MODULUS_BITS / 8 || \
      (expLen) > RSA_MAX_EXPONENT_BITS / 8)
+
+static int in_fips_mode = 0;
+static PRCallOnceType rsa_KernelFips;
+
+static PRStatus
+rsa_getKernelFips()
+{
+    in_fips_mode = NSS_GetSystemFIPSEnabled();
+    return PR_SUCCESS;
+}
 
 struct blindingParamsStr;
 typedef struct blindingParamsStr blindingParams;
@@ -141,11 +152,24 @@ rsa_build_from_primes(const mp_int *p, const mp_int *q,
             err = mp_invmod(d, &phi, e);
         } else {
             err = mp_invmod(e, &phi, d);
-        }
+            /* FIPS 186-4 (B.3.1.3.a) places additional requirements on the
+             * private exponent d:
+             *   2^(n/2) < d < lcm(p-1, q-1) = phi
+             */
+            if (in_fips_mode && (MP_OKAY == err)) {
+                CHECK_MPI_OK( mp_2expt(&tmp, keySizeInBits / 2) );
+                if ((mp_cmp(d, &tmp) <= 0) || (mp_cmp(d, &phi) >= 0)) {
+                    /* new set of p, q is needed for another calculation of d */
+                    err = MP_UNDEF;
+                }
+            }
+       }
     } else {
         err = MP_OKAY;
     }
-    /*     Verify that phi(n) and e have no common divisors */
+    /*     Verify that phi(n) and e have no common divisors
+     *     This is also the coprimality constraint from FIPS 186-4 (B.3.1.2.a)
+     */
     if (err != MP_OKAY) {
         if (err == MP_UNDEF) {
             PORT_SetError(SEC_ERROR_NEED_RANDOM);
@@ -255,13 +279,19 @@ RSA_NewKey(int keySizeInBits, SECItem *publicExponent)
     mp_int q = { 0, 0, 0, NULL };
     mp_int e = { 0, 0, 0, NULL };
     mp_int d = { 0, 0, 0, NULL };
+    mp_int u = { 0, 0, 0, NULL };
+    mp_int v = { 0, 0, 0, NULL };
     int kiter;
     int max_attempts;
     mp_err err = MP_OKAY;
-    SECStatus rv = SECSuccess;
+    SECStatus rv = SECFailure;
     int prerr = 0;
     RSAPrivateKey *key = NULL;
     PLArenaPool *arena = NULL;
+
+    /* Initialize the FIPS mode if not already done. */
+    PR_CallOnce(&rsa_KernelFips, rsa_getKernelFips);
+
     /* Require key size to be a multiple of 16 bits. */
     if (!publicExponent || keySizeInBits % 16 != 0 ||
         BAD_RSA_KEY_SIZE((unsigned int)keySizeInBits / 8, publicExponent->len)) {
@@ -276,11 +306,40 @@ RSA_NewKey(int keySizeInBits, SECItem *publicExponent)
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         goto cleanup;
     }
+
+    MP_DIGITS(&p) = 0;
+    MP_DIGITS(&q) = 0;
+    MP_DIGITS(&d) = 0;
+    MP_DIGITS(&u) = 0;
+    MP_DIGITS(&v) = 0;
+    CHECK_MPI_OK(mp_init(&p));
+    CHECK_MPI_OK(mp_init(&q));
+    CHECK_MPI_OK(mp_init(&d));
+    CHECK_MPI_OK(mp_init(&u));
+    CHECK_MPI_OK(mp_init(&v));
+
 #ifndef NSS_FIPS_DISABLED
     /* Check that the exponent is not smaller than 65537  */
     if (mp_cmp_d(&e, 0x10001) < 0) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         goto cleanup;
+    }
+
+    if (in_fips_mode) {
+        /* FIPS 186-4 requires 2^16 < e < 2^256 (B.3.1.1.b) */
+        CHECK_MPI_OK( mp_2expt(&v, 256) );
+        if (!(mp_cmp(&e, &v) < 0 )) {
+            err = MP_BADARG;
+            goto cleanup;
+        }
+
+        /* FIPS 186-4 mandates keys to be either 2048, 3072 or 4096 bits long.
+         * We also allow a key length of 4096, since this is needed in order to
+         * pass the CAVS RSA SigGen test. */
+        if (keySizeInBits < 2048) {
+            PORT_SetError(SEC_ERROR_INVALID_ARGS);
+            goto cleanup;
+        }
     }
 #endif
 
@@ -298,12 +357,7 @@ RSA_NewKey(int keySizeInBits, SECItem *publicExponent)
     key->arena = arena;
     /* length of primes p and q (in bytes) */
     primeLen = keySizeInBits / (2 * PR_BITS_PER_BYTE);
-    MP_DIGITS(&p) = 0;
-    MP_DIGITS(&q) = 0;
-    MP_DIGITS(&d) = 0;
-    CHECK_MPI_OK(mp_init(&p));
-    CHECK_MPI_OK(mp_init(&q));
-    CHECK_MPI_OK(mp_init(&d));
+
     /* 3.  Set the version number (PKCS1 v1.5 says it should be zero) */
     SECITEM_AllocItem(arena, &key->version, 1);
     key->version.data[0] = 0;
@@ -314,13 +368,64 @@ RSA_NewKey(int keySizeInBits, SECItem *publicExponent)
         PORT_SetError(0);
         CHECK_SEC_OK(generate_prime(&p, primeLen));
         CHECK_SEC_OK(generate_prime(&q, primeLen));
-        /* Assure p > q */
+        /* Assure p >= q */
         /* NOTE: PKCS #1 does not require p > q, and NSS doesn't use any
          * implementation optimization that requires p > q. We can remove
          * this code in the future.
          */
         if (mp_cmp(&p, &q) < 0)
             mp_exch(&p, &q);
+
+        /* FIPS 186-4 puts additional requirements on the primes (B.3.1.2.a-d)
+         * (n = key bit length):
+         * 1) both (p-1) and (q-1) are coprime to e (B.3.1.2.a), i.e.:
+         *    gcd(p-1,e) = 1, gcd(q-1,e) = 1
+         *    this is ensured in rsa_build_from_primes(), where
+         *    phi = lcm(p-1)(q-1) is tested for coprimality to e
+         * 2) magnitude constraint (B.3.1.2.b and B.3.1.2.c):
+         *    both p and q are from open the interval
+         *    I = ( sqrt(2) * 2^(n/2 - 1) ,  2^(n/2 - 1) )
+         * 3) minimum distance (B.3.1.2.d): abs(p-q) > 2 ^ (n/2 - 100)
+         */
+        if (in_fips_mode) {
+            /* 2 */
+            /* in order not to constrain the selection too much,
+             * expand the inequality:
+             *   x > 2^(1/2) * 2^(n/2 - 1)
+             *         = 2^(1/2 + k) * 2^(n/2 - k - 1)
+             *         =      y(k)   *     r(k)
+             * for z(k) >= y(k) it clearly holds:
+             *   x > z(k) * r(k)
+             * one suitable z(k) such that z(k)/y(k) - 1 = o(1) is
+             * ceil(y(k)) for big-enough k
+             * ceil(y(30))/y(30) - 1 < 10^-10, so lets use that
+             * 2^30.5 = 1518500249.98802484622388101120...
+             * the magic constant is thus z(30) = 1518500250 < 2^31
+             *
+             * Additionally, since p >= q is required above, the
+             * condtitions can be shortened to:
+             *   1518500250 * 2^(n/2 - 31) = v < q 
+             *                               p < u = 2^(n/2 - 1)
+             */
+            CHECK_MPI_OK( mp_2expt(&u, keySizeInBits / 2 - 31) );
+            CHECK_MPI_OK( mp_mul_d(&u, 1518500250, &v) );
+            CHECK_MPI_OK( mp_2expt(&u, keySizeInBits / 2) );
+            if ((mp_cmp(&q, &v) <= 0) || (mp_cmp(&p, &u) >= 0)) {
+                prerr = SEC_ERROR_NEED_RANDOM; /* retry with different values */
+                kiter++;
+                continue;
+            }
+            /* 3 */
+            CHECK_MPI_OK( mp_sub(&p, &q, &u) );
+            CHECK_MPI_OK( mp_abs(&u, &u) );
+            CHECK_MPI_OK( mp_2expt(&v, keySizeInBits / 2 - 100) );
+            if (mp_cmp(&u, &v) < 0) {
+                prerr = SEC_ERROR_NEED_RANDOM; /* retry with different values */
+                kiter++;
+                continue;
+            }
+        }
+
         /* Attempt to use these primes to generate a key */
         rv = rsa_build_from_primes(&p, &q,
                                    &e, PR_FALSE, /* needPublicExponent=false */
@@ -343,7 +448,9 @@ cleanup:
     mp_clear(&q);
     mp_clear(&e);
     mp_clear(&d);
-    if (err) {
+    mp_clear(&u);
+    mp_clear(&v);
+    if (err != MP_OKAY) {
         MP_TO_SEC_ERROR(err);
         rv = SECFailure;
     }
