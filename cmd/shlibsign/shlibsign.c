@@ -64,6 +64,53 @@ static PRBool verbose = PR_FALSE;
 static PRBool verify = PR_FALSE;
 static PRBool compat = PR_FALSE;
 
+/* SHLIBSign needs to be independent of the rest of the NSS libraries, so hand include 
+ * this function */
+
+SECItem *
+SECU_HexString2SECItem(PLArenaPool *arena, SECItem *item, const char *str)
+{
+    int i = 0;
+    int byteval = 0;
+    int tmp = PORT_Strlen(str);
+
+    PORT_Assert(item);
+
+    if ((tmp % 2) != 0) {
+        PR_SetError(SEC_ERROR_INVALID_ARGS,0);
+        return NULL;
+    }
+
+    item->len= tmp/2;
+    item->data = malloc(item->len);
+    if (item->data == NULL) {
+        return NULL;
+    }
+
+    while (str[i]) {
+        if ((str[i] >= '0') && (str[i] <= '9')) {
+            tmp = str[i] - '0';
+        } else if ((str[i] >= 'a') && (str[i] <= 'f')) {
+            tmp = str[i] - 'a' + 10;
+        } else if ((str[i] >= 'A') && (str[i] <= 'F')) {
+            tmp = str[i] - 'A' + 10;
+        } else {
+            free(item->data);
+            item->data = NULL;
+            return NULL;
+        }
+
+        byteval = byteval * 16 + tmp;
+        if ((i % 2) != 0) {
+            item->data[i / 2] = byteval;
+            byteval = 0;
+        }
+        i++;
+    }
+
+    return item;
+}
+
 typedef struct HashTableStruct {
     char *name;
     CK_MECHANISM_TYPE hash;

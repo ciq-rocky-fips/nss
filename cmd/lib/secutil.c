@@ -3859,6 +3859,84 @@ SECU_StoreCRL(PK11SlotInfo *slot, SECItem *derCrl, PRFileDesc *outFile,
     return SECSuccess;
 }
 
+/* look up the an oid by string */
+SECOidTag
+SECU_FindTagFromString(char *cipherString)
+{
+    SECOidTag tag;
+    SECOidData *oid;
+
+    /* future enhancement: accept dotted oid spec? */
+
+    for (tag = 1; (oid = SECOID_FindOIDByTag(tag)) != NULL; tag++) {
+        /* only interested in oids that we actually understand */
+        if (oid->mechanism == CKM_INVALID_MECHANISM) {
+            continue;
+        }
+        if (PORT_Strcasecmp(oid->desc, cipherString) != 0) {
+            continue;
+        }
+        return tag;
+    }
+    return SEC_OID_UNKNOWN;
+}
+
+
+/* sigh, we need toexport SECKEY_GetParameterSet(), for now
+  * just do it inline */
+/* this is temp code until we fix it correctly upstream. Don't
+  * push this upstream */
+SECOidTag
+SECU_GetSignatureAlgorithmFromPrivateKey(SECKEYPrivateKey *privKey, SECOidTag hashAlg)
+{
+    SECItem item;
+    CK_ULONG paramSet;
+    SECStatus rv;
+
+    /* don't modify hashAlg if we aren't a DSA key */
+    if (privKey->keyType != mldsaKey) {
+        return SEC_GetSignatureAlgorithmOidTag(privKey->keyType, hashAlg);
+    }
+
+    rv = PK11_ReadRawAttribute(PK11_TypePrivKey, privKey,
+                                CKA_PARAMETER_SET, &item);
+
+    if (rv != SECSuccess) {
+        return SEC_OID_UNKNOWN;
+    }
+    if (item.len != sizeof (paramSet)) {
+        PORT_Free(item.data);
+        PORT_SetError(SEC_ERROR_INVALID_KEY);
+        return SEC_OID_UNKNOWN;
+    }
+    paramSet = *(CK_ULONG *)item.data;
+    PORT_Free(item.data);
+    switch  (paramSet) {
+        case CKP_ML_DSA_44:
+            return SECU_FindTagFromString("ML-DSA-44");
+            break;
+        case CKP_ML_DSA_65:
+            return SECU_FindTagFromString("ML-DSA-65");
+            break;
+        case CKP_ML_DSA_87:
+            return SECU_FindTagFromString("ML-DSA-87");
+            break;
+        default:
+            PORT_SetError(SEC_ERROR_INVALID_KEY);
+            break;
+    }
+    return SEC_OID_UNKNOWN;
+}
+
+SECOidTag
+SECU_GetSignatureAlgorithmFromPublicKey(SECKEYPublicKey *pubKey, SECOidTag hashAlg)
+{
+    if (pubKey->keyType == mldsaKey) {
+        return pubKey->u.mldsa.params;
+    }
+    return SEC_GetSignatureAlgorithmOidTag(pubKey->keyType, hashAlg);
+}
+
 SECStatus
 SECU_SignAndEncodeCRL(CERTCertificate *issuer, CERTSignedCrl *signCrl,
                       SECOidTag hashAlgTag, SignAndEncodeFuncExitStat *resCode)
@@ -3884,7 +3962,7 @@ SECU_SignAndEncodeCRL(CERTCertificate *issuer, CERTSignedCrl *signCrl,
         return SECFailure;
     }
 
-    algID = SEC_GetSignatureAlgorithmOidTag(caPrivateKey->keyType, hashAlgTag);
+    algID = SECU_GetSignatureAlgorithmFromPrivateKey(caPrivateKey, hashAlgTag);
     if (algID == SEC_OID_UNKNOWN) {
         *resCode = noSignatureMatch;
         rv = SECFailure;
@@ -4384,6 +4462,9 @@ schemeNameToScheme(const char *name)
     compareScheme(dsa_sha256);
     compareScheme(dsa_sha384);
     compareScheme(dsa_sha512);
+    compareScheme(mldsa44);
+    compareScheme(mldsa65);
+    compareScheme(mldsa87);
 
 #undef compareScheme
 

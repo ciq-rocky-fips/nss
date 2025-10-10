@@ -438,7 +438,7 @@ sign_cert(CERTCertificate *cert, SECKEYPrivateKey *privk)
 
     SECOidTag alg = SEC_OID_UNKNOWN;
 
-    alg = SEC_GetSignatureAlgorithmOidTag(privk->keyType, SEC_OID_UNKNOWN);
+    alg = SECU_GetSignatureAlgorithmFromPrivateKey(privk, SEC_OID_UNKNOWN);
     if (alg == SEC_OID_UNKNOWN) {
         FatalError("Unknown key type");
     }

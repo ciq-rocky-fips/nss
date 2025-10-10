@@ -769,18 +769,14 @@ sec_CreateRSAPSSParameters(PLArenaPool *arena,
                            SECItem *result,
                            SECOidTag hashAlgTag,
                            const SECItem *params,
-                           const SECKEYPrivateKey *key)
+                           int modBytes)
 {
     SECKEYRSAPSSParams pssParams;
-    int modBytes, hashLength;
+    int hashLength;
     unsigned long saltLength;
     PRBool defaultSHA1 = PR_FALSE;
     SECStatus rv;
 
-    if (key->keyType != rsaKey && key->keyType != rsaPssKey) {
-        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
-        return NULL;
-    }
 
     PORT_Memset(&pssParams, 0, sizeof(pssParams));
 
@@ -813,11 +809,18 @@ sec_CreateRSAPSSParameters(PLArenaPool *arena,
         }
     }
 
-    modBytes = PK11_GetPrivateModulusLen((SECKEYPrivateKey *)key);
 
     /* Determine the hash algorithm to use, based on hashAlgTag and
-     * pssParams.hashAlg; there are four cases */
-    if (hashAlgTag != SEC_OID_UNKNOWN) {
+     * pssParams.hashAlg; there are 6  cases.
+     *  case:
+     *  1) we did not specify any parameters but we did specifi
+     *  a hashAlgTag. Use the specified hash algtag. This is the fall
+     *  through case (none of the if's trigger).
+     *  2) We have params and we have a  specified hashAlgTag from
+     *  the app and the hash alg is in the parameters, make sure that the
+     *  hashAlgTag specified by the appication  matches.
+     *  3) Same as 2 except the algorithm is not specified by the */
+    if (params && (hashAlgTag != SEC_OID_UNKNOWN)) {
         SECOidTag tag = SEC_OID_UNKNOWN;
 
         if (pssParams.hashAlg) {
@@ -902,6 +905,8 @@ sec_CreateRSAPSSParameters(PLArenaPool *arena,
         /* The specified salt length is too long */
         if (saltLength > (unsigned long)(modBytes - hashLength - 2)) {
             PORT_SetError(SEC_ERROR_INVALID_ARGS);
+
+
             return NULL;
         }
     } else if (defaultSHA1) {
@@ -988,10 +993,45 @@ SEC_CreateSignatureAlgorithmParameters(PLArenaPool *arena,
                                        const SECItem *params,
                                        const SECKEYPrivateKey *key)
 {
+    int modBytes;
     switch (signAlgTag) {
         case SEC_OID_PKCS1_RSA_PSS_SIGNATURE:
+            if (key->keyType != rsaKey && key->keyType != rsaPssKey) {
+                PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+                return NULL;
+            }
+            modBytes = PK11_GetPrivateModulusLen((SECKEYPrivateKey *)key);
             return sec_CreateRSAPSSParameters(arena, result,
-                                              hashAlgTag, params, key);
+                                              hashAlgTag, params, modBytes);
+        default:
+            if (params == NULL)
+                return NULL;
+            if (result == NULL)
+                result = SECITEM_AllocItem(arena, NULL, 0);
+            if (SECITEM_CopyItem(arena, result, params) != SECSuccess)
+                return NULL;
+            return result;
+    }
+}
+
+SECItem *
+SEC_CreateVerifySignatureAlgorithmParameters(PLArenaPool *arena,
+                                             SECItem *result,
+                                             SECOidTag signAlgTag,
+                                             SECOidTag hashAlgTag,
+                                             const SECItem *params,
+                                             const SECKEYPublicKey *key)
+{
+    int modBytes;
+    switch (signAlgTag) {
+        case SEC_OID_PKCS1_RSA_PSS_SIGNATURE:
+            if (key->keyType != rsaKey && key->keyType != rsaPssKey) {
+                PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+                return NULL;
+            }
+            modBytes = key->u.rsa.modulus.len;
+            return sec_CreateRSAPSSParameters(arena, result,
+                                              hashAlgTag, params, modBytes);
         default:
             if (params == NULL)
                 return NULL;

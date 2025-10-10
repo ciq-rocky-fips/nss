@@ -161,14 +161,15 @@ static void
 PrintUsageHeader(const char *progName)
 {
     fprintf(stderr,
-            "Usage: %s -n rsa_nickname -p port [-BDENRZbjlmrsuvx] [-w password]\n"
+            "Usage: %s -n cert_nickname -p port [-BDENRZbjlmrsuvx] [-w password]\n"
             "         [-t threads] [-i pid_file] [-c ciphers] [-Y] [-d dbdir] [-g numblocks]\n"
             "         [-f password_file] [-L [seconds]] [-M maxProcs] [-P dbprefix]\n"
             "         [-V [min-version]:[max-version]] [-a sni_name]\n"
             "         [ T <good|revoked|unknown|badsig|corrupted|none|ocsp>] [-A ca]\n"
-            "         [-C SSLCacheEntries] [-S dsa_nickname] [-Q]\n"
-            "         [-I groups] [-J signatureschemes] [-e ec_nickname]\n"
+            "         [-C SSLCacheEntries] [-S cert_nickname ] [-Q]\n"
+            "         [-I groups] [-J signatureschemes] [-e cer_nickname]\n"
             "         -U [0|1] -H [0|1|2] -W [0|1] [-z externalPsk] -q\n"
+            "  -n is for the primary cert, -e are for additional certs -S is deprecated\n"
             "\n",
             progName);
 }
@@ -239,6 +240,7 @@ PrintParameterUsage()
         "     ecdsa_secp521r1_sha512,\n"
         "     rsa_pss_rsae_sha256, rsa_pss_rsae_sha384, rsa_pss_rsae_sha512,\n"
         "     rsa_pss_pss_sha256, rsa_pss_pss_sha384, rsa_pss_pss_sha512,\n"
+        "     mldsa44, mldsa65, mldsa87\n"
         "-Z enable 0-RTT (for TLS 1.3; also use -u)\n"
         "-E enable post-handshake authentication\n"
         "   (for TLS 1.3; only has an effect with 3 or more -r options)\n"
@@ -2928,7 +2930,7 @@ main(int argc, char **argv)
     }
 
     if (certNicknameIndex == 0) {
-        fprintf(stderr, "Must specify at least one certificate nickname using '-n' (RSA), '-S' (DSA), or 'e' (EC).\n");
+        fprintf(stderr, "Must specify at least one certificate nickname using '-n' or '-e' or '-S' (deprecated) \n");
         fprintf(stderr, "Run '%s -h' for usage information.\n", progName);
         exit(6);
     }

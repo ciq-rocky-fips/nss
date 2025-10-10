@@ -130,7 +130,7 @@ lc_hash_update(struct lc_hash_ctx *ptr, const unsigned char *input, size_t inLen
                 memset(ptr->buf_space, 0, sizeof(ptr->buf_space));
             }
         } else {
-            newBuf = reallocarray(ptr->buf, 1, len);
+            newBuf = realloc(ptr->buf, len);
         }
         if (!newBuf) {
             return;

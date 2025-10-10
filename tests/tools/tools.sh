@@ -139,6 +139,17 @@ tools_init()
   cp ${QADIR}/tools/openssl-ml-dsa-87.p12 ${TOOLSDIR}/data
 
   cd ${TOOLSDIR}
+
+  unset TOOLS_ENABLE_ML_DSA
+  # if we are running upgrade_db, then the ML-DSA certs won't be in the database
+  # because  the databases were upgraded form dbm databases that can't store ML-DSA
+  # certificates, so don't try to export those non-existant certs form the database
+  if [ "${TEST_MODE}" != "UPGRADE_DB" ] && using_sql; then
+      TOOLS_ENABLE_ML_DSA=${NSS_ENABLE_ML_DSA}
+  fi
+  echo "TOOLS_ENABLE_ML_DSA=${TOOLS_ENABLE_ML_DSA}"
+  echo "NSS_ENABLE_ML_DSA=${NSS_ENABLE_ML_DSA}"
+
 }
 
 ########################## list_p12_file ###############################
@@ -491,29 +502,31 @@ tools_p12_export_list_import_with_default_ciphers()
   html_msg $ret 0 "Listing Alice's pk12 EC file with long pw (pk12util -l)"
   check_tmpfile
 
-  echo "$SCRIPTNAME: Exporting Alice's ML-DSA cert & key---------------"
-  echo "pk12util -o Alice-mldsa.p12 -n \"Alice-ml-dsa-44\" -d ${P_R_ALICEDIR} -k ${R_PWFILE} \\"
-  echo "         -w ${R_PWFILE}"
-  ${BINDIR}/pk12util -o Alice-mldsa.p12 -n "Alice-ml-dsa-44" -d ${P_R_ALICEDIR} -k ${R_PWFILE} \
-       -w ${R_PWFILE} 2>&1
-  ret=$?
-  html_msg $ret 0 "Exporting Alice's ML-DSA cert & key (pk12util -o)"
-  check_tmpfile
-  verify_p12 Alice-mldsa.p12 "default" "default" "default"
+  if [ -n "${TOOLS_ENABLE_ML_DSA}" ]; then
+      echo "$SCRIPTNAME: Exporting Alice's ML-DSA cert & key---------------"
+      echo "pk12util -o Alice-mldsa.p12 -n \"Alice-ml-dsa-44\" -d ${P_R_ALICEDIR} -k ${R_PWFILE} \\"
+      echo "         -w ${R_PWFILE}"
+      ${BINDIR}/pk12util -o Alice-mldsa.p12 -n "Alice-ml-dsa-44" -d ${P_R_ALICEDIR} -k ${R_PWFILE} \
+           -w ${R_PWFILE} 2>&1
+      ret=$?
+      html_msg $ret 0 "Exporting Alice's ML-DSA cert & key (pk12util -o)"
+      check_tmpfile
+      verify_p12 Alice-mldsa.p12 "default" "default" "default"
 
- echo "$SCRIPTNAME: Importing Alice's ML-DSA cert & key --------------"
-  echo "pk12util -i Alice-mldsa.p12 -d ${P_R_COPYDIR} -k ${R_PWFILE} -w ${R_PWFILE}"
-  ${BINDIR}/pk12util -i Alice-mldsa.p12 -d ${P_R_COPYDIR} -k ${R_PWFILE} -w ${R_PWFILE} 2>&1
-  ret=$?
-  html_msg $ret 0 "Importing Alice's ML-DSA cert & key (pk12util -i)"
-  check_tmpfile
+     echo "$SCRIPTNAME: Importing Alice's ML-DSA cert & key --------------"
+      echo "pk12util -i Alice-mldsa.p12 -d ${P_R_COPYDIR} -k ${R_PWFILE} -w ${R_PWFILE}"
+      ${BINDIR}/pk12util -i Alice-mldsa.p12 -d ${P_R_COPYDIR} -k ${R_PWFILE} -w ${R_PWFILE} 2>&1
+      ret=$?
+      html_msg $ret 0 "Importing Alice's ML-DSA cert & key (pk12util -i)"
+      check_tmpfile
 
-  echo "$SCRIPTNAME: Listing Alice's pk12 ML-DSA file -----------------"
-  echo "pk12util -l Alice-mldsa.p12 -w ${R_PWFILE}"
-  ${BINDIR}/pk12util -l Alice-mldsa.p12 -w ${R_PWFILE} 2>&1
-  ret=$?
-  html_msg $ret 0 "Listing Alice's pk12 ML-DSA file (pk12util -l)"
-  check_tmpfile
+      echo "$SCRIPTNAME: Listing Alice's pk12 ML-DSA file -----------------"
+      echo "pk12util -l Alice-mldsa.p12 -w ${R_PWFILE}"
+      ${BINDIR}/pk12util -l Alice-mldsa.p12 -w ${R_PWFILE} 2>&1
+      ret=$?
+      html_msg $ret 0 "Listing Alice's pk12 ML-DSA file (pk12util -l)"
+      check_tmpfile
+  fi
 }
 
 tools_p12_import_old_files()
@@ -655,7 +668,13 @@ if [-z "${NSS_PK12_SHORT_TESTS}" -a  -n "${iteration_count}" -a  ${iteration_cou
   tools_p12_import_pbmac1_samples
   if using_sql; then
     tools_p12_import_rsa_pss_private_key
-    tools_p12_ml_dsa_import
+    # use the NSS_ENABLE_ML_DSA in this case because
+    # we are importing certs from elsewhere, so they
+    # should be fine as long as the underlying database
+    # isn't dbm
+    if [ -n "${NSS_ENABLE_ML_DSA}" ]; then
+       tools_p12_ml_dsa_import
+    fi
  # tools_p12_policy
   fi
 }

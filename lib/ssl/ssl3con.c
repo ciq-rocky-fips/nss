@@ -36,6 +36,7 @@
 #include "pk11func.h"
 #include "secmod.h"
 #include "blapi.h"
+#include "secmodti.h" /* for ML_DSA_OIDS, not needed upstream */
 
 #include <limits.h>
 #include <stdio.h>
@@ -71,6 +72,7 @@ PRBool ssl_IsRsaPssSignatureScheme(SSLSignatureScheme scheme);
 PRBool ssl_IsRsaeSignatureScheme(SSLSignatureScheme scheme);
 PRBool ssl_IsRsaPkcs1SignatureScheme(SSLSignatureScheme scheme);
 PRBool ssl_IsDsaSignatureScheme(SSLSignatureScheme scheme);
+PRBool ssl_IsMlDsaSignatureScheme(SSLSignatureScheme scheme);
 static SECStatus ssl3_UpdateDefaultHandshakeHashes(sslSocket *ss,
                                                    const unsigned char *b,
                                                    unsigned int l);
@@ -205,7 +207,10 @@ static const SSLSignatureScheme defaultSignatureSchemes[] = {
     ssl_sig_dsa_sha256,
     ssl_sig_dsa_sha384,
     ssl_sig_dsa_sha512,
-    ssl_sig_dsa_sha1
+    ssl_sig_dsa_sha1,
+    ssl_sig_mldsa44,
+    ssl_sig_mldsa65,
+    ssl_sig_mldsa87,
 };
 PR_STATIC_ASSERT(PR_ARRAY_SIZE(defaultSignatureSchemes) <=
                  MAX_SIGNATURE_SCHEMES);
@@ -363,7 +368,10 @@ static const CK_MECHANISM_TYPE auth_alg_defs[] = {
     CKM_RSA_PKCS,          /* ssl_auth_rsa_sign */
     CKM_RSA_PKCS_PSS,      /* ssl_auth_rsa_pss */
     CKM_NSS_HKDF_SHA256,   /* ssl_auth_psk (just check for HKDF) */
-    CKM_INVALID_MECHANISM  /* ssl_auth_tls13_any */
+    CKM_INVALID_MECHANISM, /* ssl_auth_tls13_any */
+    CKM_ML_DSA,            /* ssl_auth_mldsa (same mech for each) */
+    CKM_ML_DSA,            /* ssl_auth_mldsa (key determines the*/
+    CKM_ML_DSA,            /* ssl_auth_mldsa  parameter set) */
 };
 PR_STATIC_ASSERT(PR_ARRAY_SIZE(auth_alg_defs) == ssl_auth_size);
 
@@ -763,6 +771,13 @@ ssl_HasCert(const sslSocket *ss, PRUint16 maxVersion, SSLAuthType authType)
     if (authType == ssl_auth_null || authType == ssl_auth_psk || authType == ssl_auth_tls13_any) {
         return PR_TRUE;
     }
+    /* mldsa is only supported in TLS 1.3 or greater */
+    if (maxVersion < SSL_LIBRARY_VERSION_TLS_1_3 &&
+        (authType == ssl_auth_mldsa44 ||
+         authType == ssl_auth_mldsa65 ||
+         authType == ssl_auth_mldsa87)) {
+        return PR_FALSE;
+    }
     for (cursor = PR_NEXT_LINK(&ss->serverCerts);
          cursor != &ss->serverCerts;
          cursor = PR_NEXT_LINK(cursor)) {
@@ -808,6 +823,11 @@ ssl_SchemePolicyOK(SSLSignatureScheme scheme, PRUint32 require)
     SECOidTag hashOID = ssl3_HashTypeToOID(ssl_SignatureSchemeToHashType(scheme));
     SECOidTag sigOID;
 
+#ifndef NSS_ENABLE_ML_DSA
+    if (ssl_IsMlDsaSignatureScheme(scheme)) {
+        return PR_FALSE;
+    }
+#endif
     /* policy bits needed to enable a SignatureScheme */
     SECStatus rv = NSS_GetAlgorithmPolicy(hashOID, &policy);
     if (rv == SECSuccess &&
@@ -835,7 +855,7 @@ ssl_SchemePolicyOK(SSLSignatureScheme scheme, PRUint32 require)
 /* Check that a signature scheme is accepted.
  * Both by policy and by having a token that supports it. */
 static PRBool
-ssl_SignatureSchemeAccepted(PRUint16 minVersion,
+ssl_SignatureSchemeAccepted(PRUint16 minVersion, PRUint16 maxVersion,
                             SSLSignatureScheme scheme,
                             PRBool forCert)
 {
@@ -855,6 +875,11 @@ ssl_SignatureSchemeAccepted(PRUint16 minVersion,
     } else if (ssl_IsDsaSignatureScheme(scheme)) {
         /* DSA: not in TLS 1.3, and check policy. */
         if (minVersion >= SSL_LIBRARY_VERSION_TLS_1_3) {
+            return PR_FALSE;
+        }
+    } else if (ssl_IsMlDsaSignatureScheme(scheme)) {
+        /* MLDSA: limit ml-dsa if we don't support TLS 1.3. */
+        if (maxVersion < SSL_LIBRARY_VERSION_TLS_1_3) {
             return PR_FALSE;
         }
     }
@@ -892,7 +917,7 @@ ssl_CheckSignatureSchemes(sslSocket *ss)
 
     /* Ensure that there is a signature scheme that can be accepted.*/
     for (unsigned int i = 0; i < ss->ssl3.signatureSchemeCount; ++i) {
-        if (ssl_SignatureSchemeAccepted(ss->vrange.min,
+        if (ssl_SignatureSchemeAccepted(ss->vrange.min, ss->vrange.max,
                                         ss->ssl3.signatureSchemes[i],
                                         PR_FALSE /* forCert */)) {
             return SECSuccess;
@@ -923,7 +948,8 @@ ssl_HasSignatureScheme(const sslSocket *ss, SSLAuthType authType)
         PRBool acceptable = authType == schemeAuthType ||
                             (schemeAuthType == ssl_auth_rsa_pss &&
                              authType == ssl_auth_rsa_sign);
-        if (acceptable && ssl_SignatureSchemeAccepted(ss->version, scheme, PR_FALSE /* forCert */)) {
+        if (acceptable && ssl_SignatureSchemeAccepted(ss->version,
+                          ss->version, scheme, PR_FALSE /* forCert */)) {
             return PR_TRUE;
         }
     }
@@ -1233,7 +1259,8 @@ ssl3_GetNewRandom(SSL3Random random)
     return rv;
 }
 
-SECStatus
+/* this only implements TLS 1.2 and earlier signatures */
+static SECStatus
 ssl3_SignHashesWithPrivKey(SSL3Hashes *hash, SECKEYPrivateKey *key,
                            SSLSignatureScheme scheme, PRBool isTls, SECItem *buf)
 {
@@ -1294,8 +1321,9 @@ ssl3_SignHashesWithPrivKey(SSL3Hashes *hash, SECKEYPrivateKey *key,
             PORT_SetError(SEC_ERROR_INVALID_KEY);
             goto done;
         }
-        /* since we are calling PK11_SignWithMechanism directly, we need to check the
-         * key policy ourselves (which is already checked in SGN_Digest */
+        /* since we are calling PK11_SignWithMechanism directly, we need to
+         * check the key policy ourselves (which is already checked in
+         * SGN_Digest */
         rv = NSS_OptionGet(NSS_KEY_SIZE_POLICY_FLAGS, &optval);
         if ((rv == SECSuccess) &&
             ((optval & NSS_KEY_SIZE_POLICY_SIGN_FLAG) == NSS_KEY_SIZE_POLICY_SIGN_FLAG)) {
@@ -1370,8 +1398,9 @@ ssl3_SignHashes(sslSocket *ss, SSL3Hashes *hash, SECKEYPrivateKey *key,
     return SECSuccess;
 }
 
-/* Called from ssl3_VerifySignedHashes and tls13_HandleCertificateVerify. */
-SECStatus
+/* Called from ssl3_VerifySignedHashes */
+/* this only implements TLS 1.2 and earlier signatures */
+static SECStatus
 ssl_VerifySignedHashesWithPubKey(sslSocket *ss, SECKEYPublicKey *key,
                                  SSLSignatureScheme scheme,
                                  SSL3Hashes *hash, SECItem *buf)
@@ -3412,6 +3441,7 @@ ssl3_GetHashMechanismByHashType(SSLHashType hashType)
             return CKM_SHA256;
         case ssl_hash_sha1:
             return CKM_SHA_1;
+        /* don't return a mechansim for ml_dsa hashes */
         default:
             PORT_Assert(0);
     }
@@ -4350,6 +4380,19 @@ ssl3_HashTypeToOID(SSLHashType hashType)
             return SEC_OID_SHA384;
         case ssl_hash_sha512:
             return SEC_OID_SHA512;
+        /* ml-dsa has it's own has algorithm,
+         * if we are using an external hash,
+         * we need to fail (at least until
+         * we get mu support). Fortunately
+         * mldsa is only supported in TLS 1.3
+         * and can do full hash and sign in
+         * the TLS 1.3 protocol */
+        case ssl_hash_mldsa44:
+            return SEC_OID_ML_DSA_44;
+        case ssl_hash_mldsa65:
+            return SEC_OID_ML_DSA_65;
+        case ssl_hash_mldsa87:
+            return SEC_OID_ML_DSA_87;
         default:
             break;
     }
@@ -4368,6 +4411,12 @@ ssl3_AuthTypeToOID(SSLAuthType authType)
             return SEC_OID_ANSIX962_EC_PUBLIC_KEY;
         case ssl_auth_dsa:
             return SEC_OID_ANSIX9_DSA_SIGNATURE;
+        case ssl_auth_mldsa44:
+            return SEC_OID_ML_DSA_44;
+        case ssl_auth_mldsa65:
+            return SEC_OID_ML_DSA_65;
+        case ssl_auth_mldsa87:
+            return SEC_OID_ML_DSA_87;
         default:
             break;
     }
@@ -4402,6 +4451,12 @@ ssl_SignatureSchemeToHashType(SSLSignatureScheme scheme)
         case ssl_sig_rsa_pss_pss_sha512:
         case ssl_sig_dsa_sha512:
             return ssl_hash_sha512;
+        case ssl_sig_mldsa44:
+            return ssl_hash_mldsa44;
+        case ssl_sig_mldsa65:
+            return ssl_hash_mldsa65;
+        case ssl_sig_mldsa87:
+            return ssl_hash_mldsa87;
         case ssl_sig_rsa_pkcs1_sha1md5:
             return ssl_hash_none; /* Special for TLS 1.0/1.1. */
         case ssl_sig_none:
@@ -4456,6 +4511,10 @@ ssl_SignatureSchemeValid(SSLSignatureScheme scheme, SECOidTag spkiOid,
         /* With TLS 1.3, EC keys should have been selected based on calling
          * ssl_SignatureSchemeFromSpki(), reject them otherwise. */
         return spkiOid != SEC_OID_ANSIX962_EC_PUBLIC_KEY;
+    } else {
+        if (ssl_IsMlDsaSignatureScheme(scheme)) {
+            return PR_FALSE;
+        }
     }
     return PR_TRUE;
 }
@@ -4543,6 +4602,28 @@ ssl_SignatureSchemeFromEcSpki(const CERTSubjectPublicKeyInfo *spki,
     return SECFailure;
 }
 
+
+/* some schmemes match 1 for 1 to oids, for those schemes, we
+ * can return the oid directly. If this function return ssl_sig_none,
+ * it means the oid doen't match a scheme or matches more than one
+ * scheme */
+SSLSignatureScheme
+ssl_SignatureSchemeFromPublicKeyOid(SECOidTag tag)
+{
+    switch (tag) {
+        case SEC_OID_ML_DSA_44:
+            return ssl_sig_mldsa44;
+        case SEC_OID_ML_DSA_65:
+            return ssl_sig_mldsa65;
+        case SEC_OID_ML_DSA_87:
+            return ssl_sig_mldsa87;
+        default:
+            break;
+    }
+    return ssl_sig_none;
+}
+
+
 /* Newer signature schemes are designed so that a single SPKI can be used with
  * that scheme.  This determines that scheme from the SPKI. If the SPKI doesn't
  * have a single scheme, |*scheme| is set to ssl_sig_none. */
@@ -4552,18 +4633,24 @@ ssl_SignatureSchemeFromSpki(const CERTSubjectPublicKeyInfo *spki,
 {
     SECOidTag spkiOid = SECOID_GetAlgorithmTag(&spki->algorithm);
 
-    if (spkiOid == SEC_OID_PKCS1_RSA_PSS_SIGNATURE) {
-        return ssl_SignatureSchemeFromPssSpki(spki, scheme);
-    }
-
-    /* Only do this lookup for TLS 1.3, where the scheme can be determined from
-     * the SPKI alone because the ECDSA key size determines the hash. Earlier
-     * TLS versions allow the same EC key to be used with different hashes. */
-    if (isTls13 && spkiOid == SEC_OID_ANSIX962_EC_PUBLIC_KEY) {
-        return ssl_SignatureSchemeFromEcSpki(spki, scheme);
-    }
-
+    /* default */
     *scheme = ssl_sig_none;
+    switch (spkiOid) {
+        case SEC_OID_PKCS1_RSA_PSS_SIGNATURE:
+            return ssl_SignatureSchemeFromPssSpki(spki, scheme);
+        case SEC_OID_ANSIX962_EC_PUBLIC_KEY:
+            /* Only do this lookup for TLS 1.3, where the scheme can be
+             * determined from the SPKI alone because the ECDSA key size
+             * determines the hash. Earlier TLS versions allow the same
+             * EC key to be used with different hashes. */
+            if (isTls13) {
+                return ssl_SignatureSchemeFromEcSpki(spki, scheme);
+            }
+            break;
+        default:
+            *scheme = ssl_SignatureSchemeFromPublicKeyOid(spkiOid);
+            break;
+    }
     return SECSuccess;
 }
 
@@ -4669,6 +4756,9 @@ ssl_IsSupportedSignatureScheme(SSLSignatureScheme scheme)
         case ssl_sig_ecdsa_secp256r1_sha256:
         case ssl_sig_ecdsa_secp384r1_sha384:
         case ssl_sig_ecdsa_secp521r1_sha512:
+        case ssl_sig_mldsa44:
+        case ssl_sig_mldsa65:
+        case ssl_sig_mldsa87:
         case ssl_sig_dsa_sha1:
         case ssl_sig_dsa_sha256:
         case ssl_sig_dsa_sha384:
@@ -4751,6 +4841,21 @@ ssl_IsDsaSignatureScheme(SSLSignatureScheme scheme)
     return PR_FALSE;
 }
 
+PRBool
+ssl_IsMlDsaSignatureScheme(SSLSignatureScheme scheme)
+{
+    switch (scheme) {
+        case ssl_sig_mldsa44:
+        case ssl_sig_mldsa65:
+        case ssl_sig_mldsa87:
+            return PR_TRUE;
+
+        default:
+            return PR_FALSE;
+    }
+    return PR_FALSE;
+}
+
 SSLAuthType
 ssl_SignatureSchemeToAuthType(SSLSignatureScheme scheme)
 {
@@ -4774,6 +4879,12 @@ ssl_SignatureSchemeToAuthType(SSLSignatureScheme scheme)
         case ssl_sig_ecdsa_secp521r1_sha512:
         case ssl_sig_ecdsa_sha1:
             return ssl_auth_ecdsa;
+        case ssl_sig_mldsa44:
+            return ssl_auth_mldsa44;
+        case ssl_sig_mldsa65:
+            return ssl_auth_mldsa65;
+        case ssl_sig_mldsa87:
+            return ssl_auth_mldsa87;
         case ssl_sig_dsa_sha1:
         case ssl_sig_dsa_sha256:
         case ssl_sig_dsa_sha384:
@@ -5857,6 +5968,53 @@ ssl_FindIndexByWrapMechanism(CK_MECHANISM_TYPE mech, unsigned int *wrapMechIndex
     return SECFailure;
 }
 
+/* mldsa server private key cannot be used directly in
+ * a key exchange. Instead we'll sign the fixed value
+ * use it in a PBE. This will work with any signature scheme
+ * with a deterministic signature */
+#define SSL_SIG_KEY "NSS Session Cashe Ks Init String"
+static PK11SymKey *
+ssl_getSigKs(SECKEYPrivateKey *svrPrivKey, CK_MECHANISM_TYPE mechanism,
+             CK_MECHANISM_TYPE masterWrapMech, void *pwArg)
+{
+     const char *sigKey = SSL_SIG_KEY;
+     SECItem msg = { siBuffer, (unsigned char *)sigKey, sizeof(sigKey) };
+     /* set to the the size of the largest signature supported. currently
+      * ml_dsa. If This value is to small, PK11_SignWithMechanism will
+      * safely fail below without generating the signature */
+     unsigned char sigBuf[MAX_ML_DSA_SIGNATURE_LEN];
+     SECItem sig = {siBuffer, sigBuf, sizeof(sigBuf)};
+     /* can't use the default because we need to generate
+      * deterministic signatures */
+     CK_SIGN_ADDITIONAL_CONTEXT sig_context =
+        { CKH_DETERMINISTIC_REQUIRED, NULL, 0 };
+     SECItem sig_params={siBuffer, (unsigned char *)&sig_context,
+                                 sizeof(sig_context)};
+     PK11SymKey *Ks = NULL;
+     SECStatus rv;
+
+     sig_context.hedgeVariant = CKH_DETERMINISTIC_REQUIRED;
+     sig_context.pContext = NULL;
+     sig_context.ulContextLen = 0;
+
+     rv = PK11_SignWithMechanism(svrPrivKey, mechanism, &sig_params,
+                                 &sig, &msg);
+     if (rv != SECSuccess) {
+         return NULL;
+     }
+
+     Ks = PK11_RawPBEKeyGen(svrPrivKey->pkcs11Slot, masterWrapMech, NULL,
+                            &sig, PR_FALSE, pwArg);
+     /* sigBuf became a CSP when we turned it into a password for the
+      * PBE */
+     PORT_SafeZero(sigBuf, sizeof(sigBuf));
+
+     if (Ks == NULL) {
+         return NULL;
+     }
+     return Ks;
+}
+
 /* Each process sharing the server session ID cache has its own array of SymKey
  * pointers for the symmetric wrapping keys that are used to wrap the master
  * secrets.  There is one key for each authentication type.  These Symkeys
@@ -5868,7 +6026,10 @@ const SSLAuthType ssl_wrap_key_auth_type[SSL_NUM_WRAP_KEYS] = {
     ssl_auth_rsa_pss,
     ssl_auth_ecdsa,
     ssl_auth_ecdh_rsa,
-    ssl_auth_ecdh_ecdsa
+    ssl_auth_ecdh_ecdsa,
+    ssl_auth_mldsa44,
+    ssl_auth_mldsa65,
+    ssl_auth_mldsa87
 };
 
 static SECStatus
@@ -5963,7 +6124,7 @@ ssl_UnwrapSymWrappingKey(
             /* Derive Ks using ECDH */
             Ks = PK11_PubDeriveWithKDF(svrPrivKey, &pubWrapKey, PR_FALSE, NULL,
                                        NULL, CKM_ECDH1_DERIVE, masterWrapMech,
-                                       CKA_DERIVE, 0, CKD_NULL, NULL, NULL);
+                                       CKA_DERIVE, 0, CKD_NULL, NULL, pwArg);
             if (Ks == NULL) {
                 goto loser;
             }
@@ -5975,7 +6136,24 @@ ssl_UnwrapSymWrappingKey(
             PK11_FreeSymKey(Ks);
 
             break;
-
+        case ssl_auth_mldsa44:
+        case ssl_auth_mldsa65:
+        case ssl_auth_mldsa87:
+            /* Signature only algorithms can use a trick of signing a
+             * constant with the private key and using that constant
+             * as the password for a PBE. This only works if the
+             * signature is deterministic */
+            Ks = ssl_getSigKs(svrPrivKey, CKM_ML_DSA, masterWrapMech, pwArg);
+            if (Ks == NULL) {
+                 goto loser;
+            }
+            /*  Use Ks to unwrap the wrapping key */
+            unwrappedWrappingKey = PK11_UnwrapSymKey(Ks, masterWrapMech, NULL,
+                                                     &wrappedKey, masterWrapMech,
+                                                     CKA_UNWRAP, 0);
+            PK11_FreeSymKey(Ks);
+            break;
+        break;
         default:
             PORT_Assert(0);
             PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
@@ -6247,6 +6425,23 @@ ssl3_GetWrappingKey(sslSocket *ss,
                 SECKEY_DestroyPublicKey(pubWrapKey);
             if (Ks)
                 PK11_FreeSymKey(Ks);
+            asymWrapMechanism = masterWrapMech;
+            break;
+        case ssl_auth_mldsa44:
+        case ssl_auth_mldsa65:
+        case ssl_auth_mldsa87:
+            /* Signature only algorithms can use a trick of signing a
+             * constant with the private key and using that constant
+             * as the password for a PBE. This only works if the
+             * signature is deterministic */
+            Ks = ssl_getSigKs(svrPrivKey, CKM_ML_DSA, masterWrapMech, pwArg);
+            if (Ks == NULL) {
+                 goto loser;
+            }
+            /*  Use Ks to unwrap the wrapping key */
+            rv = PK11_WrapSymKey(masterWrapMech, NULL,Ks,
+                                 unwrappedWrappingKey, &wrappedKey);
+            PK11_FreeSymKey(Ks);
             asymWrapMechanism = masterWrapMech;
             break;
 
@@ -10339,13 +10534,15 @@ ssl3_SendServerKeyExchange(sslSocket *ss)
 }
 
 SECStatus
-ssl3_EncodeSigAlgs(const sslSocket *ss, PRUint16 minVersion, PRBool forCert,
-                   PRBool grease, sslBuffer *buf)
+ssl3_EncodeSigAlgs(const sslSocket *ss, PRUint16 minVersion,
+                   PRUint16 maxVersion, PRBool forCert, PRBool grease,
+                   sslBuffer *buf)
 {
     SSLSignatureScheme filtered[MAX_SIGNATURE_SCHEMES] = { 0 };
     unsigned int filteredCount = 0;
 
-    SECStatus rv = ssl3_FilterSigAlgs(ss, minVersion, PR_FALSE, forCert,
+    SECStatus rv = ssl3_FilterSigAlgs(ss, minVersion, maxVersion,
+                                      PR_FALSE, forCert,
                                       PR_ARRAY_SIZE(filtered),
                                       filtered, &filteredCount);
     if (rv != SECSuccess) {
@@ -10422,7 +10619,8 @@ ssl3_EncodeFilteredSigAlgs(const sslSocket *ss, const SSLSignatureScheme *scheme
  * signature_algorithms_cert.
  */
 SECStatus
-ssl3_FilterSigAlgs(const sslSocket *ss, PRUint16 minVersion, PRBool disableRsae,
+ssl3_FilterSigAlgs(const sslSocket *ss, PRUint16 minVersion, PRUint16 maxVersion,
+                   PRBool disableRsae,
                    PRBool forCert,
                    unsigned int maxSchemes, SSLSignatureScheme *filteredSchemes,
                    unsigned int *numFilteredSchemes)
@@ -10440,7 +10638,7 @@ ssl3_FilterSigAlgs(const sslSocket *ss, PRUint16 minVersion, PRBool disableRsae,
         if (disableRsae && ssl_IsRsaeSignatureScheme(ss->ssl3.signatureSchemes[i])) {
             continue;
         }
-        if (ssl_SignatureSchemeAccepted(minVersion,
+        if (ssl_SignatureSchemeAccepted(minVersion, maxVersion,
                                         ss->ssl3.signatureSchemes[i],
                                         allowUnsortedPkcs1)) {
             filteredSchemes[(*numFilteredSchemes)++] = ss->ssl3.signatureSchemes[i];
@@ -10451,10 +10649,10 @@ ssl3_FilterSigAlgs(const sslSocket *ss, PRUint16 minVersion, PRBool disableRsae,
             if (disableRsae && ssl_IsRsaeSignatureScheme(ss->ssl3.signatureSchemes[i])) {
                 continue;
             }
-            if (!ssl_SignatureSchemeAccepted(minVersion,
+            if (!ssl_SignatureSchemeAccepted(minVersion, maxVersion,
                                              ss->ssl3.signatureSchemes[i],
                                              PR_FALSE) &&
-                ssl_SignatureSchemeAccepted(minVersion,
+                ssl_SignatureSchemeAccepted(minVersion, maxVersion,
                                             ss->ssl3.signatureSchemes[i],
                                             PR_TRUE)) {
                 filteredSchemes[(*numFilteredSchemes)++] = ss->ssl3.signatureSchemes[i];
@@ -10497,7 +10695,8 @@ ssl3_SendCertificateRequest(sslSocket *ss)
 
     length = 1 + certTypesLength + 2 + calen;
     if (isTLS12) {
-        rv = ssl3_EncodeSigAlgs(ss, ss->version, PR_TRUE /* forCert */,
+        rv = ssl3_EncodeSigAlgs(ss, ss->version, ss->version,
+                                PR_TRUE /* forCert */,
                                 PR_FALSE /* GREASE */, &sigAlgsBuf);
         if (rv != SECSuccess) {
             return rv;
@@ -11201,11 +11400,9 @@ get_fake_cert(SECItem *pCertItem, int *pIndex)
         PORT_SetError(SEC_ERROR_IO);
         goto loser;
     }
-    fprintf(stderr, "using %s\n", cfn);
     return SECSuccess;
 
 loser:
-    fprintf(stderr, "failed to use %s\n", cfn);
     *pIndex = -1;
     return SECFailure;
 }
@@ -11702,6 +11899,11 @@ ssl_SetAuthKeyBits(sslSocket *ss, const SECKEYPublicKey *pubKey)
                  * only support curves we like. */
                 minKey = ss->sec.authKeyBits;
             }
+            break;
+        case mldsaKey:
+            /* ML DSA has fixed sizes and are handled by separate oids
+             * for each key */
+            minKey = ss->sec.authKeyBits;
             break;
 
         default:
@@ -14064,6 +14266,7 @@ SSL_SignatureSchemePrefSet(PRFileDesc *fd, const SSLSignatureScheme *schemes,
     }
 
     if (ss->ssl3.signatureSchemeCount == 0) {
+        PORT_SetError(SEC_ERROR_INVALID_ARGS);
         PORT_SetError(SSL_ERROR_NO_SUPPORTED_SIGNATURE_ALGORITHM);
         return SECFailure;
     }

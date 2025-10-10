@@ -57,6 +57,20 @@ ssl_gtest_certs() {
   make_cert rsa_ca_rsa_pss_chain rsa_ca_rsapss_chain sign
   make_cert ecdh_rsa ecdh_rsa kex
   make_cert dsa dsa sign
+  if [ -n "${NSS_ENABLE_ML_DSA}" ] && using_sql ;  then
+      make_cert mldsa44 mldsa44 sign
+      make_cert mldsa44_ca mldsa44_ca ca
+      make_cert mldsa44_chain mldsa44_chain sign
+      make_cert delegator_mldsa44 delegator_mldsa44 sign
+      make_cert mldsa65 mldsa65 sign
+      make_cert mldsa65_ca mldsa65_ca ca
+      make_cert mldsa65_chain mldsa65_chain sign
+      make_cert delegator_mldsa65 delegator_mldsa65 sign
+      make_cert mldsa87 mldsa87 sign
+      make_cert mldsa87_ca mldsa87_ca ca
+      make_cert mldsa87_chain mldsa87_chain sign
+      make_cert delegator_mldsa87 delegator_mldsa87 sign
+  fi
   make_cert delegator_ecdsa256 delegator_p256 sign
   make_cert delegator_rsae2048 delegator_rsae2048 sign
   make_cert delegator_rsa_pss2048 delegator_rsa_pss2048 sign
@@ -150,6 +164,12 @@ ssl_gtest_cleanup()
 
 ################## main #################################################
 cd "$(dirname "$0")"
-ssl_gtest_init
-ssl_gtest_start
-ssl_gtest_cleanup
+
+ ssl_gtest_init
+
+if  using_sql ; then
+  ssl_gtest_start
+  ssl_gtest_cleanup
+else
+   echo "skipping ssl_gtests in dbm"
+fi

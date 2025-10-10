@@ -462,6 +462,12 @@ CERTCertificate *
 SECU_FindCertByNicknameOrFilename(CERTCertDBHandle *handle,
                                   char *name, PRBool ascii,
                                   void *pwarg);
+
+/* temparary libraries for ml-dsa support */
+SECOidTag SECu_FindTagFromString(char *cipherString);
+SECOidTag SECU_GetSignatureAlgorithmFromPrivateKey(SECKEYPrivateKey *privKey, SECOidTag hashAlg);
+SECOidTag SECU_GetSignatureAlgorithmFromPublicKey(SECKEYPublicKey *privKey, SECOidTag hashAlg);
+
 #include "secerr.h"
 #include "sslerr.h"
 

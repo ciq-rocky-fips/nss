@@ -382,8 +382,7 @@ createNewCert(CERTCertificate **issuedCert, CERTCertificateRequest *oldCertReq,
     if (issuerPrivKey == NULL) {
         rv = COULD_NOT_FIND_ISSUER_PRIVATE_KEY;
     }
-    signTag = SEC_GetSignatureAlgorithmOidTag(issuerPrivatekey->keytype,
-                                              SEC_OID_UNKNOWN);
+    signTag = SECU_GetSignatureAlgorithmFromPrivateKey(issuerPrivatekey, SEC_OID_UNKNOWN);
     if (signTag == SEC_OID_UNKNOWN) {
         rv = UNSUPPORTED_SIGN_OPERATION_FOR_ISSUER;
         goto loser;

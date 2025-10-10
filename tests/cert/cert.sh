@@ -59,16 +59,16 @@ cert_init()
       html_passed "Looking for root certs module."
   fi
 
+  # only do mldsa tests if we aren't using dbm
+  unset CERT_ENABLE_ML_DSA
+  if using_sql; then
+      CERT_ENABLE_ML_DSA=${NSS_ENABLE_ML_DSA}
+  fi
+  echo "CERT_ENABLE_ML_DSA=${CERT_ENABLE_ML_DSA}"
+  echo "NSS_ENABLE_ML_DSA=${NSS_ENABLE_ML_DSA}"
+
   if [ "${OS_ARCH}" = "WINNT" -a "$OS_NAME" = "CYGWIN_NT" ]; then
 	ROOTCERTSFILE=`cygpath -m ${ROOTCERTSFILE}`
-  fi
-# only enable ml dsa certs if using the sql database. The dbm database does
-# not support ml_dsa certs
-  unset NSS_CERT_ENABLE_ML_DSA
-  if [ -n $"NSS_ENABLE_ML_DSA" ]; then
-    if using_sql ; then
-      export NSS_CERT_ENABLE_ML_DSA=1
-    fi
   fi
 }
 
@@ -296,40 +296,41 @@ cert_create_cert()
         return $RET
     fi
 
+    if [ -z "$NSS_DISABLE_DSA" ]; then
 	CU_ACTION="Import DSA Root CA for $CERTNAME"
 	certu -A -n "TestCA-dsa" -t "TC,TC,TC" -f "${R_PWFILE}" \
 	    -d "${PROFILEDIR}" -i "${R_CADIR}/TestCA-dsa.ca.cert" 2>&1
 	if [ "$RET" -ne 0 ]; then
             return $RET
 	fi
-
-    if [ -n "$NSS_CERT_ENABLE_ML_DSA" ]; then
-       CU_ACTION="Import ML-DSA-44 Root CA for $CERTNAME"
-       certu -A -n "TestCA-ml-dsa-44" -t "TC,TC,TC" -f "${R_PWFILE}" \
-           -d "${PROFILEDIR}" -i "${R_CADIR}/TestCA-ml-dsa-44.ca.cert" 2>&1
-       if [ "$RET" -ne 0 ]; then
-            return $RET
-       fi
-       CU_ACTION="Import ML-DSA-65 Root CA for $CERTNAME"
-       certu -A -n "TestCA-ml-dsa-65" -t "TC,TC,TC" -f "${R_PWFILE}" \
-           -d "${PROFILEDIR}" -i "${R_CADIR}/TestCA-ml-dsa-65.ca.cert" 2>&1
-       if [ "$RET" -ne 0 ]; then
-            return $RET
-       fi
-       CU_ACTION="Import ML-DSA-87 Root CA for $CERTNAME"
-       certu -A -n "TestCA-ml-dsa-87" -t "TC,TC,TC" -f "${R_PWFILE}" \
-           -d "${PROFILEDIR}" -i "${R_CADIR}/TestCA-ml-dsa-87.ca.cert" 2>&1
-       if [ "$RET" -ne 0 ]; then
-            return $RET
-       fi
     fi
-
-	CU_ACTION="Import EC Root CA for $CERTNAME"
-	certu -A -n "TestCA-ec" -t "TC,TC,TC" -f "${R_PWFILE}" \
-	    -d "${PROFILEDIR}" -i "${R_CADIR}/TestCA-ec.ca.cert" 2>&1
+    if [ -n "$CERT_ENABLE_ML_DSA" ]; then
+	CU_ACTION="Import ML-DSA-44 Root CA for $CERTNAME"
+	certu -A -n "TestCA-ml-dsa-44" -t "TC,TC,TC" -f "${R_PWFILE}" \
+	    -d "${PROFILEDIR}" -i "${R_CADIR}/TestCA-ml-dsa-44.ca.cert" 2>&1
 	if [ "$RET" -ne 0 ]; then
             return $RET
 	fi
+	CU_ACTION="Import ML-DSA-65 Root CA for $CERTNAME"
+	certu -A -n "TestCA-ml-dsa-65" -t "TC,TC,TC" -f "${R_PWFILE}" \
+	    -d "${PROFILEDIR}" -i "${R_CADIR}/TestCA-ml-dsa-65.ca.cert" 2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
+	CU_ACTION="Import ML-DSA-87 Root CA for $CERTNAME"
+	certu -A -n "TestCA-ml-dsa-87" -t "TC,TC,TC" -f "${R_PWFILE}" \
+	    -d "${PROFILEDIR}" -i "${R_CADIR}/TestCA-ml-dsa-87.ca.cert" 2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
+    fi
+
+    CU_ACTION="Import EC Root CA for $CERTNAME"
+    certu -A -n "TestCA-ec" -t "TC,TC,TC" -f "${R_PWFILE}" \
+        -d "${PROFILEDIR}" -i "${R_CADIR}/TestCA-ec.ca.cert" 2>&1
+    if [ "$RET" -ne 0 ]; then
+        return $RET
+    fi
 
     cert_add_cert "$5"
     return $?
@@ -370,6 +371,7 @@ cert_add_cert()
 #
 #   Generate and add DSA cert
 #
+    if [ -z "$NSS_DISABLE_DSA" ]; then
 	CU_ACTION="Generate DSA Cert Request for $CERTNAME"
 	CU_SUBJECT="CN=$CERTNAME, E=${CERTNAME}-dsa@example.com, O=BOGUS NSS, L=Mountain View, ST=California, C=US"
 	certu -R -k dsa -d "${PROFILEDIR}" -f "${R_PWFILE}" \
@@ -420,79 +422,78 @@ cert_add_cert()
             return $RET
 	fi
 	cert_log "SUCCESS: $CERTNAME's mixed DSA Cert Created"
-
-    if [ -n "$NSS_CERT_ENABLE_ML_DSA" ]; then
-       CU_ACTION="Generate ML-DSA-44 Cert Request for $CERTNAME"
-       CU_SUBJECT="CN=$CERTNAME, E=${CERTNAME}-ml-dsa-44@example.com, O=BOGUS NSS, L=Mountain View, ST=California, C=US"
-       certu -R -k mldsa -q ml-dsa-44 -d "${PROFILEDIR}" -f "${R_PWFILE}" \
-           -z "${R_NOISE_FILE}" -o req  2>&1
-       if [ "$RET" -ne 0 ]; then
-            return $RET
-       fi
-
-       CU_ACTION="Sign ${CERTNAME}'s ML-DSA-44 Request"
-       certu -C -c "TestCA-ml-dsa-44" -m "$CERTSERIAL" -v 60 -d "${P_R_CADIR}" \
-            -i req -o "${CERTNAME}-ml-dsa-44.cert" -f "${R_PWFILE}" "$1" 2>&1
-       if [ "$RET" -ne 0 ]; then
-            return $RET
-       fi
-
-       CU_ACTION="Import $CERTNAME's ML-DSA-44 Cert"
-       certu -A -n "${CERTNAME}-ml-dsa-44" -t "u,u,u" -d "${PROFILEDIR}" \
-           -f "${R_PWFILE}" -i "${CERTNAME}-ml-dsa-44.cert" 2>&1
-       if [ "$RET" -ne 0 ]; then
-            return $RET
-       fi
-       cert_log "SUCCESS: $CERTNAME's ML-DSA-44 Cert Created"
-
-       CU_ACTION="Generate ML-DSA-65 Cert Request for $CERTNAME"
-       CU_SUBJECT="CN=$CERTNAME, E=${CERTNAME}-ml-dsa-65@example.com, O=BOGUS NSS, L=Mountain View, ST=California, C=US"
-       certu -R -k mldsa -q ml-dsa-65 -d "${PROFILEDIR}" -f "${R_PWFILE}" \
-           -z "${R_NOISE_FILE}" -o req  2>&1
-       if [ "$RET" -ne 0 ]; then
-            return $RET
-       fi
-
-       CU_ACTION="Sign ${CERTNAME}'s ML-DSA-65 Request"
-       certu -C -c "TestCA-ml-dsa-65" -m "$CERTSERIAL" -v 60 -d "${P_R_CADIR}" \
-            -i req -o "${CERTNAME}-ml-dsa-65.cert" -f "${R_PWFILE}" "$1" 2>&1
-       if [ "$RET" -ne 0 ]; then
-            return $RET
-       fi
-
-       CU_ACTION="Import $CERTNAME's ML-DSA-65 Cert"
-       certu -A -n "${CERTNAME}-ml-dsa-65" -t "u,u,u" -d "${PROFILEDIR}" \
-           -f "${R_PWFILE}" -i "${CERTNAME}-ml-dsa-65.cert" 2>&1
-       if [ "$RET" -ne 0 ]; then
-            return $RET
-       fi
-       cert_log "SUCCESS: $CERTNAME's ML-DSA-65 Cert Created"
-
-       CU_ACTION="Generate ML-DSA-87 Cert Request for $CERTNAME"
-       CU_SUBJECT="CN=$CERTNAME, E=${CERTNAME}-ml-dsa-87@example.com, O=BOGUS NSS, L=Mountain View, ST=California, C=US"
-       cert_log "SUCCESS: $CERTNAME's ML-DSA-87 Cert Created"
-       certu -R -k mldsa -q ml-dsa-87 -d "${PROFILEDIR}" -f "${R_PWFILE}" \
-           -z "${R_NOISE_FILE}" -o req  2>&1
-       if [ "$RET" -ne 0 ]; then
-            return $RET
-       fi
-
-       CU_ACTION="Sign ${CERTNAME}'s ML-DSA-87 Request"
-       certu -C -c "TestCA-ml-dsa-87" -m "$CERTSERIAL" -v 60 -d "${P_R_CADIR}" \
-            -i req -o "${CERTNAME}-ml-dsa-87.cert" -f "${R_PWFILE}" "$1" 2>&1
-       if [ "$RET" -ne 0 ]; then
-            return $RET
-       fi
-
-       CU_ACTION="Import $CERTNAME's ML-DSA-87 Cert"
-       certu -A -n "${CERTNAME}-ml-dsa-87" -t "u,u,u" -d "${PROFILEDIR}" \
-           -f "${R_PWFILE}" -i "${CERTNAME}-ml-dsa-87.cert" 2>&1
-       if [ "$RET" -ne 0 ]; then
-            return $RET
-       fi
-       cert_log "SUCCESS: $CERTNAME's ML-DSA-87 Cert Created"
     fi
+    if [ -n "$CERT_ENABLE_ML_DSA" ]; then
+	CU_ACTION="Generate ML-DSA-44 Cert Request for $CERTNAME"
+	CU_SUBJECT="CN=$CERTNAME, E=${CERTNAME}-ml-dsa-44@example.com, O=BOGUS NSS, L=Mountain View, ST=California, C=US"
+	certu -R -k mldsa -q ml-dsa-44 -d "${PROFILEDIR}" -f "${R_PWFILE}" \
+	    -z "${R_NOISE_FILE}" -o req  2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
 
+	CU_ACTION="Sign ${CERTNAME}'s ML-DSA-44 Request"
+	certu -C -c "TestCA-ml-dsa-44" -m "$CERTSERIAL" -v 60 -d "${P_R_CADIR}" \
+            -i req -o "${CERTNAME}-ml-dsa-44.cert" -f "${R_PWFILE}" "$1" 2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
+
+	CU_ACTION="Import $CERTNAME's ML-DSA-44 Cert"
+	certu -A -n "${CERTNAME}-ml-dsa-44" -t "u,u,u" -d "${PROFILEDIR}" \
+	    -f "${R_PWFILE}" -i "${CERTNAME}-ml-dsa-44.cert" 2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
+	cert_log "SUCCESS: $CERTNAME's ML-DSA-44 Cert Created"
+
+	CU_ACTION="Generate ML-DSA-65 Cert Request for $CERTNAME"
+	CU_SUBJECT="CN=$CERTNAME, E=${CERTNAME}-ml-dsa-65@example.com, O=BOGUS NSS, L=Mountain View, ST=California, C=US"
+	certu -R -k mldsa -q ml-dsa-65 -d "${PROFILEDIR}" -f "${R_PWFILE}" \
+	    -z "${R_NOISE_FILE}" -o req  2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
+
+	CU_ACTION="Sign ${CERTNAME}'s ML-DSA-65 Request"
+	certu -C -c "TestCA-ml-dsa-65" -m "$CERTSERIAL" -v 60 -d "${P_R_CADIR}" \
+            -i req -o "${CERTNAME}-ml-dsa-65.cert" -f "${R_PWFILE}" "$1" 2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
+
+	CU_ACTION="Import $CERTNAME's ML-DSA-65 Cert"
+	certu -A -n "${CERTNAME}-ml-dsa-65" -t "u,u,u" -d "${PROFILEDIR}" \
+	    -f "${R_PWFILE}" -i "${CERTNAME}-ml-dsa-65.cert" 2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
+	cert_log "SUCCESS: $CERTNAME's ML-DSA-65 Cert Created"
+
+	CU_ACTION="Generate ML-DSA-87 Cert Request for $CERTNAME"
+	CU_SUBJECT="CN=$CERTNAME, E=${CERTNAME}-ml-dsa-87@example.com, O=BOGUS NSS, L=Mountain View, ST=California, C=US"
+	cert_log "SUCCESS: $CERTNAME's ML-DSA-87 Cert Created"
+	certu -R -k mldsa -q ml-dsa-87 -d "${PROFILEDIR}" -f "${R_PWFILE}" \
+	    -z "${R_NOISE_FILE}" -o req  2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
+
+	CU_ACTION="Sign ${CERTNAME}'s ML-DSA-87 Request"
+	certu -C -c "TestCA-ml-dsa-87" -m "$CERTSERIAL" -v 60 -d "${P_R_CADIR}" \
+            -i req -o "${CERTNAME}-ml-dsa-87.cert" -f "${R_PWFILE}" "$1" 2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
+
+	CU_ACTION="Import $CERTNAME's ML-DSA-87 Cert"
+	certu -A -n "${CERTNAME}-ml-dsa-87" -t "u,u,u" -d "${PROFILEDIR}" \
+	    -f "${R_PWFILE}" -i "${CERTNAME}-ml-dsa-87.cert" 2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
+	cert_log "SUCCESS: $CERTNAME's ML-DSA-87 Cert Created"
+    fi
 
 #
 #   Generate and add EC cert
@@ -605,6 +606,7 @@ cert_all_CA()
     # in the chain
 
 
+    if [ -z "$NSS_DISABLE_DSA" ]; then
 #
 #       Create DSA version of TestCA
 	ALL_CU_SUBJECT="CN=NSS Test CA (DSA), O=BOGUS NSS, L=Mountain View, ST=California, C=US"
@@ -628,41 +630,67 @@ cert_all_CA()
 	rm $CLIENT_CADIR/dsaroot.cert $SERVER_CADIR/dsaroot.cert
 #	dsaroot.cert in $CLIENT_CADIR and in $SERVER_CADIR is one of the last 
 #	in the chain
-
-    if [ -n "$NSS_CERT_ENABLE_ML_DSA" ]; then
+    fi
+    if [ -n "$CERT_ENABLE_ML_DSA" ]; then
 #
 #       Create ML-DSA-44 version of TestCA
-       ALL_CU_SUBJECT="CN=NSS Test CA (ML-DSA-44), O=BOGUS NSS, L=Mountain View, ST=California, C=US"
-       cert_ml_dsa_CA ml-dsa-44 $CADIR TestCA-ml-dsa-44 -x "CTu,CTu,CTu" ${D_CA} "1"
+	ALL_CU_SUBJECT="CN=NSS Test CA (ML-DSA-44), O=BOGUS NSS, L=Mountain View, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-44 $CADIR TestCA-ml-dsa-44 -x "CTu,CTu,CTu" ${D_CA} "1"
 #
 #       Create ML-DSA-44 versions of the intermediate CA certs
-       ALL_CU_SUBJECT="CN=NSS Server Test CA (ML-DSA-44), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
-       cert_ml_dsa_CA ml-dsa-44 $SERVER_CADIR serverCA-ml-dsa-44 -x "Cu,Cu,Cu" ${D_SERVER_CA} "2"
+	ALL_CU_SUBJECT="CN=NSS Server Test CA (ML-DSA-44), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-44 $SERVER_CADIR serverCA-ml-dsa-44 -x "Cu,Cu,Cu" ${D_SERVER_CA} "2"
+	ALL_CU_SUBJECT="CN=NSS Chain1 Server Test CA (ML-DSA-44), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-44 $SERVER_CADIR chain-1-serverCA-ml-dsa-44 "-c serverCA-ml-dsa-44" "u,u,u" ${D_SERVER_CA} "3"
+	ALL_CU_SUBJECT="CN=NSS Chain2 Server Test CA (ML-DSA-44), O=BOGUS NSS, L=Santa Clara, ST=California, C=US" 
+	cert_ml_dsa_CA ml-dsa-44 $SERVER_CADIR chain-2-serverCA-ml-dsa-44 "-c chain-1-serverCA-ml-dsa-44" "u,u,u" ${D_SERVER_CA} "4"
 
-       ALL_CU_SUBJECT="CN=NSS Client Test CA (ML-DSA-44), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
-       cert_m_ldsa_CA ml-dsa-44 $CLIENT_CADIR clientCA-dsa -x "Tu,Cu,Cu" ${D_CLIENT_CA} "5"
+	ALL_CU_SUBJECT="CN=NSS Client Test CA (ML-DSA-44), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-44 $CLIENT_CADIR clientCA-ml-dsa-44 -x "Tu,Cu,Cu" ${D_CLIENT_CA} "5"
+	ALL_CU_SUBJECT="CN=NSS Chain1 Client Test CA (ML-DSA-44), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-44 $CLIENT_CADIR chain-1-clientCA-ml-dsa-44 "-c clientCA-ml-dsa-44" "u,u,u" ${D_CLIENT_CA} "6"
+	ALL_CU_SUBJECT="CN=NSS Chain2 Client Test CA (ML-DSA-44), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-44 $CLIENT_CADIR chain-2-clientCA-ml-dsa-44 "-c chain-1-clientCA-ml-dsa-44" "u,u,u" ${D_CLIENT_CA} "7"
+
 #
 #       Create ML-DSA-65 version of TestCA
-       ALL_CU_SUBJECT="CN=NSS Test CA (ML-DSA-65), O=BOGUS NSS, L=Mountain View, ST=California, C=US"
-       cert_ml_dsa_CA ml-dsa-65 $CADIR TestCA-ml-dsa-65 -x "CTu,CTu,CTu" ${D_CA} "1"
-#
+	ALL_CU_SUBJECT="CN=NSS Test CA (ML-DSA-65), O=BOGUS NSS, L=Mountain View, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-65 $CADIR TestCA-ml-dsa-65 -x "CTu,CTu,CTu" ${D_CA} "1"
 #       Create ML-DSA-65 versions of the intermediate CA certs
-       ALL_CU_SUBJECT="CN=NSS Server Test CA (ML-DSA-65), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
-       cert_ml_dsa_CA ml-dsa-65 $SERVER_CADIR serverCA-ml-dsa-65 -x "Cu,Cu,Cu" ${D_SERVER_CA} "2"
+	ALL_CU_SUBJECT="CN=NSS Server Test CA (ML-DSA-65), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-65 $SERVER_CADIR serverCA-ml-dsa-65 -x "Cu,Cu,Cu" ${D_SERVER_CA} "2"
+	ALL_CU_SUBJECT="CN=NSS Chain1 Server Test CA (ML-DSA-65), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-65 $SERVER_CADIR chain-1-serverCA-ml-dsa-65 "-c serverCA-ml-dsa-65" "u,u,u" ${D_SERVER_CA} "3"
+	ALL_CU_SUBJECT="CN=NSS Chain2 Server Test CA (ML-DSA-65), O=BOGUS NSS, L=Santa Clara, ST=California, C=US" 
+	cert_ml_dsa_CA ml-dsa-65 $SERVER_CADIR chain-2-serverCA-ml-dsa-65 "-c chain-1-serverCA-ml-dsa-65" "u,u,u" ${D_SERVER_CA} "4"
+#
 
-       ALL_CU_SUBJECT="CN=NSS Client Test CA (ML-DSA-65), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
-       cert_m_ldsa_CA ml-dsa-44 $CLIENT_CADIR clientCA-dsa -x "Tu,Cu,Cu" ${D_CLIENT_CA} "5"
+	ALL_CU_SUBJECT="CN=NSS Client Test CA (ML-DSA-65), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-65 $CLIENT_CADIR clientCA-ml-dsa-65 -x "Tu,Cu,Cu" ${D_CLIENT_CA} "5"
+	ALL_CU_SUBJECT="CN=NSS Chain1 Client Test CA (ML-DSA-65), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-65 $CLIENT_CADIR chain-1-clientCA-ml-dsa-65 "-c clientCA-ml-dsa-65" "u,u,u" ${D_CLIENT_CA} "6"
+	ALL_CU_SUBJECT="CN=NSS Chain2 Client Test CA (ML-DSA-65), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-65 $CLIENT_CADIR chain-2-clientCA-ml-dsa-65 "-c chain-1-clientCA-ml-dsa-65" "u,u,u" ${D_CLIENT_CA} "7"
 #
 #       Create ML-DSA-87 version of TestCA
-       ALL_CU_SUBJECT="CN=NSS Test CA (ML-DSA-87), O=BOGUS NSS, L=Mountain View, ST=California, C=US"
-       cert_ml_dsa_CA ml-dsa-87 $CADIR TestCA-ml-dsa-87 -x "CTu,CTu,CTu" ${D_CA} "1"
+	ALL_CU_SUBJECT="CN=NSS Test CA (ML-DSA-87), O=BOGUS NSS, L=Mountain View, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-87 $CADIR TestCA-ml-dsa-87 -x "CTu,CTu,CTu" ${D_CA} "1"
 #
 #       Create ML-DSA-87 versions of the intermediate CA certs
-       ALL_CU_SUBJECT="CN=NSS Server Test CA (ML-DSA-87), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
-       cert_ml_dsa_CA ml-dsa-87 $SERVER_CADIR serverCA-ml-dsa-87 -x "Cu,Cu,Cu" ${D_SERVER_CA} "2"
+	ALL_CU_SUBJECT="CN=NSS Server Test CA (ML-DSA-87), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-87 $SERVER_CADIR serverCA-ml-dsa-87 -x "Cu,Cu,Cu" ${D_SERVER_CA} "2"
+	ALL_CU_SUBJECT="CN=NSS Chain1 Server Test CA (ML-DSA-87), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-87 $SERVER_CADIR chain-1-serverCA-ml-dsa-87 "-c serverCA-ml-dsa-87" "u,u,u" ${D_SERVER_CA} "3"
+	ALL_CU_SUBJECT="CN=NSS Chain2 Server Test CA (ML-DSA-87), O=BOGUS NSS, L=Santa Clara, ST=California, C=US" 
+	cert_ml_dsa_CA ml-dsa-87 $SERVER_CADIR chain-2-serverCA-ml-dsa-87 "-c chain-1-serverCA-ml-dsa-87" "u,u,u" ${D_SERVER_CA} "4"
+#
 
-       ALL_CU_SUBJECT="CN=NSS Client Test CA (ML-DSA-87), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
-       cert_m_ldsa_CA ml-dsa-87 $CLIENT_CADIR clientCA-dsa -x "Tu,Cu,Cu" ${D_CLIENT_CA} "5"
+	ALL_CU_SUBJECT="CN=NSS Client Test CA (ML-DSA-87), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-87 $CLIENT_CADIR clientCA-ml-dsa-87 -x "Tu,Cu,Cu" ${D_CLIENT_CA} "5"
+	ALL_CU_SUBJECT="CN=NSS Chain1 Client Test CA (ML-DSA-87), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-87 $CLIENT_CADIR chain-1-clientCA-ml-dsa-87 "-c clientCA-ml-dsa-87" "u,u,u" ${D_CLIENT_CA} "6"
+	ALL_CU_SUBJECT="CN=NSS Chain2 Client Test CA (ML-DSA-87), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-87 $CLIENT_CADIR chain-2-clientCA-ml-dsa-87 "-c chain-1-clientCA-ml-dsa-87" "u,u,u" ${D_CLIENT_CA} "7"
 
     fi
 
@@ -1189,6 +1217,7 @@ cert_extended_ssl()
   certu -A -n "clientCA" -t "T,," -f "${R_PWFILE}" -d "${PROFILEDIR}" \
           -i "${CLIENT_CADIR}/clientCA.ca.cert" 2>&1
 
+    if [ -z "$NSS_DISABLE_DSA" ]; then
 #
 #     Repeat the above for DSA certs
 #
@@ -1232,6 +1261,72 @@ cert_extended_ssl()
 #      certu -A -n "clientCA-dsamixed" -t "T,," -f "${R_PWFILE}" \
 #	  -d "${PROFILEDIR}" -i "${CLIENT_CADIR}/clientCA-dsamixed.ca.cert" \
 #	  2>&1
+     fi
+    if [ -n "$CERT_ENABLE_ML_DSA" ]; then
+#
+#     Repeat the above for ML-DSA-44 certs
+#
+      CU_ACTION="Generate ML-DSA-44 Cert Request for $CERTNAME (ext)"
+      CU_SUBJECT="CN=$CERTNAME, E=${CERTNAME}-ml-dsa-44@example.com, O=BOGUS NSS, L=Mountain View, ST=California, C=US"
+      certu -R -d "${PROFILEDIR}" -k mldsa -q ml-dsa-44 -f "${R_PWFILE}" \
+	  -z "${R_NOISE_FILE}" -o req 2>&1
+
+      CU_ACTION="Sign ${CERTNAME}'s ML-DSA-44 Request (ext)"
+      cp ${CERTDIR}/req ${SERVER_CADIR}
+      certu -C -c "chain-2-serverCA-ml-dsa-44" -m 200 -v 60 -d "${P_SERVER_CADIR}" \
+          -i req -o "${CERTNAME}-ml-dsa-44.cert" -f "${R_PWFILE}" 2>&1
+
+      CU_ACTION="Import $CERTNAME's ML-DSA-44 Cert  -t u,u,u (ext)"
+      certu -A -n "${CERTNAME}-ml-dsa-44" -t "u,u,u" -d "${PROFILEDIR}" \
+	  -f "${R_PWFILE}" -i "${CERTNAME}-ml-dsa-44.cert" 2>&1
+
+      CU_ACTION="Import Client ML-DSA-44 Root CA -t T,, for $CERTNAME (ext.)"
+      certu -A -n "clientCA-ml-dsa-44" -t "T,," -f "${R_PWFILE}" -d "${PROFILEDIR}" \
+          -i "${CLIENT_CADIR}/clientCA-ml-dsa-44.ca.cert" 2>&1
+#
+#     Repeat the above for ML-DSA-65 certs
+#
+      CU_ACTION="Generate ML-DSA-65 Cert Request for $CERTNAME (ext)"
+      CU_SUBJECT="CN=$CERTNAME, E=${CERTNAME}-ml-dsa-65@example.com, O=BOGUS NSS, L=Mountain View, ST=California, C=US"
+      certu -R -d "${PROFILEDIR}" -k mldsa -q ml-dsa-65 -f "${R_PWFILE}" \
+	  -z "${R_NOISE_FILE}" -o req 2>&1
+
+      CU_ACTION="Sign ${CERTNAME}'s ML-DSA-65 Request (ext)"
+      cp ${CERTDIR}/req ${SERVER_CADIR}
+      certu -C -c "chain-2-serverCA-ml-dsa-65" -m 200 -v 60 -d "${P_SERVER_CADIR}" \
+          -i req -o "${CERTNAME}-ml-dsa-65.cert" -f "${R_PWFILE}" 2>&1
+
+      CU_ACTION="Import $CERTNAME's ML-DSA-65 Cert  -t u,u,u (ext)"
+      certu -A -n "${CERTNAME}-ml-dsa-65" -t "u,u,u" -d "${PROFILEDIR}" \
+	  -f "${R_PWFILE}" -i "${CERTNAME}-ml-dsa-65.cert" 2>&1
+
+      CU_ACTION="Import Client ML-DSA-65 Root CA -t T,, for $CERTNAME (ext.)"
+      certu -A -n "clientCA-ml-dsa-65" -t "T,," -f "${R_PWFILE}" -d "${PROFILEDIR}" \
+          -i "${CLIENT_CADIR}/clientCA-ml-dsa-65.ca.cert" 2>&1
+#
+#     Repeat the above for ML-DSA-87 certs
+#
+      CU_ACTION="Generate ML-DSA-87 Cert Request for $CERTNAME (ext)"
+      CU_SUBJECT="CN=$CERTNAME, E=${CERTNAME}-ml-dsa-87@example.com, O=BOGUS NSS, L=Mountain View, ST=California, C=US"
+      certu -R -d "${PROFILEDIR}" -k mldsa -q ml-dsa-87 -f "${R_PWFILE}" \
+	  -z "${R_NOISE_FILE}" -o req 2>&1
+
+      CU_ACTION="Sign ${CERTNAME}'s ML-DSA-87 Request (ext)"
+      cp ${CERTDIR}/req ${SERVER_CADIR}
+      certu -C -c "chain-2-serverCA-ml-dsa-87" -m 200 -v 60 -d "${P_SERVER_CADIR}" \
+          -i req -o "${CERTNAME}-ml-dsa-87.cert" -f "${R_PWFILE}" 2>&1
+
+      CU_ACTION="Import $CERTNAME's ML-DSA-87 Cert  -t u,u,u (ext)"
+      certu -A -n "${CERTNAME}-ml-dsa-87" -t "u,u,u" -d "${PROFILEDIR}" \
+	  -f "${R_PWFILE}" -i "${CERTNAME}-ml-dsa-87.cert" 2>&1
+
+      CU_ACTION="Import Client ML-DSA-87 Root CA -t T,, for $CERTNAME (ext.)"
+      certu -A -n "clientCA-ml-dsa-87" -t "T,," -f "${R_PWFILE}" -d "${PROFILEDIR}" \
+          -i "${CLIENT_CADIR}/clientCA-ml-dsa-87.ca.cert" 2>&1
+#
+#     done with ML-DSA certs
+#
+     fi
 
 #
 #     Repeat the above for EC certs
@@ -1285,24 +1380,24 @@ cert_extended_ssl()
   # we'll use one of the longer nicknames for testing.
   # (Because "grep -w hostname" matches "grep -w hostname-dsamixed")
   MYDBPASS="-d ${PROFILEDIR} -f ${R_PWFILE}"
-  TESTNAME="Ensure there's exactly one match for ${CERTNAME}-dsamixed"
-  cert_check_nickname_exists "$MYDBPASS" "${CERTNAME}-dsamixed" 0 1 "${TESTNAME}"
+  TESTNAME="Ensure there's exactly one match for ${CERTNAME}-ecmixed"
+  cert_check_nickname_exists "$MYDBPASS" "${CERTNAME}-ecmixed" 0 1 "${TESTNAME}"
 
-  CU_ACTION="Repeated import of $CERTNAME's mixed DSA Cert with different nickname"
-  certu -A -n "${CERTNAME}-repeated-dsamixed" -t "u,u,u" -d "${PROFILEDIR}" \
-        -f "${R_PWFILE}" -i "${CERTNAME}-dsamixed.cert" 2>&1
+  CU_ACTION="Repeated import of $CERTNAME's mixed EC Cert with different nickname"
+  certu -A -n "${CERTNAME}-repeated-ecmixed" -t "u,u,u" -d "${PROFILEDIR}" \
+        -f "${R_PWFILE}" -i "${CERTNAME}-ecmixed.cert" 2>&1
 
-  TESTNAME="Ensure there's still exactly one match for ${CERTNAME}-dsamixed"
-  cert_check_nickname_exists "$MYDBPASS" "${CERTNAME}-dsamixed" 0 1 "${TESTNAME}"
+  TESTNAME="Ensure there's still exactly one match for ${CERTNAME}-ecmixed"
+  cert_check_nickname_exists "$MYDBPASS" "${CERTNAME}-ecmixed" 0 1 "${TESTNAME}"
 
-  TESTNAME="Ensure there's zero matches for ${CERTNAME}-repeated-dsamixed"
-  cert_check_nickname_exists "$MYDBPASS" "${CERTNAME}-repeated-dsamixed" 0 0 "${TESTNAME}"
+  TESTNAME="Ensure there's zero matches for ${CERTNAME}-repeated-ecmixed"
+  cert_check_nickname_exists "$MYDBPASS" "${CERTNAME}-repeated-ecmixed" 0 0 "${TESTNAME}"
 
   echo "Importing all the server's own CA chain into the servers DB"
   for CA in `find ${SERVER_CADIR} -name "?*.ca.cert"` ;
   do
       N=`basename $CA | sed -e "s/.ca.cert//"`
-      if [ $N = "serverCA" -o $N = "serverCA-ec" -o $N = "serverCA-dsa" ] ; then
+      if [ $N = "serverCA" -o $N = "serverCA-ec" -o $N = "serverCA-dsa" -o $N = "serverCA-ml-dsa-44" -o $N = "serverCA-ml-dsa-65" -o $N = "serverCA-ml-dsa-87"  ] ; then
           T="-t C,C,C"
       else
           T="-t u,u,u"
@@ -1341,6 +1436,7 @@ cert_extended_ssl()
 #
 #     Repeat the above for DSA certs
 #
+  if [ -z "$NSS_DISABLE_DSA" ]; then
       CU_ACTION="Generate DSA Cert Request for $CERTNAME (ext)"
       CU_SUBJECT="CN=$CERTNAME, E=${CERTNAME}-dsa@example.com, O=BOGUS NSS, L=Mountain View, ST=California, C=US"
       certu -R -d "${PROFILEDIR}" -k dsa -f "${R_PWFILE}" \
@@ -1384,6 +1480,70 @@ cert_extended_ssl()
 #
 # done with mixed DSA certs
 #
+    fi
+#
+#     Repeat the above for ML-DSA certs
+#
+  if [ -n "$CERT_ENABLE_ML_DSA" ]; then
+#     ML-DSA-44 certs
+      CU_ACTION="Generate ML-DSA-44 Cert Request for $CERTNAME (ext)"
+      CU_SUBJECT="CN=$CERTNAME, E=${CERTNAME}-ml-dsa-44@example.com, O=BOGUS NSS, L=Mountain View, ST=California, C=US"
+      certu -R -d "${PROFILEDIR}" -k mldsa -q ml-dsa-44 -f "${R_PWFILE}" \
+	  -z "${R_NOISE_FILE}" -o req 2>&1
+
+      CU_ACTION="Sign ${CERTNAME}'s ML-DSA-44 Request (ext)"
+      cp ${CERTDIR}/req ${CLIENT_CADIR}
+      certu -C -c "chain-2-clientCA-ml-dsa-44" -m 300 -v 60 -d "${P_CLIENT_CADIR}" \
+          -i req -o "${CERTNAME}-ml-dsa-44.cert" -f "${R_PWFILE}" 2>&1
+
+      CU_ACTION="Import $CERTNAME's ML-DSA-44 Cert -t u,u,u (ext)"
+      certu -A -n "${CERTNAME}-ml-dsa-44" -t "u,u,u" -d "${PROFILEDIR}" \
+	  -f "${R_PWFILE}" -i "${CERTNAME}-ml-dsa-44.cert" 2>&1
+
+      CU_ACTION="Import Server ML-DSA-44 Root CA -t C,C,C for $CERTNAME (ext.)"
+      certu -A -n "serverCA-ml-dsa-44" -t "C,C,C" -f "${R_PWFILE}" \
+	  -d "${PROFILEDIR}" -i "${SERVER_CADIR}/serverCA-ml-dsa-44.ca.cert" 2>&1
+#     ML-DSA-65 certs
+      CU_ACTION="Generate ML-DSA-65 Cert Request for $CERTNAME (ext)"
+      CU_SUBJECT="CN=$CERTNAME, E=${CERTNAME}-ml-dsa-65@example.com, O=BOGUS NSS, L=Mountain View, ST=California, C=US"
+      certu -R -d "${PROFILEDIR}" -k mldsa -q ml-dsa-65 -f "${R_PWFILE}" \
+	  -z "${R_NOISE_FILE}" -o req 2>&1
+
+      CU_ACTION="Sign ${CERTNAME}'s ML-DSA-65 Request (ext)"
+      cp ${CERTDIR}/req ${CLIENT_CADIR}
+      certu -C -c "chain-2-clientCA-ml-dsa-65" -m 300 -v 60 -d "${P_CLIENT_CADIR}" \
+          -i req -o "${CERTNAME}-ml-dsa-65.cert" -f "${R_PWFILE}" 2>&1
+
+      CU_ACTION="Import $CERTNAME's ML-DSA-65 Cert -t u,u,u (ext)"
+      certu -A -n "${CERTNAME}-ml-dsa-65" -t "u,u,u" -d "${PROFILEDIR}" \
+	  -f "${R_PWFILE}" -i "${CERTNAME}-ml-dsa-65.cert" 2>&1
+
+      CU_ACTION="Import Server ML-DSA-65 Root CA -t C,C,C for $CERTNAME (ext.)"
+      certu -A -n "serverCA-ml-dsa-65" -t "C,C,C" -f "${R_PWFILE}" \
+	  -d "${PROFILEDIR}" -i "${SERVER_CADIR}/serverCA-ml-dsa-65.ca.cert" 2>&1
+#     ML-DSA-87 certs
+      CU_ACTION="Generate ML-DSA-87 Cert Request for $CERTNAME (ext)"
+      CU_SUBJECT="CN=$CERTNAME, E=${CERTNAME}-ml-dsa-87@example.com, O=BOGUS NSS, L=Mountain View, ST=California, C=US"
+      certu -R -d "${PROFILEDIR}" -k mldsa -q ml-dsa-87 -f "${R_PWFILE}" \
+	  -z "${R_NOISE_FILE}" -o req 2>&1
+
+      CU_ACTION="Sign ${CERTNAME}'s ML-DSA-87 Request (ext)"
+      cp ${CERTDIR}/req ${CLIENT_CADIR}
+      certu -C -c "chain-2-clientCA-ml-dsa-87" -m 300 -v 60 -d "${P_CLIENT_CADIR}" \
+          -i req -o "${CERTNAME}-ml-dsa-87.cert" -f "${R_PWFILE}" 2>&1
+
+      CU_ACTION="Import $CERTNAME's ML-DSA-87 Cert -t u,u,u (ext)"
+      certu -A -n "${CERTNAME}-ml-dsa-87" -t "u,u,u" -d "${PROFILEDIR}" \
+	  -f "${R_PWFILE}" -i "${CERTNAME}-ml-dsa-87.cert" 2>&1
+
+      CU_ACTION="Import Server ML-DSA-87 Root CA -t C,C,C for $CERTNAME (ext.)"
+      certu -A -n "serverCA-ml-dsa-87" -t "C,C,C" -f "${R_PWFILE}" \
+	  -d "${PROFILEDIR}" -i "${SERVER_CADIR}/serverCA-ml-dsa-87.ca.cert" 2>&1
+#
+# done with ML-DSA certs
+#
+#
+    fi
 
 #
 #     Repeat the above for EC certs
@@ -1436,7 +1596,7 @@ cert_extended_ssl()
   for CA in `find ${CLIENT_CADIR} -name "?*.ca.cert"` ;
   do
       N=`basename $CA | sed -e "s/.ca.cert//"`
-      if [ $N = "clientCA" -o $N = "clientCA-ec" -o $N = "clientCA-dsa" ] ; then
+      if [ $N = "clientCA" -o $N = "clientCA-ec" -o $N = "clientCA-dsa" -o $N = "clientCA-ml-dsa-44" -o $N = "clientCA-ml-dsa-65" -o $N = "clientCA-ml-dsa-87" ] ; then
           T="-t T,C,C"
       else
           T="-t u,u,u"
@@ -1474,10 +1634,12 @@ cert_ssl()
   CU_ACTION="Modify trust attributes of Root CA -t TC,TC,TC"
   certu -M -n "TestCA" -t "TC,TC,TC" -d ${PROFILEDIR} -f "${R_PWFILE}"
 
+  if [ -z "$NSS_DISABLE_DSA" ]; then
   CU_ACTION="Modify trust attributes of DSA Root CA -t TC,TC,TC"
   certu -M -n "TestCA-dsa" -t "TC,TC,TC" -d ${PROFILEDIR} -f "${R_PWFILE}"
+  fi
 
-  if [ -n "$NSS_CERT_ENABLE_ML_DSA" ]; then
+  if [ -n "$CERT_ENABLE_ML_DSA" ]; then
   CU_ACTION="Modify trust attributes of ML-DSA-44 Root CA -t TC,TC,TC"
   certu -M -n "TestCA-ml-dsa-44" -t "TC,TC,TC" -d ${PROFILEDIR} -f "${R_PWFILE}"
   CU_ACTION="Modify trust attributes of ML-DSA-65 Root CA -t TC,TC,TC"
@@ -1593,9 +1755,16 @@ MODSCRIPT
   certu -G -k rsa -g 2048 -y 17 -d "${PROFILEDIR}" -z ${R_NOISE_FILE} -f "${R_FIPSPWFILE}" 
   RETEXPECTED=0
 
+  if [ -z "$NSS_DISABLE_DSA" ]; then
+      FIPS_KEY="-k dsa"
+  elif [ -n "$CERT_ENABLE_ML_DSA" ]; then
+      FIPS_KEY="-k mldsa -q ml-dsa-44"
+  else
+      FIPS_KEY="-k ec -q nistp256"
+  fi
   CU_ACTION="Generate Certificate for ${CERTNAME}"
   CU_SUBJECT="CN=${CERTNAME}, E=fips@example.com, O=BOGUS NSS, OU=FIPS PUB 140, L=Mountain View, ST=California, C=US"
-  certu -S -n ${FIPSCERTNICK} -x -t "Cu,Cu,Cu" -d "${PROFILEDIR}" -f "${R_FIPSPWFILE}" -k dsa -v 600 -m 500 -z "${R_NOISE_FILE}" 2>&1
+  certu -S -n ${FIPSCERTNICK} -x -t "Cu,Cu,Cu" -d "${PROFILEDIR}" -f "${R_FIPSPWFILE}" ${FIPS_KEY} -v 600 -m 500 -z "${R_NOISE_FILE}" 2>&1
   if [ "$RET" -eq 0 ]; then
     cert_log "SUCCESS: FIPS passed"
   fi
@@ -2027,6 +2196,7 @@ EOF_CRLINI
   chmod 600 ${CRL_FILE_GRP_1}_or
 
 
+  if [ -z "$NSS_DISABLE_DSA" ]; then
       CU_ACTION="Generating CRL (DSA) for range ${CRL_GRP_1_BEGIN}-${CRL_GRP_END} TestCA-dsa authority"
 
 #     Until Bug 292285 is resolved, do not encode x400 Addresses. After
@@ -2041,6 +2211,43 @@ addext issuerAltNames 0 "rfc822Name:ca-dsaemail@ca.com|dnsName:ca-dsa.com|direct
 EOF_CRLINI
       CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
       chmod 600 ${CRL_FILE_GRP_1}_or-dsa
+  fi
+
+if [ -n "$CERT_ENABLE_ML_DSA" ]; then
+      CU_ACTION="Generating CRL (ML-DSA-44) for range ${CRL_GRP_1_BEGIN}-${CRL_GRP_END} TestCA-ml-dsa-44 authority"
+#     Until Bug 292285 is resolved, do not encode x400 Addresses. After
+#     the bug is resolved, reintroduce "x400Address:x400Address" within
+#     addext issuerAltNames ...
+      crlu -q -d $CADIR -G -n "TestCA-ml-dsa-44" -f ${R_PWFILE} \
+	  -o ${CRL_FILE_GRP_1}_or-ml-dsa-44 <<EOF_CRLINI
+update=$CRLUPDATE
+addcert ${CRL_GRP_1_BEGIN}-${CRL_GRP_END_} $CRL_GRP_DATE
+addext reasonCode 0 4
+addext issuerAltNames 0 "rfc822Name:ca-ml-dsa-44email@ca.com|dnsName:ca-ml-dsa-44.com|directoryName:CN=NSS Test CA (ML-DSA-44),O=BOGUS NSS,L=Mountain View,ST=California,C=US|URI:http://ca-dsa.com|ipAddress:192.168.0.1|registerID=reg CA (ML-DSA-44)"
+EOF_CRLINI
+      CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
+      chmod 600 ${CRL_FILE_GRP_1}_or-ml-dsa-44
+      CU_ACTION="Generating CRL (ML-DSA-65) for range ${CRL_GRP_1_BEGIN}-${CRL_GRP_END} TestCA-ml-dsa-65 authority"
+      crlu -q -d $CADIR -G -n "TestCA-ml-dsa-65" -f ${R_PWFILE} \
+	  -o ${CRL_FILE_GRP_1}_or-ml-dsa-65 <<EOF_CRLINI
+update=$CRLUPDATE
+addcert ${CRL_GRP_1_BEGIN}-${CRL_GRP_END_} $CRL_GRP_DATE
+addext reasonCode 0 4
+addext issuerAltNames 0 "rfc822Name:ca-ml-dsa-65email@ca.com|dnsName:ca-ml-dsa-65.com|directoryName:CN=NSS Test CA (ML-DSA-65),O=BOGUS NSS,L=Mountain View,ST=California,C=US|URI:http://ca-dsa.com|ipAddress:192.168.0.1|registerID=reg CA (ML-DSA-65)"
+EOF_CRLINI
+      CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
+      chmod 600 ${CRL_FILE_GRP_1}_or-ml-dsa-65
+      CU_ACTION="Generating CRL (ML-DSA-87) for range ${CRL_GRP_1_BEGIN}-${CRL_GRP_END} TestCA-ml-dsa-87 authority"
+      crlu -q -d $CADIR -G -n "TestCA-ml-dsa-87" -f ${R_PWFILE} \
+	  -o ${CRL_FILE_GRP_1}_or-ml-dsa-87 <<EOF_CRLINI
+update=$CRLUPDATE
+addcert ${CRL_GRP_1_BEGIN}-${CRL_GRP_END_} $CRL_GRP_DATE
+addext reasonCode 0 4
+addext issuerAltNames 0 "rfc822Name:ca-ml-dsa-87email@ca.com|dnsName:ca-ml-dsa-87.com|directoryName:CN=NSS Test CA (ML-DSA-87),O=BOGUS NSS,L=Mountain View,ST=California,C=US|URI:http://ca-dsa.com|ipAddress:192.168.0.1|registerID=reg CA (ML-DSA-87)"
+EOF_CRLINI
+      CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
+      chmod 600 ${CRL_FILE_GRP_1}_or-ml-dsa-87
+fi
 
 
 
@@ -2077,6 +2284,7 @@ EOF_CRLINI
   TEMPFILES="$TEMPFILES ${CRL_FILE_GRP_1}_or"
 
 
+  if [ -z "$NSS_DISABLE_DSA" ]; then
   CU_ACTION="Modify CRL (DSA) by adding one more cert"
   crlu -d $CADIR -M -n "TestCA-dsa" -f ${R_PWFILE} -o ${CRL_FILE_GRP_1}_or1-dsa \
       -i ${CRL_FILE_GRP_1}_or-dsa <<EOF_CRLINI
@@ -2086,6 +2294,45 @@ EOF_CRLINI
   CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
   chmod 600 ${CRL_FILE_GRP_1}_or1-dsa
   TEMPFILES="$TEMPFILES ${CRL_FILE_GRP_1}_or-dsa"
+  fi
+if [ -n "$CERT_ENABLE_ML_DSA" ]; then
+      CU_ACTION="Modify CRL (ML-DSA-44) by adding one more cert"
+      crlu -d $CADIR -M -n "TestCA-ml-dsa-44" -f ${R_PWFILE} \
+           -o ${CRL_FILE_GRP_1}_or1-ml-dsa-44 \
+           -i ${CRL_FILE_GRP_1}_or-ml-dsa-44 <<EOF_CRLINI
+update=$CRLUPDATE
+addcert ${CRL_GRP_END} $CRL_GRP_DATE
+EOF_CRLINI
+     CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
+     chmod 600 ${CRL_FILE_GRP_1}_or1-ml-dsa-44
+     TEMPFILES="$TEMPFILES ${CRL_FILE_GRP_1}_or-ml-dsa-44"
+     CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
+     chmod 600 ${CRL_FILE_GRP_1}_or1-ml-dsa-65
+     TEMPFILES="$TEMPFILES ${CRL_FILE_GRP_1}_or-ml-dsa-65"
+      CU_ACTION="Modify CRL (ML-DSA-65) by adding one more cert"
+      crlu -d $CADIR -M -n "TestCA-ml-dsa-65" -f ${R_PWFILE} \
+           -o ${CRL_FILE_GRP_1}_or1-ml-dsa-65 \
+           -i ${CRL_FILE_GRP_1}_or-ml-dsa-65 <<EOF_CRLINI
+update=$CRLUPDATE
+addcert ${CRL_GRP_END} $CRL_GRP_DATE
+EOF_CRLINI
+     CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
+     chmod 600 ${CRL_FILE_GRP_1}_or1-ml-dsa-65
+     TEMPFILES="$TEMPFILES ${CRL_FILE_GRP_1}_or-ml-dsa-65"
+     CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
+     chmod 600 ${CRL_FILE_GRP_1}_or1-ml-dsa-87
+     TEMPFILES="$TEMPFILES ${CRL_FILE_GRP_1}_or-ml-dsa-87"
+      CU_ACTION="Modify CRL (ML-DSA-87) by adding one more cert"
+      crlu -d $CADIR -M -n "TestCA-ml-dsa-87" -f ${R_PWFILE} \
+           -o ${CRL_FILE_GRP_1}_or1-ml-dsa-87 \
+           -i ${CRL_FILE_GRP_1}_or-ml-dsa-87 <<EOF_CRLINI
+update=$CRLUPDATE
+addcert ${CRL_GRP_END} $CRL_GRP_DATE
+EOF_CRLINI
+     CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
+     chmod 600 ${CRL_FILE_GRP_1}_or1-ml-dsa-87
+     TEMPFILES="$TEMPFILES ${CRL_FILE_GRP_1}_or-ml-dsa-87"
+fi
 
 
       CU_ACTION="Modify CRL (ECC) by adding one more cert"
@@ -2112,17 +2359,51 @@ EOF_CRLINI
   TEMPFILES="$TEMPFILES ${CRL_FILE_GRP_1}_or1"
 
 
+  if [ -z "$NSS_DISABLE_DSA" ]; then
   CU_ACTION="Modify CRL (DSA) by removing one cert"
   sleep 2
   CRLUPDATE=`date -u "+%Y%m%d%H%M%SZ"`
-  crlu -d $CADIR -M -n "TestCA-dsa" -f ${R_PWFILE} -o ${CRL_FILE_GRP_1} \
-      -i ${CRL_FILE_GRP_1}_or1 <<EOF_CRLINI
+  crlu -d $CADIR -M -n "TestCA-dsa" -f ${R_PWFILE} -o ${CRL_FILE_GRP_1}-dsa \
+      -i ${CRL_FILE_GRP_1}_or1-dsa <<EOF_CRLINI
 update=$CRLUPDATE
 rmcert  ${UNREVOKED_CERT_GRP_1}
 EOF_CRLINI
-  chmod 600 ${CRL_FILE_GRP_1}
+  chmod 600 ${CRL_FILE_GRP_1}-dsa
   TEMPFILES="$TEMPFILES ${CRL_FILE_GRP_1}_or1-dsa"
+  fi
 
+if [ -n "$CERT_ENABLE_ML_DSA" ]; then
+      CU_ACTION="Modify CRL (ML-DSA-44) by removing one cert"
+      sleep 2
+      CRLUPDATE=`date -u "+%Y%m%d%H%M%SZ"`
+      crlu -d $CADIR -M -n "TestCA-ml-dsa-44" -f ${R_PWFILE} -o ${CRL_FILE_GRP_1}-ml-dsa-44 \
+           -i ${CRL_FILE_GRP_1}_or1-ml-dsa-44 <<EOF_CRLINI
+update=$CRLUPDATE
+rmcert  ${UNREVOKED_CERT_GRP_1}
+EOF_CRLINI
+      chmod 600 ${CRL_FILE_GRP_1}-ml-dsa-44
+      TEMPFILES="$TEMPFILES ${CRL_FILE_GRP_1}_or1-ml-dsa-44"
+      CU_ACTION="Modify CRL (ML-DSA-65) by removing one cert"
+      sleep 2
+      CRLUPDATE=`date -u "+%Y%m%d%H%M%SZ"`
+      crlu -d $CADIR -M -n "TestCA-ml-dsa-65" -f ${R_PWFILE} -o ${CRL_FILE_GRP_1}-ml-dsa-65 \
+           -i ${CRL_FILE_GRP_1}_or1-ml-dsa-65 <<EOF_CRLINI
+update=$CRLUPDATE
+rmcert  ${UNREVOKED_CERT_GRP_1}
+EOF_CRLINI
+      chmod 600 ${CRL_FILE_GRP_1}-ml-dsa-65
+      TEMPFILES="$TEMPFILES ${CRL_FILE_GRP_1}_or1-ml-dsa-65"
+      CU_ACTION="Modify CRL (ML-DSA-87) by removing one cert"
+      sleep 2
+      CRLUPDATE=`date -u "+%Y%m%d%H%M%SZ"`
+      crlu -d $CADIR -M -n "TestCA-ml-dsa-87" -f ${R_PWFILE} -o ${CRL_FILE_GRP_1}-ml-dsa-87 \
+           -i ${CRL_FILE_GRP_1}_or1-ml-dsa-87 <<EOF_CRLINI
+update=$CRLUPDATE
+rmcert  ${UNREVOKED_CERT_GRP_1}
+EOF_CRLINI
+      chmod 600 ${CRL_FILE_GRP_1}-ml-dsa-87
+      TEMPFILES="$TEMPFILES ${CRL_FILE_GRP_1}_or1-ml-dsa-87"
+fi
 
 
       CU_ACTION="Modify CRL (ECC) by removing one cert"
@@ -2152,6 +2433,43 @@ rmcert  ${UNREVOKED_CERT_GRP_2}
 EOF_CRLINI
   CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
   chmod 600 ${CRL_FILE_GRP_2}
+
+if [ -n "${CERT_ENABLE_ML_DSA}" ]; then
+      CU_ACTION="Creating CRL (ML_DSA-44) for groups 1 and 2"
+      crlu -d $CADIR -M -n "TestCA-ml-dsa-44" -f ${R_PWFILE} \
+          -o ${CRL_FILE_GRP_2}-ml-dsa-44 \
+          -i ${CRL_FILE_GRP_1}-ml-dsa-44 <<EOF_CRLINI
+update=$CRLUPDATE
+addcert ${CRL_GRP_2_BEGIN}-${CRL_GRP_END} $CRL_GRP_DATE
+addext invalidityDate 0 $CRLUPDATE
+rmcert  ${UNREVOKED_CERT_GRP_2}
+EOF_CRLINI
+      CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
+      chmod 600 ${CRL_FILE_GRP_2}-ml-dsa-65
+      CU_ACTION="Creating CRL (ML_DSA-65) for groups 1 and 2"
+      crlu -d $CADIR -M -n "TestCA-ml-dsa-65" -f ${R_PWFILE} \
+          -o ${CRL_FILE_GRP_2}-ml-dsa-65 \
+          -i ${CRL_FILE_GRP_1}-ml-dsa-65 <<EOF_CRLINI
+update=$CRLUPDATE
+addcert ${CRL_GRP_2_BEGIN}-${CRL_GRP_END} $CRL_GRP_DATE
+addext invalidityDate 0 $CRLUPDATE
+rmcert  ${UNREVOKED_CERT_GRP_2}
+EOF_CRLINI
+      CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
+      chmod 600 ${CRL_FILE_GRP_2}-ml-dsa-65
+      CU_ACTION="Creating CRL (ML_DSA-87) for groups 1 and 2"
+      crlu -d $CADIR -M -n "TestCA-ml-dsa-87" -f ${R_PWFILE} \
+          -o ${CRL_FILE_GRP_2}-ml-dsa-87 \
+          -i ${CRL_FILE_GRP_1}-ml-dsa-87 <<EOF_CRLINI
+update=$CRLUPDATE
+addcert ${CRL_GRP_2_BEGIN}-${CRL_GRP_END} $CRL_GRP_DATE
+addext invalidityDate 0 $CRLUPDATE
+rmcert  ${UNREVOKED_CERT_GRP_2}
+EOF_CRLINI
+      CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
+      chmod 600 ${CRL_FILE_GRP_2}-ml-dsa-87
+fi
+
       CU_ACTION="Creating CRL (ECC) for groups 1 and 2"
       crlu -d $CADIR -M -n "TestCA-ec" -f ${R_PWFILE} -o ${CRL_FILE_GRP_2}-ec \
           -i ${CRL_FILE_GRP_1}-ec <<EOF_CRLINI
@@ -2183,6 +2501,39 @@ addext crlNumber 0 2
 EOF_CRLINI
   CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
   chmod 600 ${CRL_FILE_GRP_3}
+
+if [ -n "${CERT_ENABLE_ML_DSA}" ]; then
+      CU_ACTION="Creating CRL (ML-DSA-44) for groups 1, 2 and 3"
+      crlu -d $CADIR -M -n "TestCA-ml-dsa-44" -f ${R_PWFILE} -o ${CRL_FILE_GRP_3}-ml-dsa-44 \
+          -i ${CRL_FILE_GRP_2}-ml-dsa-44 <<EOF_CRLINI
+update=$CRLUPDATE
+addcert ${CRL_GRP_3_BEGIN}-${CRL_GRP_END} $CRL_GRP_DATE
+rmcert  ${UNREVOKED_CERT_GRP_3}
+addext crlNumber 0 2
+EOF_CRLINI
+      CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
+      chmod 600 ${CRL_FILE_GRP_3}-ml-dsa-44
+      CU_ACTION="Creating CRL (ML-DSA-65) for groups 1, 2 and 3"
+      crlu -d $CADIR -M -n "TestCA-ml-dsa-65" -f ${R_PWFILE} -o ${CRL_FILE_GRP_3}-ml-dsa-65 \
+          -i ${CRL_FILE_GRP_2}-ml-dsa-65 <<EOF_CRLINI
+update=$CRLUPDATE
+addcert ${CRL_GRP_3_BEGIN}-${CRL_GRP_END} $CRL_GRP_DATE
+rmcert  ${UNREVOKED_CERT_GRP_3}
+addext crlNumber 0 2
+EOF_CRLINI
+      CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
+      chmod 600 ${CRL_FILE_GRP_3}-ml-dsa-65
+      CU_ACTION="Creating CRL (ML-DSA-87) for groups 1, 2 and 3"
+      crlu -d $CADIR -M -n "TestCA-ml-dsa-87" -f ${R_PWFILE} -o ${CRL_FILE_GRP_3}-ml-dsa-87 \
+          -i ${CRL_FILE_GRP_2}-ml-dsa-87 <<EOF_CRLINI
+update=$CRLUPDATE
+addcert ${CRL_GRP_3_BEGIN}-${CRL_GRP_END} $CRL_GRP_DATE
+rmcert  ${UNREVOKED_CERT_GRP_3}
+addext crlNumber 0 2
+EOF_CRLINI
+      CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
+      chmod 600 ${CRL_FILE_GRP_3}-ml-dsa-87
+fi
       CU_ACTION="Creating CRL (ECC) for groups 1, 2 and 3"
       crlu -d $CADIR -M -n "TestCA-ec" -f ${R_PWFILE} -o ${CRL_FILE_GRP_3}-ec \
           -i ${CRL_FILE_GRP_2}-ec <<EOF_CRLINI
@@ -2201,6 +2552,25 @@ EOF_CRLINI
   crlu -D -n TestCA  -f "${R_PWFILE}" -d "${R_SERVERDIR}"
   crlu -I -i ${CRL_FILE} -n "TestCA" -f "${R_PWFILE}" -d "${R_SERVERDIR}"
   CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
+
+if [ -n "${CERT_ENABLE_ML_DSA}" ]; then
+      CU_ACTION="Importing CRL (ML-DSA-44) for groups 1"
+      crlu -D -n TestCA-ml-dsa-44  -f "${R_PWFILE}" -d "${R_SERVERDIR}"
+      crlu -I -i ${CRL_FILE}-ml-dsa-44 -n "TestCA-ml-dsa-44" -f "${R_PWFILE}" \
+	  -d "${R_SERVERDIR}"
+      CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
+      CU_ACTION="Importing CRL (ML-DSA-65) for groups 1"
+      crlu -D -n TestCA-ml-dsa-65  -f "${R_PWFILE}" -d "${R_SERVERDIR}"
+      crlu -I -i ${CRL_FILE}-ml-dsa-65 -n "TestCA-ml-dsa-65" -f "${R_PWFILE}" \
+	  -d "${R_SERVERDIR}"
+      CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
+      CU_ACTION="Importing CRL (ML-DSA-87) for groups 1"
+      crlu -D -n TestCA-ml-dsa-87  -f "${R_PWFILE}" -d "${R_SERVERDIR}"
+      crlu -I -i ${CRL_FILE}-ml-dsa-87 -n "TestCA-ml-dsa-87" -f "${R_PWFILE}" \
+	  -d "${R_SERVERDIR}"
+      CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
+fi
+
       CU_ACTION="Importing CRL (ECC) for groups 1"
       crlu -D -n TestCA-ec  -f "${R_PWFILE}" -d "${R_SERVERDIR}"
       crlu -I -i ${CRL_FILE}-ec -n "TestCA-ec" -f "${R_PWFILE}" \

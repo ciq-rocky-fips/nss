@@ -15,6 +15,9 @@
 #include "prerr.h"
 #include "secitem.h"
 #include "secmod.h"
+#include "secmodti.h" /* don't upstream, to get private SEC_OID_ defines */
+#include "cryptohi.h"
+#include "sechash.h"
 #include "sslimpl.h"
 #include "sslproto.h"
 #include "sslerr.h"
@@ -4499,15 +4502,293 @@ tls13_HandleCertificate(sslSocket *ss, PRUint8 *b, PRUint32 length, PRBool alrea
     return ssl3_AuthCertificate(ss); /* sets ss->ssl3.hs.ws */
 }
 
+/* this should be in cryptohi, but we need can't create a new API
+ * for it which doesn't try to parse old parameters and select things
+ * based on the privkey stuff */
+static
+SECItem *
+tls_encodeRSAParams(PLArenaPool *arena, SECOidTag hashAlgTag)
+{
+    SECKEYRSAPSSParams pssParams;
+    SECStatus rv;
+    int saltLen;
+    SECItem *hashAlgItem = NULL;
+    SECItem *saltItem = NULL;
+
+    PORT_Memset(&pssParams, 0, sizeof(pssParams));
+
+    /* RSA PSS let's us default SHA1, but we know this can only be called
+     * for TLS 1.3 and greater, and there isn't any SHA-1 in TLS 1.3, so
+     * we can skip those checks */
+    pssParams.hashAlg = PORT_ArenaZNew(arena, SECAlgorithmID);
+    if (!pssParams.hashAlg) {
+        return NULL;
+    }
+    rv = SECOID_SetAlgorithmID(arena, pssParams.hashAlg, hashAlgTag, NULL);
+    if (rv != SECSuccess) {
+        return NULL;
+    }
+    hashAlgItem = SEC_ASN1EncodeItem(arena, NULL, pssParams.hashAlg,
+                                     SEC_ASN1_GET(SECOID_AlgorithmIDTemplate));
+    if (!hashAlgItem) {
+        return NULL;
+    }
+    pssParams.maskAlg = PORT_ArenaZNew(arena, SECAlgorithmID);
+    if (!pssParams.maskAlg) {
+        return NULL;
+    }
+    rv = SECOID_SetAlgorithmID(arena, pssParams.maskAlg,
+                               SEC_OID_PKCS1_MGF1, hashAlgItem);
+    if (rv != SECSuccess) {
+        return  NULL;
+    }
+    saltLen = HASH_ResultLenByOidTag(hashAlgTag);
+    if (saltLen == 0) {
+        return NULL;
+    }
+    saltItem = SEC_ASN1EncodeInteger(arena, &pssParams.saltLength, saltLen);
+    if (!saltItem) {
+        return NULL;
+    }
+    return SEC_ASN1EncodeItem(arena, NULL, &pssParams, SECKEY_RSAPSSParamsTemplate);
+}
+
+/* we put this here because it only affects TLS 1.3, TLS 1.2 and earlier
+ * use the old sign hashes interface. TLS 1.3 is friendly to algorthims
+ * that don't have a signed hashes interface */
+/* we generate an algorithm ID rather than just use an OID to support RSAPSS.
+ * It's generated completely from the scheme, without the key */
+SECAlgorithmID  *
+tls_GetSignatureAlgorithmId(PLArenaPool *arena, SSLSignatureScheme scheme)
+{
+    SECAlgorithmID *newAlgID = PORT_ArenaZNew(arena, SECAlgorithmID);
+    SECOidTag algTag = SEC_OID_UNKNOWN;
+    SECOidTag hashAlgTag = SEC_OID_UNKNOWN;
+    SECItem *params = NULL;
+    SECStatus rv;
+
+    switch (scheme) {
+        /* do rsa PSS first because it needs to set the params
+         * for the algTag the difference between rsa_pss_rsae and
+         * rsa_pss_pss is in the selection an validation of the cert
+         * At this stage, the signatures are the same, so for our
+         * purposed they are equivalent */
+    case ssl_sig_rsa_pss_rsae_sha256:
+    case ssl_sig_rsa_pss_pss_sha256:
+        hashAlgTag = SEC_OID_SHA256;
+        goto rsa_pss_next;
+    case ssl_sig_rsa_pss_rsae_sha384:
+    case ssl_sig_rsa_pss_pss_sha384:
+        hashAlgTag = SEC_OID_SHA384;
+        goto rsa_pss_next;
+    case ssl_sig_rsa_pss_rsae_sha512:
+    case ssl_sig_rsa_pss_pss_sha512:
+        hashAlgTag = SEC_OID_SHA512;
+rsa_pss_next:
+        params = tls_encodeRSAParams(arena, hashAlgTag);
+        if (params == NULL) {
+            break;
+        }
+        algTag = SEC_OID_PKCS1_RSA_PSS_SIGNATURE;
+        break;
+    /* the curve comes from the key and should have already been
+     * enforced at a different level */
+    case ssl_sig_ecdsa_secp256r1_sha256:
+        algTag = SEC_OID_ANSIX962_ECDSA_SHA256_SIGNATURE;
+        break;
+    case ssl_sig_ecdsa_secp384r1_sha384:
+        algTag = SEC_OID_ANSIX962_ECDSA_SHA384_SIGNATURE;
+        break;
+    case ssl_sig_ecdsa_secp521r1_sha512:
+        algTag = SEC_OID_ANSIX962_ECDSA_SHA512_SIGNATURE;
+        break;
+    case ssl_sig_mldsa44:
+        algTag = SEC_OID_ML_DSA_44;
+        break;
+    case ssl_sig_mldsa65:
+        algTag = SEC_OID_ML_DSA_65;
+        break;
+    case ssl_sig_mldsa87:
+        algTag = SEC_OID_ML_DSA_87;
+        break;
+
+    /* the following is unsupported in tls 1.3 and greater, just break.
+     * We include them here explicitly so we get the compiler warning about
+     * missing enums in the switch statement. default would be a break anyway.
+     * That way we'll know to update this table when new algorithsm are
+     * added */
+
+    /* as of now sig ed is not supported in NSS. That could change, and this
+     * is part the code that would pick up the change (need OIDS for the
+     * hash variants of these signature, and then add them here) */
+    case ssl_sig_ed25519:
+    case ssl_sig_ed448:
+
+    /* sha1 hashes in sigs are explicitly disallowed int TLS 1.3 or greater */
+    case ssl_sig_ecdsa_sha1:
+
+    /* rsa pkcs1 sigs are explicitly disallowed in TLS 1.3 and greater */
+    case ssl_sig_rsa_pkcs1_sha1:
+    case ssl_sig_rsa_pkcs1_sha256:
+    case ssl_sig_rsa_pkcs1_sha384:
+    case ssl_sig_rsa_pkcs1_sha512:
+
+    /* dsa sigs are explicitly disallowed in TLS 1.3 and greater */
+    case ssl_sig_dsa_sha1:
+    case ssl_sig_dsa_sha256:
+    case ssl_sig_dsa_sha384:
+    case ssl_sig_dsa_sha512:
+
+    /* special sig variants that aren't supported in TLS 1.3 or greater */
+    case ssl_sig_rsa_pkcs1_sha1md5:
+    case ssl_sig_none:
+        break;
+    }
+
+    /* the earlier code should have made sure none of the unsupported
+     * algorithms were accepted */
+    PORT_Assert(algTag != SEC_OID_UNKNOWN);
+    if (algTag == SEC_OID_UNKNOWN) {
+        PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+        return NULL;
+    }
+
+    rv = SECOID_SetAlgorithmID(arena, newAlgID, algTag, params);
+    if (rv != SECSuccess) {
+        return NULL;
+    }
+    return newAlgID;
+}
+
+struct tlsSignOrVerifyContextStr {
+    PRBool sign;
+    union  {
+        SGNContext *sig;
+        VFYContext *vfy;
+    } u;
+};
+
+tlsSignOrVerifyContext *
+tls_SignOrVerifyGetNewContext(SECKEYPrivateKey *privKey,
+                              SECKEYPublicKey *pubKey,
+                              SSLSignatureScheme scheme, PRBool sign,
+                              SECItem *signature, void *pwArg)
+{
+    PLArenaPool *arena = PORT_NewArena(DER_DEFAULT_CHUNKSIZE);
+    SECAlgorithmID *sigAlgID = NULL;
+    tlsSignOrVerifyContext *newCtx = PORT_ZNew(tlsSignOrVerifyContext);
+    SECStatus rv;
+
+    if (!newCtx) {
+        goto loser;
+    }
+
+    if (!arena) {
+        goto loser;
+    }
+
+    if (sign) {
+        PORT_Assert(privKey);
+    } else {
+        PORT_Assert(pubKey);
+    }
+
+    if ((sign && !privKey) || (!sign && !pubKey)) {
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        goto loser;
+    }
+
+    newCtx->sign = sign;
+
+    sigAlgID = tls_GetSignatureAlgorithmId(arena, scheme);
+    if (sigAlgID ==  NULL) {
+        goto loser;
+    }
+    if (sign) {
+        newCtx->u.sig= SGN_NewContextWithAlgorithmID(sigAlgID, privKey);
+        if (!newCtx->u.sig) {
+            goto loser;
+        }
+        rv = SGN_Begin(newCtx->u.sig);
+    } else {
+        newCtx->u.vfy = VFY_CreateContextWithAlgorithmID(pubKey, signature,
+                                                         sigAlgID, NULL, pwArg);
+        if (!newCtx->u.vfy) {
+            goto loser;
+        }
+        rv = VFY_Begin(newCtx->u.vfy);
+    }
+    if (rv != SECSuccess) {
+        goto loser;
+    }
+    PORT_FreeArena(arena, PR_FALSE);
+    return (newCtx);
+
+loser:
+    tls_DestroySignOrVerifyContext(newCtx);
+    if (arena) {
+        PORT_FreeArena(arena, PR_FALSE);
+    }
+    return NULL;
+}
+
+
+SECStatus
+tls_SignOrVerifyUpdate(tlsSignOrVerifyContext *ctx, const unsigned char *buf,
+                       int len)
+{
+    SECStatus rv;
+    if (ctx->sign) {
+        rv = SGN_Update(ctx->u.sig, buf, len);
+    } else {
+        rv = VFY_Update(ctx->u.vfy, buf, len);
+    }
+    return rv;
+}
+
+SECStatus
+tls_SignOrVerifyEnd(tlsSignOrVerifyContext *ctx, SECItem *sig)
+{
+    SECStatus rv;
+    if (ctx->sign) {
+        rv = SGN_End(ctx->u.sig,  sig);
+    } else {
+        /* sign is already set in the context */
+        rv = VFY_End(ctx->u.vfy);
+    }
+    return rv;
+}
+
+void
+tls_DestroySignOrVerifyContext(tlsSignOrVerifyContext *ctx)
+{
+    if (!ctx) {
+        return;
+    }
+    if (ctx->sign) {
+        if (ctx->u.sig) {
+            SGN_DestroyContext(ctx->u.sig, PR_TRUE);
+        }
+    } else {
+        if (ctx->u.vfy) {
+            VFY_DestroyContext(ctx->u.vfy, PR_TRUE);
+        }
+    }
+    PORT_Free(ctx);
+}
+
+
 /* Add context to the hash functions as described in
    [draft-ietf-tls-tls13; Section 4.9.1] */
 SECStatus
-tls13_AddContextToHashes(sslSocket *ss, const SSL3Hashes *hashes,
-                         SSLHashType algorithm, PRBool sending,
-                         SSL3Hashes *tbsHash)
+tls13_SignOrVerifyHashWithContext(sslSocket *ss, const SSL3Hashes *hashes,
+                         SECKEYPrivateKey *privKey, SECKEYPublicKey *pubKey,
+                         SSLSignatureScheme scheme, PRBool sending,
+                         SECItem *signature)
 {
     SECStatus rv = SECSuccess;
-    PK11Context *ctx;
+    tlsSignOrVerifyContext *ctx = NULL;
+    void *pwArg = ss->pkcs11PinArg;
     const unsigned char context_padding[] = {
         0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
         0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
@@ -4523,42 +4804,56 @@ tls13_AddContextToHashes(sslSocket *ss, const SSL3Hashes *hashes,
     const char *server_cert_verify_string = "TLS 1.3, server CertificateVerify";
     const char *context_string = (sending ^ ss->sec.isServer) ? client_cert_verify_string
                                                               : server_cert_verify_string;
-    unsigned int hashlength;
 
     /* Double check that we are doing the same hash.*/
     PORT_Assert(hashes->len == tls13_GetHashSize(ss));
-
-    ctx = PK11_CreateDigestContext(ssl3_HashTypeToOID(algorithm));
-    if (!ctx) {
-        PORT_SetError(SEC_ERROR_NO_MEMORY);
-        goto loser;
+    if (hashes->len != tls13_GetHashSize(ss)) {
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        return SECFailure;
     }
-
-    PORT_Assert(SECFailure);
-    PORT_Assert(!SECSuccess);
 
     PRINT_BUF(50, (ss, "TLS 1.3 hash without context", hashes->u.raw, hashes->len));
     PRINT_BUF(50, (ss, "Context string", context_string, strlen(context_string)));
-    rv |= PK11_DigestBegin(ctx);
-    rv |= PK11_DigestOp(ctx, context_padding, sizeof(context_padding));
-    rv |= PK11_DigestOp(ctx, (unsigned char *)context_string,
-                        strlen(context_string) + 1); /* +1 includes the terminating 0 */
-    rv |= PK11_DigestOp(ctx, hashes->u.raw, hashes->len);
-    /* Update the hash in-place */
-    rv |= PK11_DigestFinal(ctx, tbsHash->u.raw, &hashlength, sizeof(tbsHash->u.raw));
-    PK11_DestroyContext(ctx, PR_TRUE);
-    PRINT_BUF(50, (ss, "TLS 1.3 hash with context", tbsHash->u.raw, hashlength));
 
-    tbsHash->len = hashlength;
-    tbsHash->hashAlg = algorithm;
+    ctx = tls_SignOrVerifyGetNewContext(privKey, pubKey, scheme,
+                                        sending, signature, pwArg);
+    if (ctx == NULL) {
+        goto loser;
+    }
 
+    rv = tls_SignOrVerifyUpdate(ctx, context_padding, sizeof(context_padding));
+    if (rv != SECSuccess) {
+        goto loser;
+    }
+    rv = tls_SignOrVerifyUpdate(ctx, (const unsigned char *)context_string,
+                                /* +1 includes the terminating 0 */
+                                strlen(context_string) + 1);
+    if (rv != SECSuccess) {
+        goto loser;
+    }
+    rv = tls_SignOrVerifyUpdate(ctx, hashes->u.raw, hashes->len);
+    if (rv != SECSuccess) {
+        goto loser;
+    }
+    rv = tls_SignOrVerifyEnd(ctx, signature);
     if (rv) {
         ssl_MapLowLevelError(SSL_ERROR_SHA_DIGEST_FAILURE);
         goto loser;
     }
+    tls_DestroySignOrVerifyContext(ctx);
+
+    /* if we are server & sending or !server & !sending, update the scheme */
+    /* only update on server cert verify */
+    if (((ss->sec.isServer) ^ sending) == 0){
+        ss->sec.signatureScheme = scheme;
+        ss->sec.authType = ssl_SignatureSchemeToAuthType(scheme);
+    }
+
     return SECSuccess;
 
 loser:
+    tls_DestroySignOrVerifyContext(ctx);
+
     return SECFailure;
 }
 
@@ -5363,9 +5658,7 @@ tls13_SendCertificateVerify(sslSocket *ss, SECKEYPrivateKey *privKey)
     SECStatus rv = SECFailure;
     SECItem buf = { siBuffer, NULL, 0 };
     unsigned int len;
-    SSLHashType hashAlg;
     SSL3Hashes hash;
-    SSL3Hashes tbsHash; /* The hash "to be signed". */
 
     PORT_Assert(ss->opt.noLocks || ssl_HaveXmitBufLock(ss));
     PORT_Assert(ss->opt.noLocks || ssl_HaveSSL3HandshakeLock(ss));
@@ -5386,14 +5679,10 @@ tls13_SendCertificateVerify(sslSocket *ss, SECKEYPrivateKey *privKey)
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
         return SECFailure;
     }
-    hashAlg = ssl_SignatureSchemeToHashType(ss->ssl3.hs.signatureScheme);
-    rv = tls13_AddContextToHashes(ss, &hash, hashAlg,
-                                  PR_TRUE, &tbsHash);
-    if (rv != SECSuccess) {
-        return SECFailure;
-    }
 
-    rv = ssl3_SignHashes(ss, &tbsHash, privKey, &buf);
+    rv = tls13_SignOrVerifyHashWithContext(ss, &hash, privKey, NULL,
+                                           ss->ssl3.hs.signatureScheme,
+                                           PR_TRUE, &buf);
     if (rv == SECSuccess && !ss->sec.isServer) {
         /* Remember the info about the slot that did the signing.
          * Later, when doing an SSL restart handshake, verify this.
@@ -5410,7 +5699,7 @@ tls13_SendCertificateVerify(sslSocket *ss, SECKEYPrivateKey *privKey)
         PK11_FreeSlot(slot);
     }
     if (rv != SECSuccess) {
-        goto done; /* err code was set by ssl3_SignHashes */
+        goto done; /* err code was set by tls13_SignOrVerifyHashWithContext */
     }
 
     len = buf.len + 2 + 2;
@@ -5451,8 +5740,6 @@ tls13_HandleCertificateVerify(sslSocket *ss, PRUint8 *b, PRUint32 length)
     SECItem signed_hash = { siBuffer, NULL, 0 };
     SECStatus rv;
     SSLSignatureScheme sigScheme;
-    SSLHashType hashAlg;
-    SSL3Hashes tbsHash;
     SSL3Hashes hashes;
 
     SSL_TRC(3, ("%d: TLS13[%d]: handle certificate_verify handshake",
@@ -5526,13 +5813,6 @@ tls13_HandleCertificateVerify(sslSocket *ss, PRUint8 *b, PRUint32 length)
         FATAL_ERROR(ss, PORT_GetError(), illegal_parameter);
         return SECFailure;
     }
-    hashAlg = ssl_SignatureSchemeToHashType(sigScheme);
-
-    rv = tls13_AddContextToHashes(ss, &hashes, hashAlg, PR_FALSE, &tbsHash);
-    if (rv != SECSuccess) {
-        FATAL_ERROR(ss, SSL_ERROR_DIGEST_FAILURE, internal_error);
-        return SECFailure;
-    }
 
     rv = ssl3_ConsumeHandshakeVariable(ss, &signed_hash, 2, &b, &length);
     if (rv != SECSuccess) {
@@ -5550,9 +5830,8 @@ tls13_HandleCertificateVerify(sslSocket *ss, PRUint8 *b, PRUint32 length)
         ssl_MapLowLevelError(SSL_ERROR_EXTRACT_PUBLIC_KEY_FAILURE);
         return SECFailure;
     }
-
-    rv = ssl_VerifySignedHashesWithPubKey(ss, pubKey, sigScheme,
-                                          &tbsHash, &signed_hash);
+    rv = tls13_SignOrVerifyHashWithContext(ss, &hashes, NULL, pubKey,
+                                           sigScheme, PR_FALSE, &signed_hash);
     if (rv != SECSuccess) {
         FATAL_ERROR(ss, PORT_GetError(), decrypt_error);
         goto loser;

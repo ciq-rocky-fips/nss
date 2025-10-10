@@ -55,6 +55,10 @@ dbtest_init()
 
   html_head "CERT and Key DB Tests"
 
+  PK11IMPORT_PARAMS=""
+  if [ -z "${NSS_ENABLE_ML_DSA}" ] || ! using_sql; then
+      PK11IMPORT_PARAMS="-m no"
+  fi
 }
 
 ############################## dbtest_cleanup ############################
@@ -257,7 +261,8 @@ dbtest_main()
     fi
     # import a token private key and make sure the corresponding public key is
     # created
-    ${BINDIR}/pk11importtest -d ${CONFLICT_DIR} -f ${R_PWFILE}
+    echo "pk11importtest ${PK11IMPORT_PARAMS} -d ${CONFLICT_DIR} -f ${R_PWFILE}"
+    ${BINDIR}/pk11importtest ${PK11IMPORT_PARAMS} -d ${CONFLICT_DIR} -f ${R_PWFILE}
     ret=$?
     if [ $ret -ne 0 ]; then
       html_failed "Importing Token Private Key does not create the corrresponding Public Key"
@@ -297,7 +302,7 @@ dbtest_main()
         do
           # mangle the last byte of the hmac
           # The following increments the last nibble by 1 with both F and f
-          # mapping to 0. This mangles both upper and lower case results, so 
+          # mapping to 0. This mangles both upper and lower case results, so
           # it will work on the mac.
           last=$((${#data}-1))
           newbyte=$(echo "${data:${last}}" | tr A-Fa-f0-9 B-F0b-f0-9a)

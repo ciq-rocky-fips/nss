@@ -411,7 +411,7 @@ static char *err;
    backslashes must be backslash-escaped. Otherwise, anything goes. */
 /* Standard whitespace */
 /*---------------------------- Actions --------------------------------*/
-#line 437 "lex.Pk11Install_yy.cpp"
+#line 437 "lex.Pk11Install_yy.c"
 
 /* Macros after this point can all be overridden by user definitions in
  * section 1.
@@ -563,7 +563,7 @@ YY_DECL
 
 #line 60 "installparse.l"
 
-#line 591 "lex.Pk11Install_yy.cpp"
+#line 591 "lex.Pk11Install_yy.c"
 
     if (yy_init) {
         yy_init = 0;
@@ -691,7 +691,7 @@ YY_DECL
 #line 81 "installparse.l"
                 ECHO;
                 YY_BREAK
-#line 722 "lex.Pk11Install_yy.cpp"
+#line 722 "lex.Pk11Install_yy.c"
             case YY_STATE_EOF(INITIAL):
                 yyterminate();
 

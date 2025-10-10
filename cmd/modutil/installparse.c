@@ -40,7 +40,7 @@ char yysccsid[] = "@(#)yaccpar	1.4 (Berkeley) 02/25/90";
 extern char *Pk11Install_yytext;
 char *Pk11Install_yyerrstr = NULL;
 
-#line 40 "ytab.c"
+#line 40 "installparse.c"
 #define OPENBRACE 257
 #define CLOSEBRACE 258
 #define STRING 259
@@ -247,7 +247,7 @@ Pk11Install_yyerror(char *message)
     }
     Pk11Install_yyerrstr = tmp;
 }
-#line 191 "ytab.c"
+#line 191 "installparse.c"
 #define YYABORT goto yyabort
 #define YYACCEPT goto yyaccept
 #define YYERROR goto yyerrlab
@@ -418,7 +418,7 @@ yyreduce:
         {
             yyval.string = yyvsp[0].string;
         } break;
-#line 374 "ytab.c"
+#line 374 "installparse.c"
     }
     yyssp -= yym;
     yystate = *yyssp;
