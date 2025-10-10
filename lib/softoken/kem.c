@@ -12,7 +12,8 @@
 #include "softoken.h"
 
 /* change to the largest KEM Secret Bytes value supported */
-#define MAX_SHARED_SECRET_BYTES KYBER_SHARED_SECRET_BYTES
+/* currenly only mlkem is supported */
+#define MAX_KEM_SHARED_SECRET_BYTES KYBER_SHARED_SECRET_BYTES
 
 KyberParams
 sftk_kyber_PK11ParamToInternal(CK_ML_KEM_PARAMETER_SET_TYPE pk11ParamSet)
@@ -25,6 +26,8 @@ sftk_kyber_PK11ParamToInternal(CK_ML_KEM_PARAMETER_SET_TYPE pk11ParamSet)
         case CKP_NSS_ML_KEM_768:
         case CKP_ML_KEM_768:
             return params_ml_kem768;
+        case CKP_ML_KEM_1024:
+            return params_ml_kem1024;
         default:
             return params_kyber_invalid;
     }
@@ -41,6 +44,9 @@ sftk_kyber_AllocPubKeyItem(KyberParams params, SECItem *pubkey)
         case params_ml_kem768:
         case params_ml_kem768_test_mode:
             return SECITEM_AllocItem(NULL, pubkey, KYBER768_PUBLIC_KEY_BYTES);
+        case params_ml_kem1024:
+        case params_ml_kem1024_test_mode:
+            return SECITEM_AllocItem(NULL, pubkey, MLKEM1024_PUBLIC_KEY_BYTES);
         default:
             return NULL;
     }
@@ -57,6 +63,9 @@ sftk_kyber_AllocPrivKeyItem(KyberParams params, SECItem *privkey)
         case params_ml_kem768:
         case params_ml_kem768_test_mode:
             return SECITEM_AllocItem(NULL, privkey, KYBER768_PRIVATE_KEY_BYTES);
+        case params_ml_kem1024:
+        case params_ml_kem1024_test_mode:
+            return SECITEM_AllocItem(NULL, privkey, MLKEM1024_PRIVATE_KEY_BYTES);
         default:
             return NULL;
     }
@@ -73,6 +82,10 @@ sftk_kyber_AllocCiphertextItem(KyberParams params, SECItem *ciphertext)
         case params_ml_kem768:
         case params_ml_kem768_test_mode:
             return SECITEM_AllocItem(NULL, ciphertext, KYBER768_CIPHERTEXT_BYTES);
+        case params_ml_kem1024:
+        case params_ml_kem1024_test_mode:
+            return SECITEM_AllocItem(NULL, ciphertext, MLKEM1024_CIPHERTEXT_BYTES);
+
         default:
             return NULL;
     }
@@ -152,6 +165,8 @@ sftk_kem_CiphertextLen(CK_MECHANISM_PTR pMechanism, CK_ULONG paramSet)
                 case CKP_NSS_ML_KEM_768:
                 case CKP_ML_KEM_768:
                     return KYBER768_CIPHERTEXT_BYTES;
+                case CKP_ML_KEM_1024:
+                    return MLKEM1024_CIPHERTEXT_BYTES;
                 default:
                     break;
             }
@@ -250,7 +265,7 @@ NSC_EncapsulateKey(CK_SESSION_HANDLE hSession,
 
     /* The length of secretBuf can be increased if we ever support other KEMs
      * by changing the define at the top of this file */
-    uint8_t secretBuf[MAX_SHARED_SECRET_BYTES] = { 0 };
+    uint8_t secretBuf[MAX_KEM_SHARED_SECRET_BYTES] = { 0 };
     SECItem secret = { siBuffer, secretBuf, sizeof secretBuf };
 
     key->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_ENCAPSULATE,
@@ -399,7 +414,7 @@ NSC_DecapsulateKey(CK_SESSION_HANDLE hSession,
 
     /* The length of secretBuf can be increased if we ever support other KEMs
      * by changing the define at the top of this file */
-    uint8_t secretBuf[MAX_SHARED_SECRET_BYTES] = { 0 };
+    uint8_t secretBuf[MAX_KEM_SHARED_SECRET_BYTES] = { 0 };
     SECItem secret = { siBuffer, secretBuf, sizeof secretBuf };
     key->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_DECAPSULATE,
                                        key, 0);

@@ -161,8 +161,8 @@ static const PRUint16 srtpCiphers[] = {
     }
 #define HYGROUP(kem, ec, size, kem_oid, ec_oid, assumeSupported) \
     {                                                            \
-        ssl_grp_kem_##kem##ec, size, ssl_kea_ecdh_hybrid,        \
-            SEC_OID_##kem_oid##ec_oid, assumeSupported          \
+        ssl_grp_kem_##ec##kem, size, ssl_kea_ecdh_hybrid,        \
+            SEC_OID_##ec_oid##kem_oid, assumeSupported          \
     }
 
 const sslNamedGroupDef ssl_named_groups[] = {
@@ -170,6 +170,7 @@ const sslNamedGroupDef ssl_named_groups[] = {
      * checking bit security and expect 256 bits there (not 255). */
     HYGROUP(mlkem768, x25519,    256, MLKEM768, X25519,    PR_TRUE),
     HYGROUP(mlkem768, secp256r1, 256, MLKEM768, SECP256R1, PR_TRUE),
+    HYGROUP(mlkem1024, secp384r1, 384, MLKEM1024, SECP384R1, PR_TRUE),
     { ssl_grp_ec_curve25519, 256, ssl_kea_ecdh, SEC_OID_CURVE25519, PR_TRUE },
     ECGROUP(secp256r1, 256, SECP256R1, PR_TRUE),
     ECGROUP(secp384r1, 384, SECP384R1, PR_TRUE),
@@ -209,6 +210,7 @@ PR_STATIC_ASSERT(SSL_NAMED_GROUP_COUNT == PR_ARRAY_SIZE(ssl_named_groups));
 
 #undef ECGROUP
 #undef FFGROUP
+#undef HYGROUP
 
 /* forward declarations. */
 static sslSocket *ssl_NewSocket(PRBool makeLocks, SSLProtocolVariant variant);

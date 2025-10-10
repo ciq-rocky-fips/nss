@@ -206,7 +206,8 @@ struct PK11GenericObjectStr {
  * private header file, so we can set real names for oids that aren't upstream
  * yet, so we applications don't try to use them and get hosed when they change
  */
+#define SEC_OID_X25519MLKEM768 SEC_OID_MLKEM768X25519
 #define SEC_OID_SECP256R1MLKEM768 SEC_OID_PRIVATE_1
-#define SEC_OID_MLKEM1024SECP256R1 SEC_OID_PRIVATE_2
+#define SEC_OID_SECP384R1MLKEM1024 SEC_OID_PRIVATE_2
 
 #endif /* _SECMODTI_H_ */

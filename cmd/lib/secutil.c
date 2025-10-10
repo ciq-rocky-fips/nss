@@ -4216,8 +4216,12 @@ static const struct SSLNamedGroupString {
 #ifndef NSS_DISABLE_KYBER
     { NAME_AND_LEN("xyber76800"), ssl_grp_kem_xyber768d00 },
 #endif
+    { NAME_AND_LEN("x25519mlkem768"), ssl_grp_kem_mlkem768x25519 },
     { NAME_AND_LEN("mlkem768x25519"), ssl_grp_kem_mlkem768x25519 },
+    { NAME_AND_LEN("secp256r1mlkem768"), ssl_grp_kem_secp256r1mlkem768 },
     { NAME_AND_LEN("mlkem768secp256r1"), ssl_grp_kem_secp256r1mlkem768 },
+    { NAME_AND_LEN("secp384r1mlkem1024"), ssl_grp_kem_secp384r1mlkem1024 },
+    { NAME_AND_LEN("mlkem1024secp384r1"), ssl_grp_kem_secp384r1mlkem1024},
 };
 
 static const size_t sslNamedGroupStringLen=PR_ARRAY_SIZE(sslNamedGroupStringArray);
@@ -4234,11 +4238,6 @@ groupNameToNamedGroup(char *name)
             if (!strncmp(name, ngs->name, len))  {
                 return ngs->grp;
             }
-        }
-    }
-    if (PL_strlen(name) == 14) {
-        if (!strncmp(name, "mlkem768x25519", 14)) {
-            return ssl_grp_kem_mlkem768x25519;
         }
     }
 

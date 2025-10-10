@@ -5542,7 +5542,7 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
         crv = CKR_OK;
         switch (keyType) {
             case CKK_ML_KEM:
-                cipher_text_length = KYBER_SHARED_SECRET_BYTES;
+                cipher_text_length = MAX_ML_KEM_CIPHER_LENGTH;
                 mech.mechanism = CKM_ML_KEM;
                 break;
             case CKK_RSA:

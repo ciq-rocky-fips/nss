@@ -32,7 +32,6 @@
     'hmacct.c',
     'jpake.c',
     'kyber.c',
-    'kyber-pqcrystals-ref.c',
     'ldvector.c',
     'md2.c',
     'md5.c',
@@ -233,6 +232,18 @@
         }],
       ],
     }],
+    [ 'no_kyber_support==0', {
+        'sources': [
+            'kyber-pqcrystals-ref.c',
+        ],
+    }]
+    [ 'ml_kem_1024_support==1', {
+        'sources': [
+            'verified/libcrux_mlkem1024_portable.c',
+        ],
+    }]
+
+
   ],
  'ldflags': [
    '-Wl,-Bsymbolic'

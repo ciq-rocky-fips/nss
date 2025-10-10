@@ -3088,6 +3088,9 @@ pk11_KyberCiphertextLength(SECKEYKyberPublicKey *pubKey)
         case params_ml_kem768:
         case params_ml_kem768_test_mode:
             return KYBER768_CIPHERTEXT_BYTES;
+        case params_ml_kem1024:
+        case params_ml_kem1024_test_mode:
+            return MLKEM1024_CIPHERTEXT_BYTES;
         default:
             // unreachable
             return 0;

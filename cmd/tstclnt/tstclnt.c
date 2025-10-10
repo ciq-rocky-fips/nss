@@ -314,7 +314,7 @@ PrintParameterUsage()
 #ifndef NSS_DISABLE_KYBER
                     "xyber768d00,  "
 #endif
-                    "mlkem768x25519, mlkem768secp256r1\n",
+                    "x25519mlkem768, secp256r1mlkem768, secp384r1mlkem1024\n",
             "-I", "", "", "");
     fprintf(stderr, "%-20s Comma separated list of signature schemes in preference order.\n"
                     "%-20s The following values are valid:\n"

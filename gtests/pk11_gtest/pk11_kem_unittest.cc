@@ -74,6 +74,9 @@ class Pkcs11KEMTest
         return CKM_NSS_KYBER_KEY_PAIR_GEN;
       case CKP_NSS_ML_KEM_768:
         return CKM_NSS_ML_KEM_KEY_PAIR_GEN;
+      case CKP_ML_KEM_768:
+      case CKP_ML_KEM_1024:
+        return CKM_ML_KEM_KEY_PAIR_GEN;
       default:
         EXPECT_TRUE(false);
         return 0;
@@ -86,6 +89,9 @@ class Pkcs11KEMTest
         return CKM_NSS_KYBER;
       case CKP_NSS_ML_KEM_768:
         return CKM_NSS_ML_KEM;
+      case CKP_ML_KEM_768:
+      case CKP_ML_KEM_1024:
+        return CKM_ML_KEM;
       default:
         EXPECT_TRUE(false);
         return 0;
@@ -98,6 +104,9 @@ TEST_P(Pkcs11KEMTest, KemConsistencyTest) {
   ScopedSECKEYPrivateKey priv;
   ScopedSECKEYPublicKey pub;
   generator.GenerateKey(&priv, &pub, false);
+
+  ASSERT_NE(nullptr, pub);
+  ASSERT_NE(nullptr, priv);
 
   // Copy the public key to simulate receiving the key as an octet string
   ScopedSECKEYPublicKey pubCopy(SECKEY_CopyPublicKey(pub.get()));
@@ -144,6 +153,8 @@ INSTANTIATE_TEST_SUITE_P(Pkcs11KEMTest, Pkcs11KEMTest,
 #ifndef NSS_DISABLE_KYBER
                              CKP_NSS_KYBER_768_ROUND3,
 #endif
+                             CKP_ML_KEM_768,
+                             CKP_ML_KEM_1024,
                              CKP_NSS_ML_KEM_768));
 
 }  // namespace nss_test

@@ -133,9 +133,9 @@ typedef enum { SSLAppOpRead = 0,
 #ifndef NSS_DISABLE_KYBER
 /* this define is checked against the namedGroup table
  * and compile time asserts kick in if it doesn't match */
-#define SSL_NAMED_GROUP_COUNT 34
+#define SSL_NAMED_GROUP_COUNT 35
 #else
-#define SSL_NAMED_GROUP_COUNT 33
+#define SSL_NAMED_GROUP_COUNT 34
 #endif
 
 /* The maximum DH and RSA bit-length supported. */
