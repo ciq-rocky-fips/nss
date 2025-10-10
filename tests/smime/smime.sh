@@ -872,8 +872,8 @@ smime_init
 smime_main
 smime_data_tb
 smime_p7
-if using_sql ; then
-  smime_policy
-fi
+#if using_sql ; then
+#  smime_policy
+#fi
 smime_cleanup
 

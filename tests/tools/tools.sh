@@ -595,7 +595,7 @@ tools_p12()
   tools_p12_import_pbmac1_samples
   if using_sql; then
     tools_p12_import_rsa_pss_private_key
-    tools_p12_policy
+#tools_p12_policy
   fi
 }
 
