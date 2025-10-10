@@ -319,8 +319,12 @@ RSA_NewKey(int keySizeInBits, SECItem *publicExponent)
         goto cleanup;
     }
 #ifndef NSS_FIPS_DISABLED
-    /* Check that the exponent is not smaller than 65537  */
-    if (mp_cmp_d(&e, 0x10001) < 0) {
+    /* Check that the exponent is not smaller than 65537, and not larger
+     * the the max digit (which is between 2^33-1 and 2^65-1 all of which is less thant
+     * the FIPS max of 2^256. NSS level code already limits this value to 2^33-1,
+     * so we aren't adding any new requirements on real code. We use
+     * MP_DIGIT_MAX because it allows us to easily use mp_cmp_d */
+    if ((mp_cmp_d(&e, 0x10001) == MP_LT) || (mp_cmp_d(&e, MP_DIGIT_MAX) == MP_GT)) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         goto cleanup;
     }

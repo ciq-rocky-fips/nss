@@ -2459,8 +2459,6 @@ sftk_checkFIPSHash(CK_MECHANISM_TYPE hash, PRBool allowSmall, PRBool allowCMAC)
     switch (hash) {
         case CKM_AES_CMAC:
             return allowCMAC;
-        case CKM_SHA_1:
-        case CKM_SHA_1_HMAC:
         case CKM_SHA224:
         case CKM_SHA224_HMAC:
             return allowSmall;
@@ -2594,6 +2592,13 @@ sftk_handleSpecial(SFTKSlot *slot, CK_MECHANISM *mech,
                 return PR_FALSE;
             }
             if (*(pbkdf2->ulPasswordLen) < SFTKFIPS_PBKDF2_MIN_PW_LEN) {
+                return PR_FALSE;
+            }
+            /* sigh pbKDF2 defines it's own prf, just reject SHA-1 here. Future
+             * make the mapping switch in nsc_SetupPBEKeyGen into a generic function
+             * that return a hashType or a mechanism and then we can use
+             * sftk_checkFIPSHash */
+            if (pbkdf2->prf == CKP_PKCS5_PBKD2_HMAC_SHA1) {
                 return PR_FALSE;
             }
             return PR_TRUE;

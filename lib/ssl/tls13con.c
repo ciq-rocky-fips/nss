@@ -729,9 +729,18 @@ tls13_SetupClientHello(sslSocket *ss, sslClientHelloType chType)
      * TODO(ekr@rtfm.com): be smarter about offering the group
      * that the other side negotiated if we are resuming. */
     PORT_Assert(PR_CLIST_IS_EMPTY(&ss->ephemeralKeyPairs));
+    PRBool has_hybrid = PR_FALSE;
     for (i = 0; i < SSL_NAMED_GROUP_COUNT; ++i) {
         if (!ss->namedGroupPreferences[i]) {
             continue;
+        }
+        /* only send one hybrid key share no matter how many key
+         * shares we send */
+        if (ss->namedGroupPreferences[i]->keaType == ssl_kea_ecdh_hybrid)  {
+            if (has_hybrid) {
+                continue; /* already have one skip*/
+            }
+            has_hybrid = PR_TRUE;
         }
         rv = tls13_AddKeyShare(ss, ss->namedGroupPreferences[i]);
         if (rv != SECSuccess) {

@@ -261,7 +261,7 @@ MLDSA_SignInit(MLDSAPrivateKey *key, CK_HEDGE_TYPE hedgeType,
 #else
     int ret = -1;
     MLDSAContext *lctx = NULL;
-    if (!ctx || !key || sgnCtx->len > 255) {
+    if (!ctx || !key || (sgnCtx && sgnCtx->len > 255)) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         return SECFailure;
     }
@@ -434,7 +434,7 @@ MLDSA_VerifyInit(MLDSAPublicKey *key, const SECItem *sgnCtx, MLDSAContext **ctx)
 #else
     MLDSAContext *lctx;
     int ret = -1;
-    if (!ctx || !key || sgnCtx->len > 255) {
+    if (!ctx || !key || (sgnCtx && sgnCtx->len > 255)) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         return SECFailure;
     }
