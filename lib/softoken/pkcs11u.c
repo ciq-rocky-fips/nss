@@ -2460,6 +2460,28 @@ sftk_GetHashTypeFromMechanism(CK_MECHANISM_TYPE mech)
     }
 }
 
+/*
+ * Utility function for converting parameter HASH_HashTypes types into
+ * CK_MECHANISM_TYPE. Only used internally for now.
+ */
+static CK_MECHANISM_TYPE sftk_GetMechanismFromHashType(HASH_HashType hash)
+{
+    switch (hash) {
+        case HASH_AlgSHA1:
+             return CKM_SHA_1;
+        case HASH_AlgSHA224:
+             return CKM_SHA224;
+        case HASH_AlgSHA256:
+             return CKM_SHA256;
+        case HASH_AlgSHA384:
+             return CKM_SHA384;
+        case HASH_AlgSHA512:
+             return CKM_SHA512;
+        default:
+             return CKM_INVALID_MECHANISM;
+    }
+}
+
 #ifdef NSS_HAS_FIPS_INDICATORS
 /**************** FIPS Indicator Utilities *************************/
 /* sigh, we probably need a version of this in secutil so that both
@@ -2603,6 +2625,8 @@ sftk_checkFIPSHash(CK_MECHANISM_TYPE hash, PRBool allowSmall, PRBool allowCMAC)
     return PR_FALSE;
 }
 
+extern HASH_HashType pkcs5_prf_alg_to_hash(CK_PKCS5_PBKD2_PSEUDO_RANDOM_FUNCTION_TYPE prf);
+
 /*
  * handle specialized FIPS semantics that are too complicated to
  * handle with just a table. NOTE: this means any additional semantics
@@ -2691,6 +2715,8 @@ sftk_handleSpecial(SFTKSlot *slot, CK_MECHANISM *mech,
              *    2. salt must be at least 128 bits (16 bytes).
              *    3. password must match the length specified in the SP
              */
+            HASH_HashType prf_hash = HASH_AlgNULL;
+            CK_MECHANISM_TYPE prf_mech_type = CKM_INVALID_MECHANISM;
             CK_PKCS5_PBKD2_PARAMS2 *pbkdf2 = (CK_PKCS5_PBKD2_PARAMS2 *)
                                                 mech->pParameter;
             if (mech->ulParameterLen != sizeof(*pbkdf2)) {
@@ -2705,7 +2731,16 @@ sftk_handleSpecial(SFTKSlot *slot, CK_MECHANISM *mech,
             if (pbkdf2->ulPasswordLen < SFTKFIPS_PBKDF2_MIN_PW_LEN) {
                 return PR_FALSE;
             }
-            return PR_TRUE;
+            /* Ensure the PRF is a FIPS approved hash */
+            prf_hash = pkcs5_prf_alg_to_hash(pbkdf2->prf);
+            if (prf_hash == HASH_AlgNULL) {
+                return PR_FALSE;
+            }
+            prf_mech_type = sftk_GetMechanismFromHashType(prf_hash);
+            if (prf_mech_type == CKM_INVALID_MECHANISM) {
+                return PR_FALSE;
+            }
+            return sftk_checkFIPSHash(prf_mech_type, PR_FALSE, PR_FALSE);
         }
         /* check the hash mechanisms to make sure they themselves are FIPS */
         case SFTKFIPSChkHashSp800:

@@ -4959,6 +4959,24 @@ nsc_SetupHMACKeyGen(CK_MECHANISM_PTR pMechanism, NSSPKCS5PBEParameter **pbe)
     return CKR_OK;
 }
 
+HASH_HashType pkcs5_prf_alg_to_hash(CK_PKCS5_PBKD2_PSEUDO_RANDOM_FUNCTION_TYPE prf)
+{
+    switch (prf) {
+        case CKP_PKCS5_PBKD2_HMAC_SHA1:
+            return HASH_AlgSHA1;
+        case CKP_PKCS5_PBKD2_HMAC_SHA224:
+            return HASH_AlgSHA224;
+        case CKP_PKCS5_PBKD2_HMAC_SHA256:
+            return HASH_AlgSHA256;
+        case CKP_PKCS5_PBKD2_HMAC_SHA384:
+            return HASH_AlgSHA384;
+        case CKP_PKCS5_PBKD2_HMAC_SHA512:
+            return HASH_AlgSHA512;
+        default:
+            return HASH_AlgNULL;
+    }
+}
+
 /* maybe this should be table driven? */
 static CK_RV
 nsc_SetupPBEKeyGen(CK_MECHANISM_PTR pMechanism, NSSPKCS5PBEParameter **pbe,
@@ -4986,24 +5004,9 @@ nsc_SetupPBEKeyGen(CK_MECHANISM_PTR pMechanism, NSSPKCS5PBEParameter **pbe,
             return CKR_MECHANISM_PARAM_INVALID;
         }
         pbkd2_params = (CK_PKCS5_PBKD2_PARAMS2 *)pMechanism->pParameter;
-        switch (pbkd2_params->prf) {
-            case CKP_PKCS5_PBKD2_HMAC_SHA1:
-                hashType = HASH_AlgSHA1;
-                break;
-            case CKP_PKCS5_PBKD2_HMAC_SHA224:
-                hashType = HASH_AlgSHA224;
-                break;
-            case CKP_PKCS5_PBKD2_HMAC_SHA256:
-                hashType = HASH_AlgSHA256;
-                break;
-            case CKP_PKCS5_PBKD2_HMAC_SHA384:
-                hashType = HASH_AlgSHA384;
-                break;
-            case CKP_PKCS5_PBKD2_HMAC_SHA512:
-                hashType = HASH_AlgSHA512;
-                break;
-            default:
-                return CKR_MECHANISM_PARAM_INVALID;
+        hashType = pkcs5_prf_alg_to_hash(pbkd2_params->prf);
+        if (hashType == HASH_AlgNULL) {
+            return CKR_MECHANISM_PARAM_INVALID;
         }
         if (pbkd2_params->saltSource != CKZ_SALT_SPECIFIED) {
             return CKR_MECHANISM_PARAM_INVALID;
