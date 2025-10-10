@@ -555,6 +555,11 @@ sftk_isTrue(SFTKObject *object, CK_ATTRIBUTE_TYPE type)
     if (attribute == NULL) {
         return PR_FALSE;
     }
+    if ((attribute->attrib.pValue == NULL) ||
+        (attribute->attrib.ulValueLen != sizeof(CK_BBOOL))) {
+        return PR_FALSE;
+    }
+
     tok = (PRBool)(*(CK_BBOOL *)attribute->attrib.pValue);
     sftk_FreeAttribute(attribute);
 

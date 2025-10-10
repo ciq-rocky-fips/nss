@@ -80,19 +80,30 @@ tls13_SizeOfKeyShareEntry(const sslEphemeralKeyPair *keyPair)
 
     if (keyPair->kemKeys) {
         PORT_Assert(!keyPair->kemCt);
-        PORT_Assert(keyPair->group->name == ssl_grp_kem_xyber768d00 || keyPair->group->name == ssl_grp_kem_mlkem768x25519);
+        PORT_Assert(
+#ifndef NSS_DISABLE_KYBER
+                keyPair->group->name == ssl_grp_kem_xyber768d00 ||
+#endif
+                keyPair->group->name == ssl_grp_kem_mlkem768x25519 ||
+                keyPair->group->name == ssl_grp_kem_secp256r1mlkem768);
         pubKey = keyPair->kemKeys->pubKey;
         size += pubKey->u.kyber.publicValue.len;
     }
     if (keyPair->kemCt) {
         PORT_Assert(!keyPair->kemKeys);
-        PORT_Assert(keyPair->group->name == ssl_grp_kem_xyber768d00 || keyPair->group->name == ssl_grp_kem_mlkem768x25519);
+        PORT_Assert(
+#ifndef NSS_DISABLE_KYBER
+                keyPair->group->name == ssl_grp_kem_xyber768d00 ||
+#endif
+                keyPair->group->name == ssl_grp_kem_mlkem768x25519 ||
+                keyPair->group->name == ssl_grp_kem_secp256r1mlkem768);
         size += keyPair->kemCt->len;
     }
 
     return size;
 }
 
+#ifndef NSS_DISABLE_KYBER
 static SECStatus
 tls13_WriteXyber768D00KeyExchangeInfo(sslBuffer *buf, sslEphemeralKeyPair *keyPair)
 {
@@ -100,6 +111,34 @@ tls13_WriteXyber768D00KeyExchangeInfo(sslBuffer *buf, sslEphemeralKeyPair *keyPa
     PORT_Assert(keyPair->keys->pubKey->keyType == ecKey);
 
     // Encode the X25519 share first, then the Kyber768 key or ciphertext.
+    SECStatus rv;
+    rv = sslBuffer_Append(buf, keyPair->keys->pubKey->u.ec.publicValue.data,
+                          keyPair->keys->pubKey->u.ec.publicValue.len);
+    if (rv != SECSuccess) {
+        return rv;
+    }
+
+    if (keyPair->kemKeys) {
+        PORT_Assert(!keyPair->kemCt);
+        rv = sslBuffer_Append(buf, keyPair->kemKeys->pubKey->u.kyber.publicValue.data, keyPair->kemKeys->pubKey->u.kyber.publicValue.len);
+    } else if (keyPair->kemCt) {
+        rv = sslBuffer_Append(buf, keyPair->kemCt->data, keyPair->kemCt->len);
+    } else {
+        PORT_Assert(0);
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        rv = SECFailure;
+    }
+    return rv;
+}
+#endif
+
+static SECStatus
+tls13_WriteMLKEM768Secp256r1KeyExchangeInfo(sslBuffer *buf, sslEphemeralKeyPair *keyPair)
+ {
+    PORT_Assert(keyPair->group->name == ssl_grp_kem_secp256r1mlkem768);
+    PORT_Assert(keyPair->keys->pubKey->keyType == ecKey);
+
+    // Encode the p256 key first, then the Kyber768 key or ciphertext.
     SECStatus rv;
     rv = sslBuffer_Append(buf, keyPair->keys->pubKey->u.ec.publicValue.data,
                           keyPair->keys->pubKey->u.ec.publicValue.len);
@@ -187,12 +226,18 @@ tls13_EncodeKeyShareEntry(sslBuffer *buf, sslEphemeralKeyPair *keyPair)
     }
 
     switch (keyPair->group->name) {
-        case ssl_grp_kem_mlkem768x25519:
-            rv = tls13_WriteMLKEM768X25519KeyExchangeInfo(buf, keyPair);
-            break;
+#ifndef NSS_DISABLE_KYBER
         case ssl_grp_kem_xyber768d00:
             rv = tls13_WriteXyber768D00KeyExchangeInfo(buf, keyPair);
             break;
+#endif
+        case ssl_grp_kem_mlkem768x25519:
+            rv = tls13_WriteMLKEM768X25519KeyExchangeInfo(buf, keyPair);
+            break;
+        case ssl_grp_kem_secp256r1mlkem768:
+            rv = tls13_WriteMLKEM768Secp256r1KeyExchangeInfo(buf, keyPair);
+            break;
+
         default:
             rv = tls13_WriteKeyExchangeInfo(buf, keyPair);
             break;

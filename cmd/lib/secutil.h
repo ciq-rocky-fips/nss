@@ -425,6 +425,8 @@ SECStatus parseGroupList(const char *arg, SSLNamedGroup **enabledGroups,
 SECStatus parseSigSchemeList(const char *arg,
                              const SSLSignatureScheme **enabledSigSchemes,
                              unsigned int *enabledSigSchemeCount);
+const char *SECU_NamedGroupToGroupName(SSLNamedGroup grp);
+
 typedef struct {
     SECItem label;
     PRBool hasContext;

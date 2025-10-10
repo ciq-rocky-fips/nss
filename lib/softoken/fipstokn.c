@@ -24,6 +24,7 @@
 #include "pkcs11i.h"
 #include "prenv.h"
 #include "prprf.h"
+#include "kem.h"
 
 #include <ctype.h>
 
@@ -261,6 +262,30 @@ static CK_FUNCTION_LIST_3_0 sftk_fipsTable = {
 
 };
 
+CK_RV FC_Encapsulate(CK_SESSION_HANDLE hSession,
+                      CK_MECHANISM_PTR pMechanism,
+                      CK_OBJECT_HANDLE hPublicKey,
+                      CK_ATTRIBUTE_PTR pTemplate,
+                      CK_ULONG ulAttributeCount,
+                      CK_OBJECT_HANDLE_PTR phKey,
+                      CK_BYTE_PTR pCiphertext,
+                      CK_ULONG_PTR pulCiphertextLen);
+
+CK_RV FC_Decapsulate(CK_SESSION_HANDLE hSession,
+                      CK_MECHANISM_PTR pMechanism,
+                      CK_OBJECT_HANDLE hPrivateKey,
+                      CK_BYTE_PTR pCiphertext,
+                      CK_ULONG ulCiphertextLen,
+                      CK_ATTRIBUTE_PTR pTemplate,
+                      CK_ULONG ulAttributeCount,
+                      CK_OBJECT_HANDLE_PTR phKey);
+
+CK_NSS_KEM_FUNCTIONS sftk_fips_kem_funcList = {
+    { 1, 0 },
+    FC_Encapsulate,
+    FC_Decapsulate
+};
+
 /* forward declaration of special GetInfo functions */
 CK_RV FC_GetInfoV2(CK_INFO_PTR pInfo);
 CK_RV NSC_GetInfoV2(CK_INFO_PTR pInfo);
@@ -302,10 +327,11 @@ static CK_INTERFACE fips_interfaces[] = {
     { (CK_UTF8CHAR_PTR) "PKCS 11", &sftk_fipsTable, NSS_INTERFACE_FLAGS },
     { (CK_UTF8CHAR_PTR) "PKCS 11", &sftk_fipsTable_v2, NSS_INTERFACE_FLAGS },
     { (CK_UTF8CHAR_PTR) "Vendor NSS Module Interface", &sftk_module_funcList, NSS_INTERFACE_FLAGS },
-    { (CK_UTF8CHAR_PTR) "Vendor NSS FIPS Interface", &sftk_fips_funcList, NSS_INTERFACE_FLAGS }
+    { (CK_UTF8CHAR_PTR) "Vendor NSS FIPS Interface", &sftk_fips_funcList, NSS_INTERFACE_FLAGS },
+    { (CK_UTF8CHAR_PTR) "Vendor NSS KEM Interface", &sftk_fips_kem_funcList, NSS_INTERFACE_FLAGS }
 };
 /* must match the count of interfaces in fips_interfaces above*/
-#define FIPS_INTERFACE_COUNT 4
+#define FIPS_INTERFACE_COUNT PR_ARRAY_SIZE(fips_interfaces)
 
 /* CKO_NOT_A_KEY can be any object class that's not a key object. */
 #define CKO_NOT_A_KEY CKO_DATA
@@ -350,6 +376,8 @@ sftk_mapLinuxAuditType(NSSAuditSeverity severity, NSSAuditType auditType)
         case NSS_AUDIT_LOAD_KEY:
         case NSS_AUDIT_UNWRAP_KEY:
         case NSS_AUDIT_WRAP_KEY:
+        case NSS_AUDIT_ENCAPSULATE_KEY:
+        case NSS_AUDIT_DECAPSULATE_KEY:
             return AUDIT_CRYPTO_KEY_USER;
         case NSS_AUDIT_CRYPT:
             return (severity == NSS_AUDIT_ERROR) ? AUDIT_CRYPTO_FAILURE_USER : AUDIT_CRYPTO_KEY_USER;
@@ -2077,4 +2105,76 @@ FC_MessageVerifyFinal(CK_SESSION_HANDLE hSession)
     SFTK_FIPSCHECK();
     CHECK_FORK();
     return NSC_MessageVerifyFinal(hSession);
+}
+
+/*
+ * vendor specific encapsulate/decapsulate
+ */
+CK_RV
+FC_Encapsulate(CK_SESSION_HANDLE hSession,
+               CK_MECHANISM_PTR pMechanism,
+               CK_OBJECT_HANDLE hPublicKey,
+               CK_ATTRIBUTE_PTR pTemplate,
+               CK_ULONG ulAttributeCount,
+               CK_OBJECT_HANDLE_PTR phKey,
+               CK_BYTE_PTR pCiphertext,
+               CK_ULONG_PTR pulCiphertextLen)
+{
+    CK_BBOOL *boolptr;
+    SFTK_FIPSCHECK();
+    CHECK_FORK();
+
+    /* all secret keys must be sensitive, if the upper level code tries to say
+     * otherwise, reject it. */
+    boolptr = (CK_BBOOL *)fc_getAttribute(pTemplate,
+                                          ulAttributeCount, CKA_SENSITIVE);
+    if (boolptr != NULL) {
+        if (!(*boolptr)) {
+            return CKR_ATTRIBUTE_VALUE_INVALID;
+        }
+    }
+
+    rv = NSC_Encapsulate(hSession, pMechanism, hPublicKey, pTemplate,
+                         ulAttributeCount, phKey, pCiphertext,
+                         pulCiphertextLen);
+    if (sftk_audit_enabled) {
+        sftk_AuditEncapsulate(hSession, pMechanism, hPublicKey, pTemplate,
+                              ulAttributeCount, phKey, pCiphertext,
+                              pulCiphertextLen, rv);
+    }
+    return rv;
+}
+
+CK_RV
+FC_Decapsulate(CK_SESSION_HANDLE hSession,
+               CK_MECHANISM_PTR pMechanism,
+               CK_OBJECT_HANDLE hPrivateKey,
+               CK_BYTE_PTR pCiphertext,
+               CK_ULONG ulCiphertextLen,
+               CK_ATTRIBUTE_PTR pTemplate,
+               CK_ULONG ulAttributeCount,
+               CK_OBJECT_HANDLE_PTR phKey)
+{
+    CK_BBOOL *boolptr;
+    SFTK_FIPSCHECK();
+    CHECK_FORK();
+
+    /* all secret keys must be sensitive, if the upper level code tries to say
+     * otherwise, reject it. */
+    boolptr = (CK_BBOOL *)fc_getAttribute(pTemplate,
+                                          ulAttributeCount, CKA_SENSITIVE);
+    if (boolptr != NULL) {
+        if (!(*boolptr)) {
+            return CKR_ATTRIBUTE_VALUE_INVALID;
+        }
+    }
+
+    rv = NSC_Decapsulate(hSession, pMechanism, hPrivateKey, pCiphertext,
+                         ulCiphertextLen, pTemplate, ulAttributeCount, phKey);
+    if (sftk_audit_enabled) {
+        sftk_AuditDecapsulate(hSession, pMechanism, hPrivateKey, pCiphertext,
+                              ulCiphertextLen, pTemplate, ulAttributeCount,
+                              phKey, rv);
+    }
+    return rv;
 }

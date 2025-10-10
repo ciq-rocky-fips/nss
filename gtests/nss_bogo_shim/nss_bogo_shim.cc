@@ -435,6 +435,7 @@ class TestAgent {
       if (rv != SECSuccess) {
         return false;
       }
+#ifndef NSS_DISABLE_KYBER
       // Xyber768 is disabled by policy by default, so if it's requested
       // we need to update the policy flags as well.
       for (auto group : groups) {
@@ -442,6 +443,7 @@ class TestAgent {
           NSS_SetAlgorithmPolicy(SEC_OID_XYBER768D00, NSS_USE_ALG_IN_SSL_KX, 0);
         }
       }
+#endif
     }
 
     return true;

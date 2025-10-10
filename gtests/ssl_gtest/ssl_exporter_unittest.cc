@@ -82,8 +82,11 @@ TEST_P(TlsConnectGenericPre13, ExporterContextLengthTooLong) {
       0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xFF};
 
   EnsureTlsSetup();
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
+  server_->ConfigNamedGroups(kNonPQDHEGroups);
   Connect();
-  CheckKeys();
+  CheckKeys(ssl_kea_ecdh, ssl_auth_rsa_sign);
+
 
   static const size_t exporter_len = 10;
   uint8_t client_value[exporter_len] = {0};

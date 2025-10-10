@@ -1900,6 +1900,12 @@ const static SECOidData oids[SEC_OID_TOTAL] = {
         "ML-KEM-768+X25519 key exchange", CKM_INVALID_MECHANISM, INVALID_CERT_EXTENSION),
     ODE(SEC_OID_TLS_REQUIRE_EMS,
         "TLS Require EMS", CKM_INVALID_MECHANISM, INVALID_CERT_EXTENSION),
+/* this will change upstream. for now apps shouldn't use it */
+/* we need it for the policy code.  */
+    ODE(SEC_OID_PRIVATE_1,
+        "ML-KEM-768+SECP256 key exchange", CKM_INVALID_MECHANISM, INVALID_CERT_EXTENSION),
+    ODE(SEC_OID_PRIVATE_2,
+        "ML-KEM-1024+SECP256 key exchange", CKM_INVALID_MECHANISM, INVALID_CERT_EXTENSION),
 
 };
 

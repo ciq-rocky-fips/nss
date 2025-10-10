@@ -29,7 +29,7 @@ TEST_P(TlsConnectGeneric, ConnectDhe) {
 
 TEST_P(TlsConnectTls13, SharesForBothEcdheAndDhe) {
   EnsureTlsSetup();
-  client_->ConfigNamedGroups(kAllDHEGroups);
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
 
   auto groups_capture =
       std::make_shared<TlsExtensionCapture>(client_, ssl_supported_groups_xtn);
@@ -41,7 +41,7 @@ TEST_P(TlsConnectTls13, SharesForBothEcdheAndDhe) {
 
   Connect();
 
-  CheckKeys();
+  CheckKeys(ssl_kea_ecdh, ssl_auth_rsa_sign);
 
   bool ec, dh;
   auto track_group_type = [&ec, &dh](SSLNamedGroup group) {

@@ -298,9 +298,11 @@ printSecurityInfo(PRFileDesc *fd)
                     channel.isFIPS ? " FIPS" : "");
             FPRINTF(stderr,
                     "strsclnt: Server Auth: %d-bit %s, Key Exchange: %d-bit %s\n"
+                    "          Key Exchange Group:%s\n"
                     "          Compression: %s\n",
                     channel.authKeyBits, suite.authAlgorithmName,
                     channel.keaKeyBits, suite.keaTypeName,
+                    SECU_NamedGroupToGroupName(channel.keaGroup),
                     channel.compressionMethodName);
         }
     }

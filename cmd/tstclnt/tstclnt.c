@@ -176,10 +176,12 @@ printSecurityInfo(PRFileDesc *fd)
                     channel.isFIPS ? " FIPS" : "");
             FPRINTF(stderr,
                     "tstclnt: Server Auth: %d-bit %s, Key Exchange: %d-bit %s\n"
+                    "         Key Exchange Group:%s\n"
                     "         Compression: %s, Extended Master Secret: %s\n"
                     "         Signature Scheme: %s\n",
                     channel.authKeyBits, suite.authAlgorithmName,
                     channel.keaKeyBits, suite.keaTypeName,
+                    SECU_NamedGroupToGroupName(channel.keaGroup),
                     channel.compressionMethodName,
                     channel.extendedMasterSecretUsed ? "Yes" : "No",
                     signatureSchemeName(channel.signatureScheme));
@@ -308,7 +310,11 @@ PrintParameterUsage()
     fprintf(stderr, "%-20s Comma separated list of enabled groups for TLS key exchange.\n"
                     "%-20s The following values are valid:\n"
                     "%-20s P256, P384, P521, x25519, FF2048, FF3072, FF4096, FF6144, FF8192\n"
-                    "%-20s xyber768d00, mlkem768x25519\n",
+                    "%-20s "
+#ifndef NSS_DISABLE_KYBER
+                    "xyber768d00,  "
+#endif
+                    "mlkem768x25519, mlkem768secp256r1\n",
             "-I", "", "", "");
     fprintf(stderr, "%-20s Comma separated list of signature schemes in preference order.\n"
                     "%-20s The following values are valid:\n"

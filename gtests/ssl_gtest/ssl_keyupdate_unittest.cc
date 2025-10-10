@@ -1180,6 +1180,8 @@ TEST_F(TlsConnectDatagram13, DTLSKU_WrongValueForUpdateRequested) {
 
 TEST_F(TlsConnectDatagram13, DTLSKU_DamagedLength) {
   EnsureTlsSetup();
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
+  server_->ConfigNamedGroups(kNonPQDHEGroups);
   // Filter replacing the length value with 0.
   auto filter = MakeTlsFilter<TLSKeyUpdateDamager>(client_, 3, 0);
   filter->EnableDecryption();
@@ -1217,6 +1219,8 @@ TEST_F(TlsConnectDatagram13, DTLSKU_DamagedLengthTooLong) {
 
 TEST_F(TlsConnectDatagram13, DTLSKU_DamagedFragmentLength) {
   EnsureTlsSetup();
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
+  server_->ConfigNamedGroups(kNonPQDHEGroups);
   // Filter replacing the fragment length with 1.
   auto filter = MakeTlsFilter<TLSKeyUpdateDamager>(client_, 10, 1);
   filter->EnableDecryption();

@@ -130,7 +130,13 @@ typedef enum { SSLAppOpRead = 0,
 #define DTLS_RETRANSMIT_FINISHED_MS 30000
 
 /* default number of entries in namedGroupPreferences */
+#ifndef NSS_DISABLE_KYBER
+/* this define is checked against the namedGroup table
+ * and compile time asserts kick in if it doesn't match */
+#define SSL_NAMED_GROUP_COUNT 34
+#else
 #define SSL_NAMED_GROUP_COUNT 33
+#endif
 
 /* The maximum DH and RSA bit-length supported. */
 #define SSL_MAX_DH_KEY_BITS 8192

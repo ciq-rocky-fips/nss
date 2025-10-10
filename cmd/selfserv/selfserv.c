@@ -227,7 +227,11 @@ PrintParameterUsage()
         "-I comma separated list of enabled groups for TLS key exchange.\n"
         "   The following values are valid:\n"
         "   P256, P384, P521, x25519, FF2048, FF3072, FF4096, FF6144, FF8192,\n"
-        "   xyber768d00, mlkem768x25519\n"
+        "   "
+#ifndef NSS_DISABLE_KYBER
+        "xyber768d00, "
+#endif
+        "mlkem768x25519, mlkem768secp256r1\n"
         "-J comma separated list of enabled signature schemes in preference order.\n"
         "   The following values are valid:\n"
         "     rsa_pkcs1_sha1, rsa_pkcs1_sha256, rsa_pkcs1_sha384, rsa_pkcs1_sha512,\n"
@@ -410,9 +414,11 @@ printSecurityInfo(PRFileDesc *fd)
                     channel.isFIPS ? " FIPS" : "");
             FPRINTF(stderr,
                     "selfserv: Server Auth: %d-bit %s, Key Exchange: %d-bit %s\n"
+                    "          Key Exchange Group:%s\n"
                     "          Compression: %s, Extended Master Secret: %s\n",
                     channel.authKeyBits, suite.authAlgorithmName,
                     channel.keaKeyBits, suite.keaTypeName,
+                    SECU_NamedGroupToGroupName(channel.keaGroup),
                     channel.compressionMethodName,
                     channel.extendedMasterSecretUsed ? "Yes" : "No");
         }

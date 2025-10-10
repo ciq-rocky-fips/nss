@@ -249,24 +249,31 @@ PK11_ImportPublicKey(PK11SlotInfo *slot, SECKEYPublicKey *pubKey,
                 }
                 break;
             case kyberKey:
+                /*fprintf(stderr, "PK11_ImportPublic key kyber, params=%d\n",
+                        pubKey->u.kyber.params);*/
                 switch (pubKey->u.kyber.params) {
+#ifndef NSS_DISABLE_KYBER
                     case params_kyber768_round3:
                     case params_kyber768_round3_test_mode:
                         keyType = CKK_NSS_KYBER;
                         kemParams = CKP_NSS_KYBER_768_ROUND3;
                         break;
+#endif
                     case params_ml_kem768:
                     case params_ml_kem768_test_mode:
-                        keyType = CKK_NSS_ML_KEM;
-                        kemParams = CKP_NSS_ML_KEM_768;
+                        keyType = CKK_ML_KEM;
+                        kemParams = CKP_ML_KEM_768;
                         break;
                     default:
                         kemParams = CKP_INVALID_ID;
                         break;
                 }
-                PK11_SETATTRS(attrs, CKA_NSS_PARAMETER_SET,
+                /*fprintf(stderr, "PK11_ImportPublic KEY_TYPE=0x%08lx, kem_params=0x%08lxd\n",
+                        keyType, kemParams); */
+
+                PK11_SETATTRS(attrs, CKA_PARAMETER_SET,
                               &kemParams,
-                              sizeof(CK_NSS_KEM_PARAMETER_SET_TYPE));
+                              sizeof(CK_ML_KEM_PARAMETER_SET_TYPE));
                 attrs++;
                 PK11_SETATTRS(attrs, CKA_VALUE, pubKey->u.kyber.publicValue.data,
                               pubKey->u.kyber.publicValue.len);
@@ -298,6 +305,7 @@ PK11_ImportPublicKey(PK11SlotInfo *slot, SECKEYPublicKey *pubKey,
             SECITEM_FreeItem(pubValue, PR_TRUE);
         }
         if (rv != SECSuccess) {
+            /* fprintf(stderr, "PK11_CreatNewObject failed %d\n", PORT_GetError()); */
             return CK_INVALID_HANDLE;
         }
     }
@@ -684,8 +692,11 @@ PK11_ExtractPublicKey(PK11SlotInfo *slot, KeyType keyType, CK_OBJECT_HANDLE id)
             case CKK_EC_EDWARDS:
                 keyType = edKey;
                 break;
+#ifndef NSS_DISABLE_KYBER
             case CKK_NSS_KYBER:
+#endif
             case CKK_NSS_ML_KEM:
+            case CKK_ML_KEM:
                 keyType = kyberKey;
                 break;
             default:
@@ -852,35 +863,54 @@ PK11_ExtractPublicKey(PK11SlotInfo *slot, KeyType keyType, CK_OBJECT_HANDLE id)
             PK11_SETATTRS(attrs, CKA_VALUE, NULL, 0);
             attrs++;
             kemParams = attrs;
-            PK11_SETATTRS(attrs, CKA_NSS_PARAMETER_SET, NULL, 0);
+            PK11_SETATTRS(attrs, CKA_PARAMETER_SET, NULL, 0);
             attrs++;
             templateCount = attrs - template;
             PR_ASSERT(templateCount <= sizeof(template) / sizeof(CK_ATTRIBUTE));
 
             crv = PK11_GetAttributes(arena, slot, id, template, templateCount);
-            if (crv != CKR_OK)
-                break;
-
+            if (crv != CKR_OK) {
+                /* try to fetch with the vendor specific
+                 * CKA_NSS_PARAMETER_SET */
+                kemParams->type = CKA_NSS_PARAMETER_SET;
+                crv = PK11_GetAttributes(arena, slot, id, template,
+                                         templateCount);
+                if (crv != CKR_OK) {
+                    break;
+                }
+            }
             if (keyClass != CKO_PUBLIC_KEY) {
                 crv = CKR_OBJECT_HANDLE_INVALID;
                 break;
             }
-
-            if (pk11KeyType != CKK_NSS_KYBER && pk11KeyType != CKK_NSS_ML_KEM) {
-                crv = CKR_OBJECT_HANDLE_INVALID;
+            switch (pk11KeyType) {
+#ifndef NSS_DISABLE_KYBER
+                case CKK_NSS_KYBER:
+#endif
+                case CKK_NSS_ML_KEM:
+                case CKK_ML_KEM:
+                    break;
+                default:
+                    crv = CKR_OBJECT_HANDLE_INVALID;
+                    break;
+            }
+            if (crv != CKR_OK) {
                 break;
             }
 
-            if (kemParams->ulValueLen != sizeof(CK_NSS_KEM_PARAMETER_SET_TYPE)) {
+            if (kemParams->ulValueLen != sizeof(CK_ML_KEM_PARAMETER_SET_TYPE)) {
                 crv = CKR_OBJECT_HANDLE_INVALID;
                 break;
             }
-            CK_NSS_KEM_PARAMETER_SET_TYPE *pPK11Params = kemParams->pValue;
+            CK_ML_KEM_PARAMETER_SET_TYPE *pPK11Params = kemParams->pValue;
             switch (*pPK11Params) {
+#ifdef NSS_DISABLE_KYBER
                 case CKP_NSS_KYBER_768_ROUND3:
                     pubKey->u.kyber.params = params_kyber768_round3;
                     break;
+#endif
                 case CKP_NSS_ML_KEM_768:
+                case CKP_ML_KEM_768:
                     pubKey->u.kyber.params = params_ml_kem768;
                     break;
                 default:
@@ -948,8 +978,11 @@ PK11_MakePrivKey(PK11SlotInfo *slot, KeyType keyType,
             case CKK_EC_EDWARDS:
                 keyType = edKey;
                 break;
+#ifndef NSS_DISABLE_KYBER
             case CKK_NSS_KYBER:
+#endif
             case CKK_NSS_ML_KEM:
+            case CKK_ML_KEM:
                 keyType = kyberKey;
                 break;
             default:
@@ -1293,6 +1326,7 @@ PK11_GenerateKeyPairWithOpFlags(PK11SlotInfo *slot, CK_MECHANISM_TYPE type,
         { CKA_DECRYPT, NULL, 0 },
         { CKA_EXTRACTABLE, NULL, 0 },
         { CKA_MODIFIABLE, NULL, 0 },
+        { CKA_DECAPSULATE, NULL, 0 },
     };
     CK_ATTRIBUTE rsaPubTemplate[] = {
         { CKA_MODULUS_BITS, NULL, 0 },
@@ -1304,6 +1338,7 @@ PK11_GenerateKeyPairWithOpFlags(PK11SlotInfo *slot, CK_MECHANISM_TYPE type,
         { CKA_VERIFY_RECOVER, NULL, 0 },
         { CKA_ENCRYPT, NULL, 0 },
         { CKA_MODIFIABLE, NULL, 0 },
+        { CKA_ENCAPSULATE, NULL, 0 },
     };
     CK_ATTRIBUTE dsaPubTemplate[] = {
         { CKA_PRIME, NULL, 0 },
@@ -1316,6 +1351,7 @@ PK11_GenerateKeyPairWithOpFlags(PK11SlotInfo *slot, CK_MECHANISM_TYPE type,
         { CKA_VERIFY_RECOVER, NULL, 0 },
         { CKA_ENCRYPT, NULL, 0 },
         { CKA_MODIFIABLE, NULL, 0 },
+        { CKA_ENCAPSULATE, NULL, 0 },
     };
     CK_ATTRIBUTE dhPubTemplate[] = {
         { CKA_PRIME, NULL, 0 },
@@ -1327,6 +1363,7 @@ PK11_GenerateKeyPairWithOpFlags(PK11SlotInfo *slot, CK_MECHANISM_TYPE type,
         { CKA_VERIFY_RECOVER, NULL, 0 },
         { CKA_ENCRYPT, NULL, 0 },
         { CKA_MODIFIABLE, NULL, 0 },
+        { CKA_ENCAPSULATE, NULL, 0 },
     };
     CK_ATTRIBUTE ecPubTemplate[] = {
         { CKA_EC_PARAMS, NULL, 0 },
@@ -1337,6 +1374,7 @@ PK11_GenerateKeyPairWithOpFlags(PK11SlotInfo *slot, CK_MECHANISM_TYPE type,
         { CKA_VERIFY_RECOVER, NULL, 0 },
         { CKA_ENCRYPT, NULL, 0 },
         { CKA_MODIFIABLE, NULL, 0 },
+        { CKA_ENCAPSULATE, NULL, 0 },
     };
     SECKEYECParams *ecParams;
 
@@ -1349,6 +1387,7 @@ PK11_GenerateKeyPairWithOpFlags(PK11SlotInfo *slot, CK_MECHANISM_TYPE type,
         { CKA_VERIFY_RECOVER, NULL, 0 },
         { CKA_ENCRYPT, NULL, 0 },
         { CKA_MODIFIABLE, NULL, 0 },
+        { CKA_ENCAPSULATE, NULL, 0 },
     };
 
     /*CK_ULONG key_size = 0;*/
@@ -1557,18 +1596,17 @@ PK11_GenerateKeyPairWithOpFlags(PK11SlotInfo *slot, CK_MECHANISM_TYPE type,
                 test_mech2.mechanism = CKM_ECDSA;
             }
             break;
+#ifndef NSS_DISABLE_KYBER
         case CKM_NSS_KYBER_KEY_PAIR_GEN:
-            kemParams = (CK_NSS_KEM_PARAMETER_SET_TYPE *)param;
-            attrs = kyberPubTemplate;
-            PK11_SETATTRS(attrs, CKA_NSS_PARAMETER_SET,
-                          kemParams,
-                          sizeof(CK_NSS_KEM_PARAMETER_SET_TYPE));
-            attrs++;
-            pubTemplate = kyberPubTemplate;
-            keyType = kyberKey;
             test_mech.mechanism = CKM_NSS_KYBER;
-            break;
+            goto ml_kem_gen;
+#endif
         case CKM_NSS_ML_KEM_KEY_PAIR_GEN:
+            test_mech.mechanism = CKM_NSS_ML_KEM;
+            goto ml_kem_gen;
+        case CKM_ML_KEM_KEY_PAIR_GEN:
+            test_mech.mechanism = CKM_ML_KEM;
+ml_kem_gen:
             kemParams = (CK_NSS_KEM_PARAMETER_SET_TYPE *)param;
             attrs = kyberPubTemplate;
             PK11_SETATTRS(attrs, CKA_NSS_PARAMETER_SET,
@@ -1577,7 +1615,6 @@ PK11_GenerateKeyPairWithOpFlags(PK11SlotInfo *slot, CK_MECHANISM_TYPE type,
             attrs++;
             pubTemplate = kyberPubTemplate;
             keyType = kyberKey;
-            test_mech.mechanism = CKM_NSS_ML_KEM;
             break;
         case CKM_EC_MONTGOMERY_KEY_PAIR_GEN:
             ecParams = (SECKEYECParams *)param;
@@ -1658,7 +1695,13 @@ PK11_GenerateKeyPairWithOpFlags(PK11SlotInfo *slot, CK_MECHANISM_TYPE type,
             case CKM_EDDSA:
                 mechanism_info.flags = CKF_SIGN | CKF_VERIFY;
                 break;
-
+#ifndef NSS_DISABLE_KYBER
+            case CKM_NSS_KYBER:
+#endif
+            case CKM_NSS_ML_KEM:
+            case CKM_ML_KEM:
+                mechanism_info.flags = CKF_ENCAPSULATE|CKF_DECAPSULATE;
+                break;
             default:
                 break;
         }
@@ -1688,6 +1731,12 @@ PK11_GenerateKeyPairWithOpFlags(PK11SlotInfo *slot, CK_MECHANISM_TYPE type,
                   mechanism_info.flags & CKF_ENCRYPT ? &cktrue : &ckfalse,
                   sizeof(CK_BBOOL));
     attrs++;
+    /* only set encapsulate if it's requested and shows up in the mechanism
+     * list, that way we don't confuse pre-3.2 PKCS #11 modules */
+    if (mechanism_info.flags & CKF_ENCAPSULATE) {
+        PK11_SETATTRS(attrs, CKA_ENCAPSULATE, &cktrue, sizeof(CK_BBOOL));
+        attrs++;
+    }
     /* set the private key attributes */
     PK11_SETATTRS(privattrs, CKA_DERIVE,
                   mechanism_info.flags & CKF_DERIVE ? &cktrue : &ckfalse,
@@ -1705,6 +1754,10 @@ PK11_GenerateKeyPairWithOpFlags(PK11SlotInfo *slot, CK_MECHANISM_TYPE type,
                   mechanism_info.flags & CKF_DECRYPT ? &cktrue : &ckfalse,
                   sizeof(CK_BBOOL));
     privattrs++;
+    if (mechanism_info.flags & CKF_DECAPSULATE) {
+        PK11_SETATTRS(privattrs, CKA_DECAPSULATE, &cktrue, sizeof(CK_BBOOL));
+        privattrs++;
+    }
 
     if (token) {
         session_handle = PK11_GetRWSession(slot);

@@ -319,3 +319,51 @@ sftk_AuditDigestKey(CK_SESSION_HANDLE hSession,
                 (PRUint32)hSession, (PRUint32)hKey, (PRUint32)rv);
     sftk_LogAuditMessage(severity, NSS_AUDIT_DIGEST_KEY, msg);
 }
+
+void
+sftk_AuditEncapsulate(CK_SESSION_HANDLE hSession,
+                      CK_MECHANISM_PTR pMechanism, CK_OBJECT_HANDLE hPublicKey,
+                      CK_ATTRIBUTE_PTR pTemplate, CK_ULONG ulAttributeCount,
+                      CK_OBJECT_HANDLE_PTR phKey, CK_BYTE_PTR pCiphertext,
+                      CK_ULONG_PTR pulCiphertextLen, CK_RV rv)
+{
+    char msg[256];
+    char mech[MECHANISM_BUFSIZE];
+    char shKey[32];
+    NSSAuditSeverity severity = (rv == CKR_OK) ? NSS_AUDIT_INFO : NSS_AUDIT_ERROR;
+
+    sftk_PrintMechanism(mech, sizeof mech, pMechanism);
+    sftk_PrintReturnedObjectHandle(shKey, sizeof shKey, "phKey", phKey, rv);
+    PR_snprintf(msg, sizeof msg,
+                "C_Encapsulate(hSession=0x%08lX, pMechanism=%s, "
+                "hPublicKey=0x%08lX, pTemplate=%p, ulAttributeCount=%lu, "
+                "phKey=%p pCipherText=%p, pulCiphertextLen=%p)=0x%08lX%s",
+                (PRUint32)hSession, mech,
+                (PRUint32)hPublicKey, pTemplate, (PRUint32)ulAttributeCount,
+                phKey, pCiphertext, pulCiphertextLen, (PRUint32)rv, shKey);
+    sftk_LogAuditMessage(severity, NSS_AUDIT_ENCAPSULATE_KEY, msg);
+}
+
+void
+sftk_AuditDecapsulate(CK_SESSION_HANDLE hSession,
+                      CK_MECHANISM_PTR pMechanism, CK_OBJECT_HANDLE hPrivateKey,
+                      CK_BYTE_PTR pCiphertext, CK_ULONG ulCiphertextLen,
+                      CK_ATTRIBUTE_PTR pTemplate, CK_ULONG ulAttributeCount,
+                      CK_OBJECT_HANDLE_PTR phKey, CK_RV rv)
+{
+    char msg[256];
+    char mech[MECHANISM_BUFSIZE];
+    char shKey[32];
+    NSSAuditSeverity severity = (rv == CKR_OK) ? NSS_AUDIT_INFO : NSS_AUDIT_ERROR;
+
+    sftk_PrintMechanism(mech, sizeof mech, pMechanism);
+    sftk_PrintReturnedObjectHandle(shKey, sizeof shKey, "phKey", phKey, rv);
+    PR_snprintf(msg, sizeof msg,
+                "C_Decapsulate(hSession=0x%08lX, pMechanism=%s, "
+                "hPrivateKey=0x%08lX, pCipherText=%p, ulCiphertextLen=%lu,",
+                "pTemplate=%p, ulAttributeCount=%lu, phKey=%p)=0x%08lX%s",
+                (PRUint32)hSession, mech,
+                (PRUint32)hPrivateKey, pCiphertext, (PRUint32)ulCiphertextLen,
+                pTemplate, (PRUint32)ulAttributeCount, phKey, (PRUint32)rv, shKey);
+    sftk_LogAuditMessage(severity, NSS_AUDIT_DECAPSULATE_KEY, msg);
+}
