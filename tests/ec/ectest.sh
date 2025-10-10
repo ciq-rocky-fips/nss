@@ -45,12 +45,20 @@ ectest_genkeydb_test()
   if [ $? -ne 0 ]; then
     return $?
   fi
+  if [ "${TEST_MODE}" = "SHARED_DB" ] ; then
   curves=( \
     "curve25519" \
     "secp256r1" \
     "secp384r1" \
     "secp521r1" \
   )
+  else
+  curves=( \
+    "secp256r1" \
+    "secp384r1" \
+    "secp521r1" \
+  )
+  fi
   for curve in "${curves[@]}"; do
     echo "Test $curve key generation using certutil ..."
     certutil -G -d "${HOSTDIR}" -k ec -q $curve -f "${R_PWFILE}" -z ${NOISE_FILE}
