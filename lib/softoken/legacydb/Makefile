@@ -23,16 +23,17 @@ include $(CORE_DEPTH)/coreconf/config.mk
 ifdef NSS_NO_INIT_SUPPORT
     DEFINES += -DNSS_NO_INIT_SUPPORT
 endif
-ifeq ($(OS_TARGET),Linux)
-ifeq ($(CPU_ARCH),ppc)
-ifdef USE_64
-    DEFINES += -DNSS_NO_INIT_SUPPORT
-endif # USE_64
-endif # ppc
-else # !Linux
+#ifeq ($(OS_TARGET),Linux)
+#ifeq ($(CPU_ARCH),ppc)
+#ifdef USE_64
+#    DEFINES += -DNSS_NO_INIT_SUPPORT
+#endif # USE_64
+#endif # ppc
+#else # !Linux
+ifneq ($(OS_TARGET),Linux)
     # turn off no init support everywhere for now
     DEFINES += -DNSS_NO_INIT_SUPPORT
-endif # Linux
+endif # !Linux
 
 #######################################################################
 # (4) Include "local" platform-dependent assignments (OPTIONAL).      #
