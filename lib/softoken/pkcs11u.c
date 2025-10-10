@@ -1103,6 +1103,7 @@ sftk_NewObject(SFTKSlot *slot)
     object->next = object->prev = NULL;
     object->slot = slot;
     object->isFIPS = sftk_isFIPS(slot->slotID);
+    object->source = SFTK_SOURCE_DEFAULT;
 
     object->refCount = 1;
     sessObject->sessionList.next = NULL;
@@ -1688,6 +1689,7 @@ sftk_CopyObject(SFTKObject *destObject, SFTKObject *srcObject)
     unsigned int i;
 
     destObject->isFIPS = srcObject->isFIPS;
+    destObject->source = srcObject->source;
     if (src_so == NULL) {
         return sftk_CopyTokenObject(destObject, srcObject);
     }
@@ -2073,6 +2075,7 @@ sftk_NewTokenObject(SFTKSlot *slot, SECItem *dbKey, CK_OBJECT_HANDLE handle)
     }
     object->slot = slot;
     object->isFIPS = sftk_isFIPS(slot->slotID);
+    object->source = SFTK_SOURCE_DEFAULT;
     object->objectInfo = NULL;
     object->infoFree = NULL;
     if (!hasLocks) {
@@ -2239,6 +2242,15 @@ sftk_AttributeToFlags(CK_ATTRIBUTE_TYPE op)
         case CKA_DIGEST:
             flags = CKF_DIGEST;
             break;
+        /* fake attribute to select key gen */
+         case CKA_NSS_GENERATE:
+            flags = CKF_GENERATE;
+            break;
+        /* fake attribute to select key pair gen */
+        case CKA_NSS_GENERATE_KEY_PAIR:
+            flags = CKF_GENERATE_KEY_PAIR;
+            break;
+        /* fake attributes to to handle MESSAGE* flags */
         case CKA_NSS_MESSAGE | CKA_ENCRYPT:
             flags = CKF_MESSAGE_ENCRYPT;
             break;
@@ -2324,10 +2336,10 @@ sftk_quickGetECCCurveOid(SFTKObject *source)
  * the sftk_handleSpecial. Since it's currently only used
  * in FIPS indicators, it's currently only compiled with
  * the FIPS indicator code */
-static int
+static CK_ULONG
 sftk_getKeyLength(SFTKObject *source)
 {
-    CK_KEY_TYPE keyType = CK_INVALID_HANDLE;
+    CK_KEY_TYPE keyType = CKK_INVALID_KEY_TYPE;
     CK_ATTRIBUTE_TYPE keyAttribute;
     CK_ULONG keyLength = 0;
     SFTKAttribute *attribute;
@@ -2347,7 +2359,7 @@ sftk_getKeyLength(SFTKObject *source)
          * key length is CKA_VALUE, which is the default */
         keyType = CKK_INVALID_KEY_TYPE;
     }
-    if (keyType == CKK_EC) {
+    if (keyType == CKK_EC || keyType == CKK_EC_EDWARDS || keyType == CKK_EC_MONTGOMERY) {
         SECOidTag curve = sftk_quickGetECCCurveOid(source);
         switch (curve) {
             case SEC_OID_CURVE25519:
@@ -2389,14 +2401,55 @@ sftk_getKeyLength(SFTKObject *source)
     return keyLength;
 }
 
+PRBool
+sftk_checkFIPSHash(CK_MECHANISM_TYPE hash, PRBool allowSmall, PRBool allowCMAC)
+{
+    switch (hash) {
+        case CKM_AES_CMAC:
+            return allowCMAC;
+        case CKM_SHA_1:
+        case CKM_SHA_1_HMAC:
+        case CKM_SHA224:
+        case CKM_SHA224_HMAC:
+            return allowSmall;
+        case CKM_SHA256:
+        case CKM_SHA256_HMAC:
+        case CKM_SHA384:
+        case CKM_SHA384_HMAC:
+        case CKM_SHA512:
+        case CKM_SHA512_HMAC:
+            return PR_TRUE;
+    }
+    return PR_FALSE;
+}
+
+PRBool
+sftk_checkKeyLength(CK_ULONG keyLength, CK_ULONG min,
+                    CK_ULONG max, CK_ULONG step)
+{
+     if (keyLength > max) {
+         return PR_FALSE;
+     }
+     if (keyLength < min ) {
+         return PR_FALSE;
+     }
+     if (((keyLength - min) % step) != 0) {
+         return PR_FALSE;
+     }
+     return PR_TRUE;
+}
+
 /*
  * handle specialized FIPS semantics that are too complicated to
  * handle with just a table. NOTE: this means any additional semantics
  * would have to be coded here before they can be added to the table */
 static PRBool
 sftk_handleSpecial(SFTKSlot *slot, CK_MECHANISM *mech,
-                   SFTKFIPSAlgorithmList *mechInfo, SFTKObject *source)
+                   SFTKFIPSAlgorithmList *mechInfo, SFTKObject *source,
+                   CK_ULONG keyLength, CK_ULONG targetKeyLength)
 {
+    PRBool allowSmall = PR_FALSE;
+    PRBool allowCMAC = PR_FALSE;
     switch (mechInfo->special) {
         case SFTKFIPSDH: {
             SECItem dhPrime;
@@ -2456,11 +2509,76 @@ sftk_handleSpecial(SFTKSlot *slot, CK_MECHANISM *mech,
             if (hashObj == NULL) {
                 return PR_FALSE;
             }
+            /* cap the salt for legacy keys */
+            if ((keyLength <= 1024) && (pss->sLen > 63)) {
+                return PR_FALSE;
+            }
+            /* cap the salt for based on the hash */
             if (pss->sLen > hashObj->length) {
+                return PR_FALSE;
+            }
+            /* Our code makes sure pss->hashAlg matches the explicit
+             * hash in the mechanism, and only mechanisms with approved
+             * hashes are included, so no need to check pss->hashAlg
+             * here */
+            return PR_TRUE;
+        }
+        case SFTKFIPSPBKDF2: {
+            /* PBKDF2 must have the following addition restrictions
+             * (independent of keysize).
+             *    1. iteration count must be at least 1000.
+             *    2. salt must be at least 128 bits (16 bytes).
+             *    3. password must match the length specified in the SP
+             */
+            CK_PKCS5_PBKD2_PARAMS *pbkdf2 = (CK_PKCS5_PBKD2_PARAMS *)
+                                                   mech->pParameter;
+            if (mech->ulParameterLen != sizeof(*pbkdf2)) {
+                return PR_FALSE;
+            }
+            if (pbkdf2->iterations < 1000) {
+                return PR_FALSE;
+            }
+            if (pbkdf2->ulSaltSourceDataLen < 16) {
+                return PR_FALSE;
+            }
+            if (*(pbkdf2->ulPasswordLen) < SFTKFIPS_PBKDF2_MIN_PW_LEN) {
                 return PR_FALSE;
             }
             return PR_TRUE;
         }
+        /* check the hash mechanisms to make sure they themselves are FIPS */
+        case SFTKFIPSChkHashSp800:
+             allowCMAC = PR_TRUE;
+        case SFTKFIPSChkHash:
+             allowSmall = PR_TRUE;
+        case SFTKFIPSChkHashTls:
+            if (mech->ulParameterLen < mechInfo->offset +sizeof(CK_ULONG)) {
+                return PR_FALSE;
+            }
+            return sftk_checkFIPSHash(*(CK_ULONG *)(((char *)mech->pParameter)
+                        + mechInfo->offset), allowSmall, allowCMAC);
+        case SFTKFIPSTlsKeyCheck:
+            if (mech->mechanism != CKM_NSS_TLS_KEY_AND_MAC_DERIVE_SHA256) {
+                /* unless the mechnism has a built-in hash, check the hash */
+                if (mech->ulParameterLen < mechInfo->offset +sizeof(CK_ULONG)) {
+                    return PR_FALSE;
+                }
+                if (!sftk_checkFIPSHash(*(CK_ULONG *)(((char *)mech->pParameter)
+                        + mechInfo->offset), PR_FALSE, PR_FALSE)) {
+                    return PR_FALSE;
+                }
+            }
+            return sftk_checkKeyLength(targetKeyLength, 112, 512, 1);
+        case SFTKFIPSRSAOAEP:;
+            CK_RSA_PKCS_OAEP_PARAMS *rsaoaep = (CK_RSA_PKCS_OAEP_PARAMS *)
+                                                mech->pParameter;
+
+            HASH_HashType hash_msg = sftk_GetHashTypeFromMechanism(rsaoaep->hashAlg);
+            HASH_HashType hash_pad = sftk_GetHashTypeFromMechanism(rsaoaep->mgf);
+            /* message hash and mask generation function must be the same */
+            if (hash_pad != hash_msg) return PR_FALSE;
+
+            return sftk_checkFIPSHash(rsaoaep->hashAlg, PR_FALSE, PR_FALSE);
         default:
             break;
     }
@@ -2471,7 +2589,7 @@ sftk_handleSpecial(SFTKSlot *slot, CK_MECHANISM *mech,
 
 PRBool
 sftk_operationIsFIPS(SFTKSlot *slot, CK_MECHANISM *mech, CK_ATTRIBUTE_TYPE op,
-                     SFTKObject *source)
+                     SFTKObject *source, CK_ULONG targetKeyLength)
 {
 #ifndef NSS_HAS_FIPS_INDICATORS
     return PR_FALSE;
@@ -2503,13 +2621,15 @@ sftk_operationIsFIPS(SFTKSlot *slot, CK_MECHANISM *mech, CK_ATTRIBUTE_TYPE op,
         SFTKFIPSAlgorithmList *mechs = &sftk_fips_mechs[i];
         /* if we match the number of records exactly, then we are an
          * approved algorithm in the approved mode with an approved key */
-        if (((mech->mechanism == mechs->type) &&
-             (opFlags == (mechs->info.flags & opFlags)) &&
-             (keyLength <= mechs->info.ulMaxKeySize) &&
-             (keyLength >= mechs->info.ulMinKeySize) &&
-             ((keyLength - mechs->info.ulMinKeySize) % mechs->step) == 0) &&
-            ((mechs->special == SFTKFIPSNone) ||
-             sftk_handleSpecial(slot, mech, mechs, source))) {
+        if ((mech->mechanism == mechs->type) &&
+            (opFlags == (mechs->info.flags & opFlags)) &&
+            sftk_checkKeyLength(keyLength, mechs->info.ulMinKeySize,
+                                mechs->info.ulMaxKeySize, mechs->step) &&
+            ((targetKeyLength == 0) ||  (mechs->special == SFTKFIPSTlsKeyCheck)
+             || sftk_checkKeyLength(targetKeyLength, mechs->info.ulMinKeySize,
+                                mechs->info.ulMaxKeySize, mechs->step)) &&
+             ((mechs->special == SFTKFIPSNone) ||
+             sftk_handleSpecial(slot, mech, mechs, source, keyLength, targetKeyLength))) {
             return PR_TRUE;
         }
     }
