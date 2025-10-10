@@ -448,7 +448,7 @@ JPAKE_Round2(PLArenaPool *arena, const SECItem *p, const SECItem *q,
 SECStatus
 JPAKE_Final(PLArenaPool *arena, const SECItem *p, const SECItem *q,
             const SECItem *x2, const SECItem *gx4, const SECItem *x2s,
-            const SECItem *B, SECItem *K);
+            const SECItem *B_, SECItem *K_);
 
 /******************************************************
 ** Elliptic Curve algorithms
@@ -1819,8 +1819,8 @@ PQG_ParamGenSeedLen(
  */
 extern SECStatus
 PQG_ParamGenV2(
-    unsigned int L,         /* input : determines length of P. */
-    unsigned int N,         /* input : determines length of Q. */
+    unsigned int L_,        /* input : determines length of P. */
+    unsigned int N_,        /* input : determines length of Q. */
     unsigned int seedBytes, /* input : length of seed in bytes.*/
     PQGParams **pParams,    /* output: P Q and G returned here */
     PQGVerify **pVfy);      /* output: counter and seed. */
@@ -1946,6 +1946,22 @@ extern SECStatus X25519_DerivePublicKey(const SECItem *privateKey, SECItem *publ
 
 /* Public key derivation is supported only for the curves supporting pt_mul method. */
 extern SECStatus EC_DerivePublicKey(const SECItem *privateKey, const ECParams *ecParams, SECItem *publicKey);
+
+/*
+ * ML_DSA functions
+ */
+SECStatus MLDSA_NewKey(CK_ML_DSA_PARAMETER_SET_TYPE paramSet, SECItem *seed,
+                        MLDSAPrivateKey *privKey, MLDSAPublicKey *pubKey);
+SECStatus MLDSA_SignInit(MLDSAPrivateKey *key, CK_HEDGE_TYPE hedgeType,
+                         const SECItem *sgnCtx, MLDSAContext **ctx);
+SECStatus MLDSA_SignUpdate(MLDSAContext *ctx, const SECItem *data);
+SECStatus MLDSA_SignFinal(MLDSAContext *ctx, SECItem *signature);
+
+SECStatus MLDSA_VerifyInit(MLDSAPublicKey *key, const SECItem *sgnCtx,
+                           MLDSAContext **ctx);
+SECStatus MLDSA_VerifyUpdate(MLDSAContext *ctx, const SECItem *data) ;
+SECStatus MLDSA_VerifyFinal(MLDSAContext *ctx, const SECItem *signature);
+
 
 SEC_END_PROTOS
 

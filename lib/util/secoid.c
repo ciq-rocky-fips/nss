@@ -39,7 +39,7 @@ const char __nss_util_version[] = "Version: NSS " NSSUTIL_VERSION _DEBUG_STRING;
 #define NISTALGS USGOV, 3, 4
 #define AES NISTALGS, 1
 #define SHAXXX NISTALGS, 2
-#define DSA2 NISTALGS, 3
+#define NISTSIGALGS NISTALGS, 3
 
 /**
  ** The Netscape OID space is allocated by Terry Hayes.  If you need
@@ -425,8 +425,11 @@ CONST_OID pkcs12KeyUsageAttr[] = { 2, 5, 29, 15 };
 
 CONST_OID ansix9DSASignature[] = { ANSI_X9_ALGORITHM, 0x01 };
 CONST_OID ansix9DSASignaturewithSHA1Digest[] = { ANSI_X9_ALGORITHM, 0x03 };
-CONST_OID nistDSASignaturewithSHA224Digest[] = { DSA2, 0x01 };
-CONST_OID nistDSASignaturewithSHA256Digest[] = { DSA2, 0x02 };
+CONST_OID nistDSASignaturewithSHA224Digest[] = { NISTSIGALGS, 0x01 };
+CONST_OID nistDSASignaturewithSHA256Digest[] = { NISTSIGALGS, 0x02 };
+CONST_OID nistMLDSASignatureParm44[] = { NISTSIGALGS, 17 };
+CONST_OID nistMLDSASignatureParm65[] = { NISTSIGALGS, 18 };
+CONST_OID nistMLDSASignatureParm87[] = { NISTSIGALGS, 19 };
 
 /* verisign OIDs */
 CONST_OID verisignUserNotices[] = { VERISIGN, 1, 7, 1, 1 };
@@ -1906,7 +1909,12 @@ const static SECOidData oids[SEC_OID_TOTAL] = {
         "ML-KEM-768+SECP256 key exchange", CKM_INVALID_MECHANISM, INVALID_CERT_EXTENSION),
     ODE(SEC_OID_PRIVATE_2,
         "ML-KEM-1024+SECP256 key exchange", CKM_INVALID_MECHANISM, INVALID_CERT_EXTENSION),
-
+    OD(nistMLDSASignatureParm44, SEC_OID_PRIVATE_3, "ML-DSA-44",
+       CKM_ML_DSA, INVALID_CERT_EXTENSION),
+    OD(nistMLDSASignatureParm65, SEC_OID_PRIVATE_4, "ML-DSA-65",
+       CKM_ML_DSA, INVALID_CERT_EXTENSION),
+    OD(nistMLDSASignatureParm87, SEC_OID_PRIVATE_5, "ML-DSA-87",
+       CKM_ML_DSA, INVALID_CERT_EXTENSION), 
 };
 
 /* PRIVATE EXTENDED SECOID Table

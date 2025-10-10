@@ -104,6 +104,9 @@ handleEncryptedPrivateImportTest(char *progName, PK11SlotInfo *slot,
         case ecKey:
             SECITEM_CopyItem(NULL, &pubValue, &pubKey->u.ec.publicValue);
             break;
+        case mldsaKey:
+            SECITEM_CopyItem(NULL, &pubValue, &pubKey->u.mldsa.publicValue);
+            break;
         default:
             fprintf(stderr, "Unknown keytype = %d\n", keyType);
             goto cleanup;
@@ -198,6 +201,7 @@ static const char *const usageInfo[] = {
     " -D                    skip dsa test",
     " -h                    skip dh test",
     " -e                    skip ec test",
+    " -m                    skip mldsa test",
 };
 static int nUsageInfo = sizeof(usageInfo) / sizeof(char *);
 
@@ -220,7 +224,8 @@ enum {
     opt_NoRSA,
     opt_NoDSA,
     opt_NoEC,
-    opt_NoDH
+    opt_NoDH,
+    opt_NoMLDSA,
 };
 
 static secuCommandFlag options[] = {
@@ -231,8 +236,9 @@ static secuCommandFlag options[] = {
     { /* opt_PWString         */ 'p', PR_TRUE, 0, PR_FALSE },
     { /* opt_NORSA            */ 'r', PR_TRUE, 0, PR_FALSE },
     { /* opt_NoDSA            */ 'D', PR_TRUE, 0, PR_FALSE },
-    { /* opt_NoDH             */ 'h', PR_TRUE, 0, PR_FALSE },
     { /* opt_NoEC             */ 'e', PR_TRUE, 0, PR_FALSE },
+    { /* opt_NoDH             */ 'h', PR_TRUE, 0, PR_FALSE },
+    { /* opt_NoMLDSA          */ 'm', PR_TRUE, 0, PR_FALSE },
 };
 
 int
@@ -248,7 +254,9 @@ main(int argc, char **argv)
     PRBool doDSA = PR_TRUE;
     PRBool doDH = PR_FALSE; /* NSS currently can't export wrapped DH keys */
     PRBool doEC = PR_TRUE;
+    PRBool doMLDSA = PR_TRUE;
     PQGParams *pqgParams = NULL;
+    CK_ULONG paramSet = CKP_ML_DSA_44;
     int keySize;
 
     args.numCommands = 0;
@@ -299,6 +307,9 @@ main(int argc, char **argv)
     }
     if (args.options[opt_NoEC].activated) {
         doEC = PR_FALSE;
+    }
+    if (args.options[opt_NoMLDSA].activated) {
+        doMLDSA = PR_FALSE;
     }
 
     slot = PK11_GetInternalKeySlot();
@@ -384,6 +395,16 @@ main(int argc, char **argv)
     ec_failed:
         if (rv != SECSuccess) {
             fprintf(stderr, "ECC Import Failed!\n");
+            failed = PR_TRUE;
+        }
+    }
+
+    if (doMLDSA) {
+        rv = handleEncryptedPrivateImportTest(progName, slot, "ML-DSA",
+                                              CKM_ML_DSA_KEY_PAIR_GEN,
+                                              &paramSet, &pwArgs);
+        if (rv != SECSuccess) {
+            fprintf(stderr, "ML-DSA Import Failed!\n");
             failed = PR_TRUE;
         }
     }

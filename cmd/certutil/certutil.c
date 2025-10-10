@@ -301,6 +301,11 @@ CertReq(SECKEYPrivateKey *privk, SECKEYPublicKey *pubk, KeyType keyType,
             return SECFailure;
         }
     } else {
+        /* sigh, we need to create a new SEC_GetSignatureAlgorithOidTag()
+         * that takes a public key and one that takes a private key */
+        if (keyType == mldsaKey) {
+            hashAlgTag = pubk->u.mldsa.params;
+        }
         signAlgTag = SEC_GetSignatureAlgorithmOidTag(keyType, hashAlgTag);
         if (signAlgTag == SEC_OID_UNKNOWN) {
             PORT_FreeArena(arena, PR_FALSE);
@@ -863,8 +868,10 @@ SECItemToHex(const SECItem *item, char *dst)
     }
 }
 
+/* must be ordered to match KeyType in keythi.h */
 static const char *const keyTypeName[] = {
-    "null", "rsa", "dsa", "fortezza", "dh", "kea", "ec", "rsaPss", "rsaOaep"
+    "null", "rsa", "dsa", "fortezza", "dh", "kea", "ec", "rsaPss", "rsaOaep",
+    "kyberKey", "edKey", "ecMontKey", "mldsaKey"
 };
 
 #define MAX_CKA_ID_BIN_LEN 20
@@ -904,6 +911,7 @@ PrintKey(PRFileDesc *out, const char *nickName, int count,
     char ckaIDbuf[MAX_CKA_ID_STR_LEN + 4];
     CERTCertificate *cert;
     KeyType keyType;
+    const char *thisKeyTypeName = "unknown";
 
     formatPrivateKeyID(key, ckaIDbuf);
     cert = PK11_GetCertFromPrivateKey(key);
@@ -913,8 +921,11 @@ PrintKey(PRFileDesc *out, const char *nickName, int count,
     } else {
         keyType = key->keyType;
     }
+    if (keyType < PR_ARRAY_SIZE(keyTypeName)) {
+        thisKeyTypeName = keyTypeName[keyType];
+    }
     PR_fprintf(out, "<%2d> %-8.8s %-42.42s %s\n", count,
-               keyTypeName[keyType], ckaIDbuf, nickName);
+               thisKeyTypeName, ckaIDbuf, nickName);
 
     return SECSuccess;
 }
@@ -1190,7 +1201,9 @@ PrintSyntax()
         "\t\t [-z noisefile] [-d certdir] [-P dbprefix]\n", progName);
     FPS "\t%s -G [-h token-name] -k ec -q curve [-f pwfile]\n"
         "\t\t [-z noisefile] [-d certdir] [-P dbprefix]\n", progName);
-    FPS "\t%s -K [-n key-name] [-h token-name] [-k dsa|ec|rsa|all]\n",
+    FPS "\t%s -G [-h token-name] -k mldsa -q paramset [-f pwfile]\n"
+        "\t\t [-z noisefile] [-d certdir] [-P dbprefix]\n", progName);
+    FPS "\t%s -K [-n key-name] [-h token-name] [-k dsa|ec|rsa|mldsa|all]\n",
         progName);
     FPS "\t\t [-f pwfile] [-X] [-d certdir] [-P dbprefix]\n");
     FPS "\t%s --upgrade-merge --source-dir upgradeDir --upgrade-id uniqueID\n",
@@ -1424,6 +1437,9 @@ luG(enum usage_level ul, const char *command)
     FPS "%-20s c2tnb359w1, c2pnb368w1, c2tnb431r1, secp112r1, \n", "");
     FPS "%-20s secp112r2, secp128r1, secp128r2, sect113r1, sect113r2\n", "");
     FPS "%-20s sect131r1, sect131r2\n", "");
+    FPS "%-20s ML-DSA parameter set (mldsa only)\n",
+        "   -q paramset");
+    FPS "%-20s valid values are ml-dsa-44,  ml-dsa-65, ml-dsa-87:\n", "");
     FPS "%-20s Key database directory (default is ~/.netscape)\n",
         "   -d keydir");
     FPS "%-20s Cert & Key database prefix\n",
@@ -1516,6 +1532,7 @@ luK(enum usage_level ul, const char *command)
 
     FPS "%-20s Key type (\"all\" (default), \"dsa\","
                                                     " \"ec\","
+                                                    " \"mldsa\","
                                                     " \"rsa\")\n",
         "   -k key-type");
     FPS "%-20s The nickname of the key or associated certificate\n",
@@ -1674,6 +1691,10 @@ luR(enum usage_level ul, const char *command)
         "   -q pqgfile");
     FPS "%-20s Elliptic curve name (ec only)\n",
         "   -q curve-name");
+    FPS "%-20s See the \"-G\" option for a full list of supported names.\n",
+        "");
+    FPS "%-20s ML-DSA parameter set (mldsa only)\n",
+        "   -q paramset");
     FPS "%-20s See the \"-G\" option for a full list of supported names.\n",
         "");
     FPS "%-20s Specify the password file\n",
@@ -1856,6 +1877,10 @@ luS(enum usage_level ul, const char *command)
         "   -q curve-name");
     FPS "%-20s See the \"-G\" option for a full list of supported names.\n",
         "");
+    FPS "%-20s ML-DSA parameter set (mldsa only)\n",
+        "   -q paramset");
+    FPS "%-20s See the \"-G\" option for a full list of supported names.\n",
+        "");
     FPS "%-20s Self sign\n",
         "   -x");
     FPS "%-20s Sign the certificate with RSA-PSS (the issuer key must be rsa)\n",
@@ -2036,6 +2061,29 @@ MakeV1Cert(CERTCertDBHandle *handle,
     return (cert);
 }
 
+/* sigh look up the ml-dsa oid by string */
+static SECOidTag
+FindTagFromString(char *cipherString)
+{
+    SECOidTag tag;
+    SECOidData *oid;
+
+    /* future enhancement: accept dotted oid spec? */
+
+    for (tag = 1; (oid = SECOID_FindOIDByTag(tag)) != NULL; tag++) {
+        /* only interested in oids that we actually understand */
+        if (oid->mechanism == CKM_INVALID_MECHANISM) {
+            continue;
+        }
+        if (PORT_Strcasecmp(oid->desc, cipherString) != 0) {
+            continue;
+        }
+        return tag;
+    }
+    return SEC_OID_UNKNOWN;
+}
+
+
 static SECStatus
 SetSignatureAlgorithm(PLArenaPool *arena,
                       SECAlgorithmID *signAlg,
@@ -2076,10 +2124,61 @@ SetSignatureAlgorithm(PLArenaPool *arena,
             SECU_PrintError(progName, "Could not set signature algorithm id.");
             return rv;
         }
+    } else if (privKey->keyType == mldsaKey) {
+        /* sigh, we need toexport SECKEY_GetParameterSet(), for now
+         * just do it inline */
+        /* this is temp code until we fix it correctly upstream. Don't
+         * push this upstream */
+        SECOidTag algID;
+        SECItem item;
+        CK_ULONG paramSet;
+
+        rv = PK11_ReadRawAttribute(PK11_TypePrivKey, privKey,
+                                   CKA_PARAMETER_SET, &item);
+
+        if (rv != SECSuccess) {
+            SECU_PrintError(progName, "missing parameter set for ml-dsa key.");
+            return SECFailure;
+        }
+        if (item.len != sizeof (paramSet)) {
+            SECU_PrintError(progName, "corrupted parameter set for ml-dsa key.");
+            PORT_Free(item.data);
+            return SECFailure;
+        }
+        paramSet = *(CK_ULONG *)item.data;
+        PORT_Free(item.data);
+        switch  (paramSet) {
+            case CKP_ML_DSA_44:
+                algID = FindTagFromString("ML-DSA-44");
+                break;
+            case CKP_ML_DSA_65:
+                algID = FindTagFromString("ML-DSA-65");
+                break;
+            case CKP_ML_DSA_87:
+                algID = FindTagFromString("ML-DSA-87");
+                break;
+            default:
+                algID = SEC_OID_UNKNOWN;
+                break;
+        }
+        if (algID == SEC_OID_UNKNOWN) {
+                PORT_SetError(SEC_ERROR_INVALID_KEY);
+                SECU_PrintError(progName, "invalid parameter set for ml-dsa key.");
+                return SECFailure;
+        }
+                
+        rv = SECOID_SetAlgorithmID(arena, signAlg, algID, 0);
+        if (rv != SECSuccess) {
+            SECU_PrintError(progName, "Could not set signature algorithm id.");
+            return rv;
+        }
     } else {
         KeyType keyType = SECKEY_GetPrivateKeyType(privKey);
         SECOidTag algID;
-
+       
+        /* first, try to get the ParameterSet from the key, If the
+         * key as a parameter set, use it, otherwise fall back to
+         * SEC_GetSignatureAlgorithmoidTag */ 
         algID = SEC_GetSignatureAlgorithmOidTag(keyType, hashAlgTag);
         if (algID == SEC_OID_UNKNOWN) {
             SECU_PrintError(progName, "Unknown key or hash type for issuer.");
@@ -2844,9 +2943,34 @@ certutil_main(int argc, char **argv, PRBool initialize)
     if (certutil.options[opt_UpgradeTokenName].activated)
         upgradeTokenName = certutil.options[opt_UpgradeTokenName].arg;
 
+    /* must be before opt_KeySize! */
+    /*  -k key type  */
+    if (certutil.options[opt_KeyType].activated) {
+        char *arg = certutil.options[opt_KeyType].arg;
+        if (PL_strcmp(arg, "rsa") == 0) {
+            keytype = rsaKey;
+        } else if (PL_strcmp(arg, "dsa") == 0) {
+            keytype = dsaKey;
+        } else if (PL_strcmp(arg, "ec") == 0) {
+            keytype = ecKey;
+        } else if (PL_strcmp(arg, "mldsa") == 0) {
+            keytype = mldsaKey;
+        } else if (PL_strcmp(arg, "all") == 0) {
+            keytype = nullKey;
+        } else {
+            /* use an existing private/public key pair */
+            keysource = arg;
+        }
+    } else if (certutil.commands[cmd_ListKeys].activated) {
+        keytype = nullKey;
+    }
+
     if (certutil.options[opt_KeySize].activated) {
         keysize = PORT_Atoi(certutil.options[opt_KeySize].arg);
-        if ((keysize < MIN_KEY_BITS) || (keysize > MAX_KEY_BITS)) {
+        /* mldsa limits are much different that rsa and dsa, don't
+         * do the check here */
+        if ((keytype != mldsaKey) &&
+                ((keysize < MIN_KEY_BITS) || (keysize > MAX_KEY_BITS))) {
             PR_fprintf(PR_STDERR,
                        "%s -g:  Keysize must be between %d and %d.\n",
                        progName, MIN_KEY_BITS, MAX_KEY_BITS);
@@ -2877,24 +3001,6 @@ certutil_main(int argc, char **argv, PRBool initialize)
         }
     }
 
-    /*  -k key type  */
-    if (certutil.options[opt_KeyType].activated) {
-        char *arg = certutil.options[opt_KeyType].arg;
-        if (PL_strcmp(arg, "rsa") == 0) {
-            keytype = rsaKey;
-        } else if (PL_strcmp(arg, "dsa") == 0) {
-            keytype = dsaKey;
-        } else if (PL_strcmp(arg, "ec") == 0) {
-            keytype = ecKey;
-        } else if (PL_strcmp(arg, "all") == 0) {
-            keytype = nullKey;
-        } else {
-            /* use an existing private/public key pair */
-            keysource = arg;
-        }
-    } else if (certutil.commands[cmd_ListKeys].activated) {
-        keytype = nullKey;
-    }
 
     if (certutil.options[opt_KeyOpFlagsOn].activated) {
         keyOpFlagsOn = GetOpFlags(certutil.options[opt_KeyOpFlagsOn].arg);
@@ -2938,9 +3044,12 @@ certutil_main(int argc, char **argv, PRBool initialize)
 
     /*  -q PQG file or curve name */
     if (certutil.options[opt_PQGFile].activated) {
-        if ((keytype != dsaKey) && (keytype != ecKey)) {
+        if ((keytype != dsaKey) && (keytype != ecKey) &&
+                (keytype != mldsaKey)) {
             PR_fprintf(PR_STDERR, "%s -q: specifies a PQG file for DSA keys"
-                                  " (-k dsa) or a named curve for EC keys (-k ec)\n)",
+                                  " (-k dsa)\n"
+                                  " or a named curve for EC keys (-k ec)\n"
+                                  " or a parameter set for ML-DSA keys (-k mldsa)\n",
                        progName);
             return 255;
         }

@@ -16,6 +16,7 @@
 #include "pkcs11t.h"
 #include "pk11func.h"
 #include "keyhi.h"
+#include "keyi.h"
 #include "secitem.h"
 #include "secerr.h"
 #include "sslerr.h"
@@ -552,6 +553,7 @@ PK11_SignatureLen(SECKEYPrivateKey *key)
     SECItem attributeItem = { siBuffer, NULL, 0 };
     SECStatus rv;
     int length;
+    SECOidTag paramSet;
 
     switch (key->keyType) {
         case rsaKey:
@@ -590,6 +592,10 @@ PK11_SignatureLen(SECKEYPrivateKey *key)
                 }
             }
             return pk11_backupGetSignLength(key);
+        case mldsaKey:
+            paramSet = SECKEY_GetParameterSet(key);
+            return SECKEY_MLDSAOidParamsToLen(paramSet, SECKEYSignatureType);
+ 
         default:
             break;
     }

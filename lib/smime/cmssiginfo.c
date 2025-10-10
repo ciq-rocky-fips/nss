@@ -141,6 +141,7 @@ NSS_CMSSignerInfo_GetSignatureAlgorithmOidTag(KeyType keyType,
             return pubkAlgTag;
         case rsaPssKey:
         case dsaKey:
+        case mldsaKey: /* pubkAlgTag and signAlgTag are the same */
         case ecKey:
             return signAlgTag;
         default:

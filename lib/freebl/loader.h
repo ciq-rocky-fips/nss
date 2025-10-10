@@ -10,7 +10,7 @@
 
 #include "blapi.h"
 
-#define FREEBL_VERSION 0x0327
+#define FREEBL_VERSION 0x0331
 
 struct FREEBLVectorStr {
 
@@ -931,6 +931,15 @@ struct FREEBLVectorStr {
     SECStatus (*p_EC_DerivePublicKey)(const SECItem *privateKey, const ECParams *ecParams, SECItem *publicKey);
     /* Version 3.030 came to here */
 
+    SECStatus (*p_MLDSA_NewKey)(CK_ML_DSA_PARAMETER_SET_TYPE paramSet, SECItem *seed, MLDSAPrivateKey *privKey, MLDSAPublicKey *pubKey);
+    SECStatus (*p_MLDSA_SignInit)(MLDSAPrivateKey *key, CK_HEDGE_TYPE hedgType, const SECItem *sgnCtx, MLDSAContext **ctx);
+    SECStatus (*p_MLDSA_SignUpdate)(MLDSAContext *ctx, const SECItem *data);
+    SECStatus (*p_MLDSA_SignFinal)(MLDSAContext *ctx, SECItem *signature);
+    SECStatus (*p_MLDSA_VerifyInit)(MLDSAPublicKey *key, const SECItem *sgnCtx, MLDSAContext **ctx);
+    SECStatus (*p_MLDSA_VerifyUpdate)(MLDSAContext *ctx, const SECItem *data) ;
+    SECStatus (*p_MLDSA_VerifyFinal)(MLDSAContext *ctx, const SECItem *signature);
+    /* Version 3.031 came to here */
+
     /* Add new function pointers at the end of this struct and bump
      * FREEBL_VERSION at the beginning of this file. */
 };
@@ -1039,3 +1048,6 @@ typedef SECStatus (*F_Kyber_NewKey)(KyberParams params, const SECItem *seed, SEC
 typedef SECStatus (*F_Kyber_Encapsulate)(KyberParams params, const SECItem *seed, const SECItem *pubKey, SECItem *ciphertext, SECItem *secret);
 
 typedef SECStatus (*F_Kyber_Decapsulate)(KyberParams params, const SECItem *privKey, const SECItem *ciphertext, SECItem *secret);
+
+
+

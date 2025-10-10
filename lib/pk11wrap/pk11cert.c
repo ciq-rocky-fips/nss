@@ -18,6 +18,7 @@
 #include "certi.h"
 #include "secitem.h"
 #include "keyhi.h"
+#include "keyi.h"
 #include "secoid.h"
 #include "pkcs7t.h"
 #include "cmsreclist.h"
@@ -155,6 +156,7 @@ PK11_IsUserCert(PK11SlotInfo *slot, CERTCertificate *cert,
         }
 
         PK11_SETATTRS(&theTemplate, 0, NULL, 0);
+        
         switch (pubKey->keyType) {
             case rsaKey:
             case rsaPssKey:
@@ -176,6 +178,10 @@ PK11_IsUserCert(PK11SlotInfo *slot, CERTCertificate *cert,
                 PK11_SETATTRS(&theTemplate, CKA_EC_POINT,
                               pubKey->u.ec.publicValue.data,
                               pubKey->u.ec.publicValue.len);
+                break;
+            case mldsaKey:
+                PK11_SETATTRS(&theTemplate, CKA_VALUE, pubKey->u.mldsa.publicValue.data,
+                              pubKey->u.mldsa.publicValue.len);
                 break;
             case keaKey:
             case fortezzaKey:
@@ -1098,30 +1104,15 @@ SECItem *
 PK11_GetPubIndexKeyID(CERTCertificate *cert)
 {
     SECKEYPublicKey *pubk;
+    const SECItem *oldItem;
     SECItem *newItem = NULL;
 
     pubk = CERT_ExtractPublicKey(cert);
     if (pubk == NULL)
         return NULL;
-
-    switch (pubk->keyType) {
-        case rsaKey:
-            newItem = SECITEM_DupItem(&pubk->u.rsa.modulus);
-            break;
-        case dsaKey:
-            newItem = SECITEM_DupItem(&pubk->u.dsa.publicValue);
-            break;
-        case dhKey:
-            newItem = SECITEM_DupItem(&pubk->u.dh.publicValue);
-            break;
-        case ecKey:
-        case edKey:
-        case ecMontKey:
-            newItem = SECITEM_DupItem(&pubk->u.ec.publicValue);
-            break;
-        case fortezzaKey:
-        default:
-            newItem = NULL; /* Fortezza Fix later... */
+    oldItem = pk11_GetPublicKeyComponent(pubk);
+    if (oldItem) {
+        newItem = SECITEM_DupItem(oldItem);
     }
     SECKEY_DestroyPublicKey(pubk);
     /* make hash of it */

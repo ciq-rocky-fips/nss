@@ -20,3 +20,8 @@ fuzz/corpus
 fuzz/out
 .chk
 cmd/dbtool/sdb.c
+lib/freebl/oqs/liboqs/**
+lib/freebl/oqs/*extract_defines*
+lib/freebl/leancrypto/leancrypto/**
+lib/freebl/oqs/**
+mldsa_samples/**
