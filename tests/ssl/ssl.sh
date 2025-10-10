@@ -962,8 +962,9 @@ ssl_policy_pkix_ocsp()
   #verbose="-v"
   html_head "Check that OCSP doesn't break if we disable sha1 $NORM_EXT - server $SERVER_MODE/client $CLIENT_MODE"
 
-  PKIX_SAVE=${NSS_DISABLE_LIBPKIX_VERIFY-"unset"}
-  unset NSS_DISABLE_LIBPKIX_VERIFY
+  PKIX_SAVE=${NSS_ENABLE_PKIX_VERIFY-"unset"}
+  NSS_ENABLE_PKIX_VERIFY="1"
+  export NSS_ENABLE_PKIX_VERIFY
 
   testname=""
 
@@ -988,10 +989,12 @@ ssl_policy_pkix_ocsp()
   html_msg $RET $RET_EXP "${testname}" \
            "produced a returncode of $RET, expected is $RET_EXP"
 
-  if [ "{PKIX_SAVE}" != "unset" ]; then
-      export NSS_DISABLE_LIBPKIX_VERIFY=${PKIX_SAVE}
+  if [ "${PKIX_SAVE}" = "unset" ]; then
+      unset NSS_ENABLE_PKIX_VERIFY
+  else
+      NSS_ENABLE_PKIX_VERIFY=${PKIX_SAVE}
+      export NSS_ENABLE_PKIX_VERIFY
   fi
-
   cp ${P_R_SERVERDIR}/pkcs11.txt.sav ${P_R_SERVERDIR}/pkcs11.txt
 
   html "</TABLE><BR>"
