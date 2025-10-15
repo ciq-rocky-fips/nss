@@ -18,9 +18,20 @@
 #include "blapit.h"
 #include "secport.h"
 #include "secrng.h"
+#include "nspr.h"
 
 #include "lc_dilithium.h"
 #include "ml_dsa_api.h"
+
+static int dilithium_in_fips_mode = 0;
+static PRCallOnceType dilithium_KernelFips;
+
+static PRStatus
+dilithium_getKernelFips()
+{
+    dilithium_in_fips_mode = NSS_GetSystemFIPSEnabled();
+    return PR_SUCCESS;
+}
 
 /*
  * some missing utilities, just use the nss implementations
@@ -133,6 +144,64 @@ mldsa_ContextGetPublicKey(const MLDSAContext *ctx)
     return ctx->pubKey;
 }
 
+#define PCT_FOR_ML_DSA_KNOWN_SIG_DATA "Known Crypto Message"
+
+/* Check that a public/private key pair match - PCT */
+static SECStatus MLDSA_CheckKey(MLDSAPrivateKey *privKey,
+				MLDSAPublicKey *pubKey)
+{
+    MLDSAContext *signCtx = NULL;
+    MLDSAContext *verifyCtx = NULL;
+    SECStatus rv = SECFailure;
+    unsigned char *data_to_sign = (unsigned char *)PCT_FOR_ML_DSA_KNOWN_SIG_DATA;
+    unsigned char sig_buf[MAX_ML_DSA_SIGNATURE_LEN] = { 0 };
+    SECItem si_signature_out = {siBuffer, sig_buf, sizeof(sig_buf)};
+    const SECItem sign_data = {siBuffer, data_to_sign, strlen(PCT_FOR_ML_DSA_KNOWN_SIG_DATA)};
+
+    /* sign the data with the private key */
+    rv = MLDSA_SignInit(privKey,
+                        CKH_HEDGE_REQUIRED,
+                        NULL,
+                        &signCtx);
+    if (rv != SECSuccess) {
+        return rv;
+    }
+    rv = MLDSA_SignUpdate(signCtx,
+                          &sign_data);
+    if (rv != SECSuccess) {
+        mldsa_DestroyContext(signCtx);
+        return rv;
+    }
+    rv = MLDSA_SignFinal(signCtx,
+                         &si_signature_out);
+    if (rv != SECSuccess) {
+        mldsa_DestroyContext(signCtx);
+        return rv;
+    }
+
+    /* Now verify the signature with the public key */
+    rv = MLDSA_VerifyInit(pubKey,
+                          NULL,
+                          &verifyCtx);
+    if (rv != SECSuccess) {
+        return rv;
+    }
+    rv = MLDSA_VerifyUpdate(verifyCtx,
+                            &sign_data);
+    if (rv != SECSuccess) {
+        mldsa_DestroyContext(verifyCtx);
+        return rv;
+    }
+    rv = MLDSA_VerifyFinal(verifyCtx,
+                           &si_signature_out);
+    if (rv != SECSuccess) {
+        mldsa_DestroyContext(verifyCtx);
+        return rv;
+    }
+
+    return rv;
+}
+
 /*
 ** Generate and return a new DSA public and private key pair,
 **  both of which are encoded into a single DSAPrivateKey struct.
@@ -144,6 +213,8 @@ MLDSA_NewKey(CK_ML_DSA_PARAMETER_SET_TYPE paramSet, SECItem *seed,
              MLDSAPrivateKey *privKey, MLDSAPublicKey *pubKey)
 {
     int ret = -1;
+
+    PR_CallOnce(&dilithium_KernelFips, dilithium_getKernelFips);
 
     /* make sure we can set the keys first */
     if (!privKey || !pubKey) {
@@ -199,6 +270,17 @@ MLDSA_NewKey(CK_ML_DSA_PARAMETER_SET_TYPE paramSet, SECItem *seed,
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         goto loser;
     }
+
+    if (dilithium_in_fips_mode) {
+        SECStatus rv;
+        /* FIPS PCT for ML-DSA is to sign and verify some data */
+        rv = MLDSA_CheckKey(privKey, pubKey);
+        if (rv != SECSuccess) {
+            PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+            goto loser;
+        }
+    }
+
     return SECSuccess;
 
 loser:
