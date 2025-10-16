@@ -11,6 +11,7 @@
 #include "blapi.h"
 #include "secerr.h"
 #include "secitem.h"
+#include "nspr.h"
 
 #include "kyber-pqcrystals-ref.h"
 #include "kyber.h"
@@ -40,6 +41,16 @@ PR_STATIC_ASSERT(KYBER_ENC_COIN_BYTES == 32);
 PR_STATIC_ASSERT(MLKEM1024_PUBLIC_KEY_BYTES == LIBCRUX_ML_KEM_MLKEM1024_CPA_PKE_PUBLIC_KEY_SIZE);
 PR_STATIC_ASSERT(MLKEM1024_PRIVATE_KEY_BYTES == LIBCRUX_ML_KEM_MLKEM1024_SECRET_KEY_SIZE);
 PR_STATIC_ASSERT(MLKEM1024_CIPHERTEXT_BYTES == LIBCRUX_ML_KEM_MLKEM1024_CPA_PKE_CIPHERTEXT_SIZE);
+
+static int kyber_in_fips_mode = 0;
+static PRCallOnceType kyber_KernelFips;
+
+static PRStatus
+kyber_getKernelFips()
+{
+    kyber_in_fips_mode = NSS_GetSystemFIPSEnabled();
+    return PR_SUCCESS;
+}
 
 static bool
 valid_params(KyberParams params)
@@ -159,6 +170,63 @@ valid_enc_seed(KyberParams params, const SECItem *seed)
     }
 }
 
+static SECStatus
+Kyber_CheckKey(KyberParams params, const SECItem *privkey, const SECItem *pubkey)
+{
+    SECStatus rv = SECFailure;
+    uint8_t ciphertext_768[KYBER768_CIPHERTEXT_BYTES];
+    uint8_t ciphertext_1024[MLKEM1024_CIPHERTEXT_BYTES];
+    uint8_t secret_buffer_encap[KYBER_SHARED_SECRET_BYTES];
+    uint8_t secret_buffer_decap[KYBER_SHARED_SECRET_BYTES];
+    SECItem ciphertext = {siBuffer, NULL, 0};
+    SECItem secret_encap = {siBuffer, secret_buffer_encap, sizeof(secret_buffer_encap)};
+    SECItem secret_decap = {siBuffer, secret_buffer_decap, sizeof(secret_buffer_decap)};
+
+    if (params == params_ml_kem768 || params == params_ml_kem768_test_mode) {
+        ciphertext.data = ciphertext_768;
+        ciphertext.len = KYBER768_CIPHERTEXT_BYTES;
+    } else if (params == params_ml_kem1024 || params == params_ml_kem1024_test_mode) {
+        ciphertext.data = ciphertext_1024;
+        ciphertext.len = MLKEM1024_CIPHERTEXT_BYTES;
+    } else {
+        rv = SECFailure;
+        goto out;
+    }
+
+    rv = Kyber_Encapsulate(params,
+                           NULL,          // Generate randomness internally
+                           pubkey,        // Recipient's public key
+                           &ciphertext,   // Output: ciphertext
+                           &secret_encap);// Output: shared secret
+
+    if (rv != SECSuccess) {
+        goto out;
+    }
+
+    rv = Kyber_Decapsulate(params,
+                           privkey,       // Recipient's private key
+                           &ciphertext,   // Input: ciphertext
+                           &secret_decap);// Output: shared secret
+    if (rv != SECSuccess) {
+        goto out;
+    }
+
+    if (PORT_Memcmp(secret_buffer_encap, secret_buffer_decap, KYBER_SHARED_SECRET_BYTES) != 0) {
+        rv = SECFailure;
+        goto out;
+    }
+
+    rv = SECSuccess;
+
+  out:
+
+    PORT_SafeZero(ciphertext_768, KYBER768_CIPHERTEXT_BYTES);
+    PORT_SafeZero(ciphertext_1024, MLKEM1024_CIPHERTEXT_BYTES);
+    PORT_SafeZero(secret_buffer_encap, KYBER_SHARED_SECRET_BYTES);
+    PORT_SafeZero(secret_buffer_decap, KYBER_SHARED_SECRET_BYTES);
+    return rv;
+}
+
 SECStatus
 Kyber_NewKey(KyberParams params, const SECItem *keypair_seed, SECItem *privkey, SECItem *pubkey)
 {
@@ -171,6 +239,8 @@ Kyber_NewKey(KyberParams params, const SECItem *keypair_seed, SECItem *privkey, 
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         return SECFailure;
     }
+
+    PR_CallOnce(&kyber_KernelFips, kyber_getKernelFips);
 
     uint8_t randbuf[KYBER_KEYPAIR_COIN_BYTES];
     uint8_t *coins;
@@ -203,6 +273,16 @@ Kyber_NewKey(KyberParams params, const SECItem *keypair_seed, SECItem *privkey, 
         /* unreachable */
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
         return SECFailure;
+    }
+
+    if (kyber_in_fips_mode) {
+        SECStatus rv = Kyber_CheckKey(params, privkey, pubkey);
+        if (rv != SECSuccess) {
+            PORT_SafeZero(pubkey->data, pubkey->len);
+            PORT_SafeZero(privkey->data, privkey->len);
+            PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+            return rv;
+        }
     }
     NSS_DECLASSIFY(pubkey->data, pubkey->len);
     return SECSuccess;
