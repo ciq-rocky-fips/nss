@@ -257,11 +257,15 @@ Kyber_NewKey(KyberParams params, const SECItem *keypair_seed, SECItem *privkey, 
     if (params == params_ml_kem768 || params == params_ml_kem768_test_mode) {
         libcrux_ml_kem_mlkem768_MlKem768KeyPair keys = libcrux_ml_kem_mlkem768_portable_generate_key_pair(coins);
         memcpy(pubkey->data, keys.pk.value, KYBER768_PUBLIC_KEY_BYTES);
+	PORT_SafeZero(keys.pk.value, KYBER768_PUBLIC_KEY_BYTES);
         memcpy(privkey->data, keys.sk.value, KYBER768_PRIVATE_KEY_BYTES);
+	PORT_SafeZero(keys.sk.value, KYBER768_PRIVATE_KEY_BYTES);
     } else if (params == params_ml_kem1024 || params == params_ml_kem1024_test_mode) {
         libcrux_ml_kem_mlkem1024_MlKem1024KeyPair keys = libcrux_ml_kem_mlkem1024_portable_generate_key_pair(coins);
         memcpy(pubkey->data, keys.pk.value, MLKEM1024_PUBLIC_KEY_BYTES);
+	PORT_SafeZero(keys.pk.value, MLKEM1024_PUBLIC_KEY_BYTES);
         memcpy(privkey->data, keys.sk.value, MLKEM1024_PRIVATE_KEY_BYTES);
+	PORT_SafeZero(keys.sk.value, MLKEM1024_PRIVATE_KEY_BYTES);
     } else if (params == params_kyber768_round3 || params == params_kyber768_round3_test_mode) {
 #ifdef NSS_DISABLE_KYBER
         PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
