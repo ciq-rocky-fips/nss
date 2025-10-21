@@ -1833,7 +1833,7 @@ freebl_ML_KEM_Test(KyberParams param_set,
         (PORT_Memcmp(priv_key_item.data, priv_key, priv_key_len) != 0) ||
         (PORT_Memcmp(pub_key_item.data, pub_key, pub_key_len) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
-        return rv;
+        return SECFailure;
     }
 
     rv = Kyber_Encapsulate(param_set,  &eseed_item, &pub_key_item,
@@ -1848,7 +1848,7 @@ freebl_ML_KEM_Test(KyberParams param_set,
         (PORT_Memcmp(ct_item.data, cipher_text, cipher_text_len) != 0) ||
         (PORT_Memcmp(key_item.data, key, key_len) != 0)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
-        return rv;
+        return SECFailure;
     }
 
     rv = Kyber_Decapsulate(param_set,  &priv_key_item, &ct_item, &key2_item);
@@ -1858,7 +1858,7 @@ freebl_ML_KEM_Test(KyberParams param_set,
     }
     if (SECITEM_CompareItem(&key2_item, &key_item) != 0) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
-        return rv;
+        return SECFailure;
     }
     return SECSuccess;
 }
