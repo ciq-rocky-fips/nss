@@ -1379,7 +1379,11 @@ sftk_handlePrivateKeyObject(SFTKSession *session, SFTKObject *object, CK_KEY_TYP
                     return CKR_TEMPLATE_INCOMPLETE;
                 }
             }
-            encrypt = sign = recover = wrap = CK_FALSE;
+            derive = CK_FALSE;
+            sign = CK_FALSE;
+            encrypt = CK_FALSE;
+            recover = CK_FALSE;
+            wrap = CK_FALSE;
             decapsulate = CK_TRUE;
             break;
 #ifdef NSS_ENABLE_ML_DSA
