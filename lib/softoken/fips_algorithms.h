@@ -205,6 +205,5 @@ SFTKFIPSAlgorithmList sftk_fips_mechs[] = {
      * resulting key will also be FIPS and the resulting operations will be
      * FIPS approved. */
     { CKM_CONCATENATE_BASE_AND_KEY, { 112, CK_MAX, CKF_DERIVE }, 1, SFTKFIPSNone },
-    { CKM_CONCATENATE_BASE_AND_DATA, { 112, CK_MAX, CKF_DERIVE }, 1, SFTKFIPSNone },
 };
 const int SFTK_NUMBER_FIPS_ALGORITHMS = PR_ARRAY_SIZE(sftk_fips_mechs);
