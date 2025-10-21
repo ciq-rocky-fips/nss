@@ -1802,7 +1802,8 @@ freebl_ML_KEM_Test(KyberParams param_set,
                    const unsigned char *pub_key, size_t pub_key_len,
                    const unsigned char *priv_key, size_t priv_key_len,
                    const unsigned char *cipher_text, size_t cipher_text_len,
-                   const unsigned char *key, size_t key_len)
+                   const unsigned char *key, size_t key_len,
+                   const unsigned char *key_reject_expected, size_t key_reject_expected_len)
 {
     SECStatus rv;
     unsigned char cipher_text_buf[MAX_ML_KEM_CIPHER_LENGTH];
@@ -1810,11 +1811,15 @@ freebl_ML_KEM_Test(KyberParams param_set,
     unsigned char pub_key_buf[MAX_ML_KEM_PUBLIC_KEY_LENGTH];
     unsigned char key_buf[KYBER_SHARED_SECRET_BYTES];
     unsigned char key2_buf[KYBER_SHARED_SECRET_BYTES];
+    unsigned char key_reject_buf[KYBER_SHARED_SECRET_BYTES];
+    unsigned char key_reject_expected_buf[KYBER_SHARED_SECRET_BYTES];
     SECItem ct_item = { siBuffer, cipher_text_buf, cipher_text_len };
     SECItem priv_key_item = { siBuffer, priv_key_buf, priv_key_len };
     SECItem pub_key_item = { siBuffer, pub_key_buf, pub_key_len };
     SECItem key_item = { siBuffer, key_buf, sizeof(key_buf) };
     SECItem key2_item = { siBuffer, key2_buf, sizeof(key2_buf) };
+    SECItem key_reject_expected_item = { siBuffer, key_reject_expected_buf, sizeof(key_reject_expected_buf) };
+    SECItem key_reject_item = { siBuffer, key_reject_buf, sizeof(key_reject_buf) };
     SECItem seed_item = { siBuffer, (unsigned char *)seed, seed_len };
     SECItem eseed_item = { siBuffer, (unsigned char *)enc_seed, enc_seed_len };
 
@@ -1851,6 +1856,7 @@ freebl_ML_KEM_Test(KyberParams param_set,
         return SECFailure;
     }
 
+    /* Success path of the Decapsulate operation */
     rv = Kyber_Decapsulate(param_set,  &priv_key_item, &ct_item, &key2_item);
     if (rv != SECSuccess) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
@@ -1860,6 +1866,31 @@ freebl_ML_KEM_Test(KyberParams param_set,
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
         return SECFailure;
     }
+
+    /* Now check the implicit failure path of the Decapsulate operation */
+    /* Change one bit in the cipher text */
+    ct_item.data[0] ^= 0x01;
+    /* Ensure the generated key is all zeros to start with */
+    PORT_Memset(key_reject_item.data, 0, sizeof(key_reject_item.len));
+    /* Prepare the expected rejected key */
+    PORT_Memcpy(key_reject_expected_item.data, key_reject_expected, key_reject_expected_item.len);
+
+    rv = Kyber_Decapsulate(param_set,  &priv_key_item, &ct_item, &key_reject_item);
+    if (rv != SECSuccess) {
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        return rv;
+    }
+    if (SECITEM_CompareItem(&key_reject_item, &key_reject_expected_item) != 0) {
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        return SECFailure;
+    }
+    /* Belt and braces: make sure the key reject is different from the
+     * valid key */
+    if (SECITEM_CompareItem(&key_reject_item, &key_item) == 0) {
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        return SECFailure;
+    }
+
     return SECSuccess;
 }
 
@@ -1886,7 +1917,8 @@ freebl_fips_ML_KEM_PowerUpSelfTest()
                             ml_kem768_pub_key, KYBER768_PUBLIC_KEY_BYTES,
                             ml_kem768_priv_key, KYBER768_PRIVATE_KEY_BYTES,
                             ml_kem768_cipher_text, KYBER768_CIPHERTEXT_BYTES,
-                            ml_kem768_key, KYBER_SHARED_SECRET_BYTES);
+                            ml_kem768_key, KYBER_SHARED_SECRET_BYTES,
+                            ml_kem768_key_reject, KYBER_SHARED_SECRET_BYTES);
     if (rv != SECSuccess) {
         return SECFailure;
     }
@@ -1896,7 +1928,8 @@ freebl_fips_ML_KEM_PowerUpSelfTest()
                             ml_kem1024_pub_key, MLKEM1024_PUBLIC_KEY_BYTES,
                             ml_kem1024_priv_key, MLKEM1024_PRIVATE_KEY_BYTES,
                             ml_kem1024_cipher_text, MLKEM1024_CIPHERTEXT_BYTES,
-                            ml_kem1024_key, KYBER_SHARED_SECRET_BYTES);
+                            ml_kem1024_key, KYBER_SHARED_SECRET_BYTES,
+                            ml_kem1024_key_reject, KYBER_SHARED_SECRET_BYTES);
     if (rv != SECSuccess) {
         return SECFailure;
     }
