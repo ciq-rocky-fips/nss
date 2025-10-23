@@ -116,10 +116,10 @@ SFTKFIPSAlgorithmList sftk_fips_mechs[] = {
     { CKM_ECDSA_SHA384, { EC_FB_KEY, CKF_SGN }, EC_FB_STEP, SFTKFIPSECC },
     { CKM_ECDSA_SHA512, { EC_FB_KEY, CKF_SGN }, EC_FB_STEP, SFTKFIPSECC },
     /* only allowed keys are implented for ML_DSA */
-    { CKM_ML_DSA_KEY_PAIR_GEN, { CK_ALL_KEY, CKF_SGN }, CK_ALL_STEP, SFTKFIPSNone },
+    { CKM_ML_DSA_KEY_PAIR_GEN, { CK_ALL_KEY, CKF_KPG }, CK_ALL_STEP, SFTKFIPSNone },
     { CKM_ML_DSA, { CK_ALL_KEY, CKF_SGN },  CK_ALL_STEP, SFTKFIPSNone },
     /* only allowed keys are implented for ML_KEM */
-    { CKM_ML_KEM_KEY_PAIR_GEN, { CK_ALL_KEY, CKF_SGN }, CK_ALL_STEP, SFTKFIPSMLKEM },
+    { CKM_ML_KEM_KEY_PAIR_GEN, { CK_ALL_KEY, CKF_KPG }, CK_ALL_STEP, SFTKFIPSMLKEM },
     { CKM_ML_KEM, { CK_ALL_KEY, CKF_SGN },  CK_ALL_STEP, SFTKFIPSMLKEM },
     /* ------------------------- RC2 Operations --------------------------- */
     /* ------------------------- AES Operations --------------------------- */
