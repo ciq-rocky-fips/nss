@@ -1461,7 +1461,11 @@ sftk_handlePrivateKeyObject(SFTKSession *session, SFTKObject *object, CK_KEY_TYP
             if (!sftk_hasAttribute(object, CKA_VALUE)) {
                return CKR_TEMPLATE_INCOMPLETE;
             }
-            encrypt = decapsulate = recover = wrap = CK_FALSE;
+            encrypt = CK_FALSE;
+            decapsulate = CK_FALSE;
+            recover = CK_FALSE;
+            wrap = CK_FALSE;
+            derive = CK_FALSE;
             sign = CK_TRUE;
             break;
 #endif
