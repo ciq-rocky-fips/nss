@@ -80,7 +80,7 @@
 #if defined(_MSC_VER)
 #define KRML_NOINLINE __declspec(noinline)
 #elif defined(__GNUC__)
-#define KRML_NOINLINE __attribute__((noinline, unused))
+#define KRML_NOINLINE __attribute__((__noinline__, __unused__))
 #else
 #define KRML_NOINLINE
 #warning "The KRML_NOINLINE macro is not defined for this toolchain!"
