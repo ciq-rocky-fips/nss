@@ -160,10 +160,18 @@ typedef enum {
  */
 typedef enum {
     SFTK_SOURCE_DEFAULT=0,
-    SFTK_SOURCE_KEA,
+    SFTK_SOURCE_KEA,            /* Generic key agreement (legacy) */
+    SFTK_SOURCE_DH,             /* Diffie-Hellman key agreement */
+    SFTK_SOURCE_ECDH,           /* Elliptic Curve Diffie-Hellman */
+    SFTK_SOURCE_MLKEM,          /* ML-KEM encapsulation/decapsulation */
     SFTK_SOURCE_HKDF_EXPAND,
     SFTK_SOURCE_HKDF_EXTRACT
 } SFTKSource;
+
+/* Helper macro to check if source is from any key agreement operation */
+#define SFTK_IS_KEA_SOURCE(src) \
+    ((src) == SFTK_SOURCE_DH || (src) == SFTK_SOURCE_ECDH || \
+     (src) == SFTK_SOURCE_MLKEM || (src) == SFTK_SOURCE_KEA)
 
 /*
  * attribute values of an object.

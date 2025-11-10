@@ -8026,8 +8026,8 @@ sftk_HKDF(CK_HKDF_PARAMS_PTR params, CK_SESSION_HANDLE hSession,
         if (isFIPS && key && sourceKey) {
             PRBool fipsOK = PR_FALSE;
             /* case one: mix the kea with a previous or default
-             * salt */
-            if ((sourceKey->source == SFTK_SOURCE_KEA) &&
+             * salt. Accept any key agreement source (DH, ECDH, ML-KEM) */
+            if (SFTK_IS_KEA_SOURCE(sourceKey->source) &&
                 (saltKeySource == SFTK_SOURCE_HKDF_EXPAND) &&
                 (saltLen == rawHash->length)) {
                 fipsOK = PR_TRUE;
@@ -9194,6 +9194,45 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
             PORT_ZFree(buf, tmpKeySize);
             /* preserve the source of the original base key */
             /* key->source = sourceKey->source; */
+
+            /* Check for ML-KEM + ECDH hybrid specifically - mark as non-FIPS approved
+             *
+             * This detects the post-quantum hybrid key exchange pattern where:
+             * - One key is from ML-KEM encapsulation/decapsulation (CKK_ML_KEM type,
+             *   or SFTK_SOURCE_MLKEM for derived secrets)
+             * - Other key is from ECDH (CKK_GENERIC_SECRET type with SFTK_SOURCE_ECDH)
+             *
+             * Note: We specifically check for ECDH only. ML-KEM + DH combinations
+             * are not flagged by this check.
+             */
+            if (key->isFIPS) {
+                CK_KEY_TYPE sourceKeyType = CKK_GENERIC_SECRET;
+                CK_KEY_TYPE paramKeyType = CKK_GENERIC_SECRET;
+                PRBool isMLKEMwithECDH = PR_FALSE;
+
+                /* Get both key types (ignore errors, default to CKK_GENERIC_SECRET) */
+                (void)sftk_GetULongAttribute(sourceKey, CKA_KEY_TYPE, &sourceKeyType);
+                (void)sftk_GetULongAttribute(paramKey, CKA_KEY_TYPE, &paramKeyType);
+
+                /* Pattern 1: ML-KEM key type combined with ECDH-derived secret */
+                if (((sourceKeyType == CKK_ML_KEM || sourceKeyType == CKK_NSS_ML_KEM) &&
+                     paramKey->source == SFTK_SOURCE_ECDH) ||
+                    ((paramKeyType == CKK_ML_KEM || paramKeyType == CKK_NSS_ML_KEM) &&
+                     sourceKey->source == SFTK_SOURCE_ECDH)) {
+                    isMLKEMwithECDH = PR_TRUE;
+                }
+
+                /* Pattern 2: ML-KEM-derived secret combined with ECDH-derived secret */
+                if ((sourceKey->source == SFTK_SOURCE_MLKEM && paramKey->source == SFTK_SOURCE_ECDH) ||
+                    (sourceKey->source == SFTK_SOURCE_ECDH && paramKey->source == SFTK_SOURCE_MLKEM)) {
+                    isMLKEMwithECDH = PR_TRUE;
+                }
+
+                /* Mark as non-FIPS if combining ML-KEM with ECDH specifically */
+                if (isMLKEMwithECDH) {
+                    key->isFIPS = PR_FALSE;
+                }
+            }
             sftk_FreeAttribute(att2);
             sftk_FreeObject(paramKey);
             break;
@@ -9481,7 +9520,7 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
             SECITEM_ZfreeItem(&dhValue, PR_FALSE);
 
             if (rv == SECSuccess) {
-                key->source = SFTK_SOURCE_KEA;
+                key->source = SFTK_SOURCE_DH;  /* Mark as DH specifically */
                 sftk_forceAttribute(key, CKA_VALUE, derived.data, derived.len);
                 SECITEM_ZfreeItem(&derived, PR_FALSE);
                 crv = CKR_OK;
@@ -9613,7 +9652,7 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
                 }
                 secretlen = keySize;
             }
-            key->source = SFTK_SOURCE_KEA;
+            key->source = SFTK_SOURCE_ECDH;  /* Mark as ECDH specifically */
 
             sftk_forceAttribute(key, CKA_VALUE, secret, secretlen);
             PORT_ZFree(tmp.data, tmp.len);
