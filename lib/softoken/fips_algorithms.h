@@ -167,11 +167,5 @@ SFTKFIPSAlgorithmList sftk_fips_mechs[] = {
         offsetof(CK_SP800_108_KDF_PARAMS, prfType) },
     { CKM_NSS_SP800_108_DOUBLE_PIPELINE_KDF_DERIVE_DATA, { 112, CK_MAX, CKF_KDF }, 1,  SFTKFIPSChkHashSp800,
         offsetof(CK_SP800_108_KDF_PARAMS, prfType) },
-    /* concatentate fuctions used in hybrid operations */
-    /* The following functions add data at the end of a base key. If the base
-     * key is FIPS, and the resulting keys are strong enough, then the
-     * resulting key will also be FIPS and the resulting operations will be
-     * FIPS approved. */
-    { CKM_CONCATENATE_BASE_AND_KEY, { 112, CK_MAX, CKF_DERIVE }, 1, SFTKFIPSNone },
 };
 const int SFTK_NUMBER_FIPS_ALGORITHMS = PR_ARRAY_SIZE(sftk_fips_mechs);
