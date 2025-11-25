@@ -270,7 +270,7 @@ NSC_EncapsulateKey(CK_SESSION_HANDLE hSession,
 
     key->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_ENCAPSULATE,
                                        key, 0);
-    key->source = SFTK_SOURCE_MLKEM;  /* Mark as ML-KEM specifically */
+    key->source = SFTK_SOURCE_KEA;
     switch (pMechanism->mechanism) {
 #ifndef NSS_DISABLE_KYBER
         case CKM_NSS_KYBER:
@@ -418,7 +418,7 @@ NSC_DecapsulateKey(CK_SESSION_HANDLE hSession,
     SECItem secret = { siBuffer, secretBuf, sizeof secretBuf };
     key->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_DECAPSULATE,
                                        key, 0);
-    key->source = SFTK_SOURCE_MLKEM;  /* Mark as ML-KEM specifically */
+    key->source = SFTK_SOURCE_KEA;
 
     switch (pMechanism->mechanism) {
 #ifndef NSS_DISABLE_KYBER
