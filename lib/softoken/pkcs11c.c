@@ -5264,7 +5264,7 @@ loser:
         sftk_FreeObject(key1obj);
     }
     if (key2obj) {
-        sftk_FreeObject(key1obj);
+        sftk_FreeObject(key2obj);
     }
     if (att1) {
         sftk_FreeAttribute(att1);
@@ -5764,17 +5764,22 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
             return crv;
         }
     }
-    isKEM = sftk_isTrue(privateKey, CKA_ENCAPSULATE);
+    isKEM = sftk_isTrue(privateKey, CKA_DECAPSULATE);
     if (isKEM) {
         unsigned char *cipher_text = NULL;
         CK_ULONG cipher_text_length = 0;
         CK_OBJECT_HANDLE key1 =  CK_INVALID_HANDLE;
         CK_OBJECT_HANDLE key2 =  CK_INVALID_HANDLE;
-        CK_KEY_TYPE genType = CKO_SECRET_KEY;
-        CK_ATTRIBUTE template = { CKA_KEY_TYPE, NULL, 0 };
+        CK_OBJECT_CLASS genClass = CKO_SECRET_KEY;
+        CK_KEY_TYPE genType = CKK_GENERIC_SECRET;
+        CK_ATTRIBUTE template[2];
 
-        template.pValue = &genType;
-        template.ulValueLen = sizeof(genType);
+        template[0].type = CKA_CLASS;
+        template[0].pValue = &genClass;
+        template[0].ulValueLen = sizeof(genClass);
+        template[1].type = CKA_KEY_TYPE;
+        template[1].pValue = &genType;
+        template[1].ulValueLen = sizeof(genType);
         crv = CKR_OK;
         switch (keyType) {
             case CKK_ML_KEM:
@@ -5809,19 +5814,19 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
         if (cipher_text == NULL) {
             return CKR_HOST_MEMORY;
         }
-        crv = NSC_Encapsulate(hSession, &mech, publicKey->handle, &template, 1,
+        crv = NSC_Encapsulate(hSession, &mech, publicKey->handle, template, 2,
                               &key1, cipher_text, &cipher_text_length);
         if (crv != CKR_OK) {
             goto kem_done;
         }
         crv = NSC_Decapsulate(hSession, &mech, privateKey->handle,
-                              cipher_text, cipher_text_length, &template, 1,
+                              cipher_text, cipher_text_length, template, 2,
                               &key2);
         if (crv != CKR_OK) {
             goto kem_done;
         }
         if (!sftk_compareKeysEqual(hSession, key1, key2)) {
-            crv = CKR_DEVICE_ERROR;
+            crv = CKR_GENERAL_ERROR;
             goto kem_done;
         }
 kem_done:
@@ -5834,7 +5839,7 @@ kem_done:
             NSC_DestroyObject(hSession, key2);
         }
         if (crv != CKR_OK) {
-            return CKR_DEVICE_ERROR;
+            return crv;
         }
     }
 
