@@ -1210,6 +1210,7 @@ sftk_updateEncrypted(PLArenaPool *arena, SFTKDBHandle *keydb,
         CKA_EXPONENT_1,
         CKA_EXPONENT_2,
         CKA_COEFFICIENT,
+        CKA_SEED,
     };
     const CK_ULONG privAttrCount = sizeof(privAttrTypes) / sizeof(privAttrTypes[0]);
 

@@ -59,6 +59,7 @@ sftkdb_isULONGAttribute(CK_ATTRIBUTE_TYPE type)
         case CKA_SUBPRIME_BITS:
         case CKA_VALUE_BITS:
         case CKA_VALUE_LEN:
+        case CKA_PARAMETER_SET:
 
         case CKA_TRUST_DIGITAL_SIGNATURE:
         case CKA_TRUST_NON_REPUDIATION:
@@ -391,7 +392,15 @@ sftkdb_fixupTemplateOut(CK_ATTRIBUTE *template, CK_OBJECT_HANDLE objectID,
                         crv = CKR_BUFFER_TOO_SMALL;
                         continue;
                     }
-                    PORT_Memcpy(template[i].pValue, &value, sizeof(CK_ULONG));
+                    /* handle the case where the CKA_PARAMETER_SET was
+                     * incorrectly encoded */
+                    if ((value > 0xff) && 
+                        (template[i].type == CKA_PARAMETER_SET)) {
+                        PORT_Memcpy(template[i].pValue, ntemplate[i].pValue,
+                                    ntemplate[i].ulValueLen);
+                    } else {
+                        PORT_Memcpy(template[i].pValue, &value, sizeof(CK_ULONG));
+                    }
                 }
                 template[i].ulValueLen = sizeof(CK_ULONG);
             }
@@ -1585,6 +1594,8 @@ sftkdb_DestroyObject(SFTKDBHandle *handle, CK_OBJECT_HANDLE objectID,
                                                    CKA_EXPONENT_2);
             (void)sftkdb_DestroyAttributeSignature(handle, keydb, objectID,
                                                    CKA_COEFFICIENT);
+            (void)sftkdb_DestroyAttributeSignature(handle, keydb, objectID,
+                                                   CKA_SEED);
         } else {
             keydb = SFTK_GET_SDB(handle->peerDB);
         }

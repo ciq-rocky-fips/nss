@@ -438,7 +438,7 @@ PK11_VerifyKeyOK(PK11SymKey *key)
 static PK11SymKey *
 pk11_ImportSymKeyWithTempl(PK11SlotInfo *slot, CK_MECHANISM_TYPE type,
                            PK11Origin origin, PRBool isToken, CK_ATTRIBUTE *keyTemplate,
-                           unsigned int templateCount, SECItem *key, void *wincx)
+                           unsigned int templateCount, SECItem *key, PRBool force, void *wincx)
 {
     PK11SymKey *symKey;
     SECStatus rv;
@@ -463,12 +463,61 @@ pk11_ImportSymKeyWithTempl(PK11SlotInfo *slot, CK_MECHANISM_TYPE type,
     /* import the keys */
     rv = PK11_CreateNewObject(slot, symKey->session, keyTemplate,
                               templateCount, isToken, &symKey->objectID);
-    if (rv != SECSuccess) {
+    if (rv == SECSuccess) {
+        return symKey;
+    }
+    /* we failed to create the key, if force isn't set, we just fail now */
+    if (!force) {
+        PK11_FreeSymKey(symKey);
+        return NULL;
+    }
+    /* if force is set, we are simulating an unwrap, probably from another token, we
+     * are probably here because we are trying to import into a FIPS token. Normally
+     * we would want this to fail, but the application got here because they are using
+     * unwrap, which is the correct way to  do this, so try to import the key into
+     * the FIPS token my hand */
+    /* first generate a seed key */
+    PK11SymKey *seedKey = PK11_KeyGen(slot, CKM_SHA256_HMAC, NULL, 256, wincx);
+
+    if (seedKey == NULL) {
         PK11_FreeSymKey(symKey);
         return NULL;
     }
 
-    return symKey;
+    /* now append our key data to the seed key and truncate the seed key */
+    CK_KEY_DERIVATION_STRING_DATA params = { 0 };
+    CK_MECHANISM mechanism = { 0, NULL, 0 };
+    params.pData = key->data;
+    params.ulLen = key->len;
+    mechanism.mechanism = CKM_CONCATENATE_DATA_AND_BASE;
+    mechanism.pParameter = &params;
+    mechanism.ulParameterLen = sizeof(params);
+
+    /* derive removed the CKA_VALUE_LEN before it called us, but now we need
+     * it back. We know there is space in the template because derive leaves
+     * space for the CKA_VALUE_LEN attribute. Any other callers that set force
+     * should also make sure there is space for the CKA_VALUE_LEN */
+    CK_ULONG valueLen; /* Don't define this in the 'if' statement, because it
+                        * would go out of scope before we use it */
+    if (!pk11_FindAttrInTemplate(keyTemplate, templateCount, CKA_VALUE_LEN)) {
+        valueLen = (CK_ULONG)key->len;
+        keyTemplate[templateCount].type = CKA_VALUE_LEN;
+        keyTemplate[templateCount].pValue = (void *)&valueLen;
+        keyTemplate[templateCount].ulValueLen = sizeof(valueLen);
+        templateCount++;
+    }
+
+    CK_RV crv = PK11_GETTAB(slot)->C_DeriveKey(symKey->session, &mechanism,
+                                              seedKey->objectID, keyTemplate,
+                                              templateCount,
+                                              &symKey->objectID);
+    PK11_FreeSymKey(seedKey);
+    if (crv == CKR_OK) {
+        return symKey;
+    }
+
+    PK11_FreeSymKey(symKey);
+    return NULL;
 }
 
 /*
@@ -506,7 +555,7 @@ PK11_ImportSymKey(PK11SlotInfo *slot, CK_MECHANISM_TYPE type,
 
     keyType = PK11_GetKeyType(type, key->len);
     symKey = pk11_ImportSymKeyWithTempl(slot, type, origin, PR_FALSE,
-                                        keyTemplate, templateCount, key, wincx);
+                                        keyTemplate, templateCount, key, PR_FALSE, wincx);
     return symKey;
 }
 /* Import a PKCS #11 data object and return it as a key. This key is
@@ -585,7 +634,7 @@ PK11_ImportSymKeyWithFlags(PK11SlotInfo *slot, CK_MECHANISM_TYPE type,
 
     keyType = PK11_GetKeyType(type, key->len);
     symKey = pk11_ImportSymKeyWithTempl(slot, type, origin, isPerm,
-                                        keyTemplate, templateCount, key, wincx);
+                                        keyTemplate, templateCount, key, PR_FALSE, wincx);
     if (symKey && isPerm) {
         symKey->owner = PR_FALSE;
     }
@@ -2675,7 +2724,7 @@ pk11_HandUnwrap(PK11SlotInfo *slot, CK_OBJECT_HANDLE wrappingKey,
     if (PK11_DoesMechanism(slot, target)) {
         symKey = pk11_ImportSymKeyWithTempl(slot, target, PK11_OriginUnwrap,
                                             isPerm, keyTemplate,
-                                            templateCount, &outKey, wincx);
+                                            templateCount, &outKey, PR_TRUE, wincx);
     } else {
         slot = PK11_GetBestSlot(target, wincx);
         if (slot == NULL) {
@@ -2687,7 +2736,7 @@ pk11_HandUnwrap(PK11SlotInfo *slot, CK_OBJECT_HANDLE wrappingKey,
         }
         symKey = pk11_ImportSymKeyWithTempl(slot, target, PK11_OriginUnwrap,
                                             isPerm, keyTemplate,
-                                            templateCount, &outKey, wincx);
+                                            templateCount, &outKey, PR_TRUE, wincx);
         PK11_FreeSlot(slot);
     }
     PORT_Free(outKey.data);

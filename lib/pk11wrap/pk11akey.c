@@ -1007,12 +1007,13 @@ PK11_ExtractPublicKey(PK11SlotInfo *slot, KeyType keyType, CK_OBJECT_HANDLE id)
  */
 SECKEYPrivateKey *
 PK11_MakePrivKey(PK11SlotInfo *slot, KeyType keyType,
-                 PRBool isTemp, CK_OBJECT_HANDLE privID, void *wincx)
+                 PRBool isOwner, CK_OBJECT_HANDLE privID, void *wincx)
 {
     PLArenaPool *arena;
     SECKEYPrivateKey *privKey;
     PRBool isPrivate;
     SECStatus rv;
+    PRBool isTemp = isOwner;
 
     /* don't know? look it up */
     if (keyType == nullKey) {
@@ -1024,6 +1025,10 @@ PK11_MakePrivKey(PK11SlotInfo *slot, KeyType keyType,
         if (keyType == nullKey) {
             return NULL;
         }
+    }
+    /* we can never own a perm key, make sure we don't set owner */
+    if (!isTemp) {
+        isOwner = PR_FALSE;
     }
 
     /* if the key is private, make sure we are authenticated to the
@@ -1052,7 +1057,9 @@ PK11_MakePrivKey(PK11SlotInfo *slot, KeyType keyType,
     privKey->keyType = keyType;
     privKey->pkcs11Slot = PK11_ReferenceSlot(slot);
     privKey->pkcs11ID = privID;
-    privKey->pkcs11IsTemp = isTemp;
+    privKey->pkcs11IsTemp = 0;
+    SECKEYPRIVATEKEY_SET_TEMP(privKey, isTemp);
+    SECKEYPRIVATEKEY_SET_OWNED(privKey, isOwner);
     privKey->wincx = wincx;
 
     return privKey;
@@ -2640,7 +2647,7 @@ PK11_CopyTokenPrivKeyToSessionPrivKey(PK11SlotInfo *destSlot,
         return NULL;
     }
 
-    return PK11_MakePrivKey(destSlot, privKey->keyType, PR_TRUE /*isTemp*/,
+    return PK11_MakePrivKey(destSlot, privKey->keyType, PR_TRUE /*isOwner*/,
                             newKeyID, privKey->wincx);
 }
 
@@ -2673,7 +2680,7 @@ PK11_ConvertSessionPrivKeyToTokenPrivKey(SECKEYPrivateKey *privk, void *wincx)
         return NULL;
     }
 
-    return PK11_MakePrivKey(slot, nullKey /*KeyType*/, PR_FALSE /*isTemp*/,
+    return PK11_MakePrivKey(slot, nullKey /*KeyType*/, PR_FALSE /*isOwner*/,
                             newKeyID, NULL /*wincx*/);
 }
 
@@ -2736,7 +2743,7 @@ pk11_DoKeys(PK11SlotInfo *slot, CK_OBJECT_HANDLE keyHandle, void *arg)
         return SECFailure;
     }
 
-    privKey = PK11_MakePrivKey(slot, nullKey, PR_TRUE, keyHandle, keycb->wincx);
+    privKey = PK11_MakePrivKey(slot, nullKey, PR_FALSE, keyHandle, keycb->wincx);
 
     if (privKey == NULL) {
         return SECFailure;
@@ -2828,7 +2835,7 @@ PK11_FindKeyByKeyID(PK11SlotInfo *slot, SECItem *keyID, void *wincx)
     if (keyHandle == CK_INVALID_HANDLE) {
         return NULL;
     }
-    privKey = PK11_MakePrivKey(slot, nullKey, PR_TRUE, keyHandle, wincx);
+    privKey = PK11_MakePrivKey(slot, nullKey, PR_FALSE, keyHandle, wincx);
     return privKey;
 }
 
@@ -3016,7 +3023,7 @@ PK11_ListPrivKeysInSlot(PK11SlotInfo *slot, char *nickname, void *wincx)
 
     for (i = 0; i < objCount; i++) {
         SECKEYPrivateKey *privKey =
-            PK11_MakePrivKey(slot, nullKey, PR_TRUE, key_ids[i], wincx);
+            PK11_MakePrivKey(slot, nullKey, PR_FALSE, key_ids[i], wincx);
         SECKEY_AddPrivateKeyToListTail(keys, privKey);
     }
 

@@ -25,7 +25,10 @@
     struct lc_hash_ctx *name= &_##name; 
 
 #define LC_HASH_SET_CTX(name, type_) \
-    name->hash= type_; 
+    name->hash= type_;  \
+    name->stream = true; \
+    name->u.ctx_ptr = NULL; \
+    name->buf = NULL;
 
 #define LC_SHAKE_256_CTX(name) \
     LC_HASH_SET_CTX(name, lc_shake256);

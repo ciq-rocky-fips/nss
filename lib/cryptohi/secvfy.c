@@ -441,7 +441,7 @@ sec_DecodeSigAlg(const SECKEYPublicKey *key, SECOidTag sigAlg,
     SECStatus rv;
     SECItem oid;
     SECOidTag encalg;
-    PRBool comboRequired = PR_TRUE;
+    PRBool comboRequired = PR_FALSE;
     char *evp;
 
     PR_ASSERT(hashalg != NULL);
