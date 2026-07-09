@@ -201,6 +201,8 @@ class TlsDropDatagram13 : public TlsConnectDatagram13,
 // ACKs
 TEST_P(TlsDropDatagram13, DropClientFirstFlightOnce) {
   client_filters_.drop_->Reset({0});
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
+  server_->ConfigNamedGroups(kNonPQDHEGroups);
   StartConnect();
   client_->Handshake();
   server_->Handshake();
@@ -210,6 +212,8 @@ TEST_P(TlsDropDatagram13, DropClientFirstFlightOnce) {
 
 TEST_P(TlsDropDatagram13, DropServerFirstFlightOnce) {
   server_filters_.drop_->Reset(0xff);
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
+  server_->ConfigNamedGroups(kNonPQDHEGroups);
   StartConnect();
   client_->Handshake();
   // Send the first flight, all dropped.
@@ -224,6 +228,8 @@ TEST_P(TlsDropDatagram13, DropServerFirstFlightOnce) {
 // TODO(ekr@rtfm.com): We should generate an empty ACK.
 TEST_P(TlsDropDatagram13, DropServerFirstRecordOnce) {
   server_filters_.drop_->Reset({0});
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
+  server_->ConfigNamedGroups(kNonPQDHEGroups);
   StartConnect();
   client_->Handshake();
   server_->Handshake();
@@ -236,6 +242,8 @@ TEST_P(TlsDropDatagram13, DropServerFirstRecordOnce) {
 // produce an ACK.
 TEST_P(TlsDropDatagram13, DropServerSecondRecordOnce) {
   server_filters_.drop_->Reset({1});
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
+  server_->ConfigNamedGroups(kNonPQDHEGroups);
   StartConnect();
   client_->Handshake();
   server_->Handshake();
@@ -299,6 +307,8 @@ TEST_P(TlsDropDatagram13, DropClientCertVerify) {
 // Shrink the MTU down so that certs get split and drop the first piece.
 TEST_P(TlsDropDatagram13, DropFirstHalfOfServerCertificate) {
   server_filters_.drop_->Reset({2});
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
+  server_->ConfigNamedGroups(kNonPQDHEGroups);
   StartConnect();
   ShrinkPostServerHelloMtu();
   client_->Handshake();
@@ -326,6 +336,8 @@ TEST_P(TlsDropDatagram13, DropFirstHalfOfServerCertificate) {
 // Shrink the MTU down so that certs get split and drop the second piece.
 TEST_P(TlsDropDatagram13, DropSecondHalfOfServerCertificate) {
   server_filters_.drop_->Reset({3});
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
+  server_->ConfigNamedGroups(kNonPQDHEGroups);
   StartConnect();
   ShrinkPostServerHelloMtu();
   client_->Handshake();
@@ -414,6 +426,8 @@ class TlsFragmentationAndRecoveryTest : public TlsDropDatagram13 {
 
  private:
   void FirstFlightDropCertificate() {
+    client_->ConfigNamedGroups(kNonPQDHEGroups);
+    server_->ConfigNamedGroups(kNonPQDHEGroups);
     StartConnect();
     client_->Handshake();
 
@@ -561,6 +575,8 @@ TEST_P(TlsDropDatagram13, NoDropsDuringZeroRtt) {
 
 TEST_P(TlsDropDatagram13, DropEEDuringZeroRtt) {
   SetupForZeroRtt();
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
+  server_->ConfigNamedGroups(kNonPQDHEGroups);
   SetFilters();
   std::cerr << "Starting second handshake" << std::endl;
   client_->Set0RttEnabled(true);
@@ -606,6 +622,8 @@ class TlsReorderDatagram13 : public TlsDropDatagram13 {
 // of the flight and will still produce an ACK.
 TEST_P(TlsDropDatagram13, ReorderServerEE) {
   server_filters_.drop_->Reset({1});
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
+  server_->ConfigNamedGroups(kNonPQDHEGroups);
   StartConnect();
   client_->Handshake();
   server_->Handshake();
@@ -684,6 +702,8 @@ TEST_F(TlsConnectDatagram13, SendOutOfOrderHsNonsenseWithHandshakeKey) {
 // Shrink the MTU down so that certs get split and then swap the first and
 // second pieces of the server certificate.
 TEST_P(TlsReorderDatagram13, ReorderServerCertificate) {
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
+  server_->ConfigNamedGroups(kNonPQDHEGroups);
   StartConnect();
   ShrinkPostServerHelloMtu();
   client_->Handshake();

@@ -4198,43 +4198,42 @@ SECU_ParseSSLVersionRangeString(const char *input,
     return SECSuccess;
 }
 
+#define NAME_AND_LEN(s) sizeof(s)-1,s
+static const struct SSLNamedGroupString {
+    int len;
+    char *name;
+    SSLNamedGroup grp;
+} sslNamedGroupStringArray[] = {
+    { NAME_AND_LEN("P256"), ssl_grp_ec_secp256r1 },
+    { NAME_AND_LEN("P384"), ssl_grp_ec_secp384r1 },
+    { NAME_AND_LEN("P521"), ssl_grp_ec_secp521r1 },
+    { NAME_AND_LEN("x25519"), ssl_grp_ec_curve25519 },
+    { NAME_AND_LEN("FF2048"), ssl_grp_ffdhe_2048 },
+    { NAME_AND_LEN("FF3072"), ssl_grp_ffdhe_3072 },
+    { NAME_AND_LEN("FF4096"), ssl_grp_ffdhe_4096 },
+    { NAME_AND_LEN("FF6144"), ssl_grp_ffdhe_6144 },
+    { NAME_AND_LEN("FF8192"), ssl_grp_ffdhe_8192 },
+#ifndef NSS_DISABLE_KYBER
+    { NAME_AND_LEN("xyber76800"), ssl_grp_kem_xyber768d00 },
+#endif
+    { NAME_AND_LEN("mlkem768x25519"), ssl_grp_kem_mlkem768x25519 },
+    { NAME_AND_LEN("mlkem768secp256r1"), ssl_grp_kem_secp256r1mlkem768 },
+};
+
+static const size_t sslNamedGroupStringLen=PR_ARRAY_SIZE(sslNamedGroupStringArray);
+
 static SSLNamedGroup
 groupNameToNamedGroup(char *name)
 {
-    if (PL_strlen(name) == 4) {
-        if (!strncmp(name, "P256", 4)) {
-            return ssl_grp_ec_secp256r1;
-        }
-        if (!strncmp(name, "P384", 4)) {
-            return ssl_grp_ec_secp384r1;
-        }
-        if (!strncmp(name, "P521", 4)) {
-            return ssl_grp_ec_secp521r1;
-        }
-    }
-    if (PL_strlen(name) == 6) {
-        if (!strncmp(name, "x25519", 6)) {
-            return ssl_grp_ec_curve25519;
-        }
-        if (!strncmp(name, "FF2048", 6)) {
-            return ssl_grp_ffdhe_2048;
-        }
-        if (!strncmp(name, "FF3072", 6)) {
-            return ssl_grp_ffdhe_3072;
-        }
-        if (!strncmp(name, "FF4096", 6)) {
-            return ssl_grp_ffdhe_4096;
-        }
-        if (!strncmp(name, "FF6144", 6)) {
-            return ssl_grp_ffdhe_6144;
-        }
-        if (!strncmp(name, "FF8192", 6)) {
-            return ssl_grp_ffdhe_8192;
-        }
-    }
-    if (PL_strlen(name) == 11) {
-        if (!strncmp(name, "xyber768d00", 11)) {
-            return ssl_grp_kem_xyber768d00;
+    int len = PL_strlen(name);
+    int i;
+
+    for (i=0; i < sslNamedGroupStringLen; i++) {
+        const struct SSLNamedGroupString *ngs = &sslNamedGroupStringArray[i];
+        if (len == ngs->len) {
+            if (!strncmp(name, ngs->name, len))  {
+                return ngs->grp;
+            }
         }
     }
     if (PL_strlen(name) == 14) {
@@ -4307,6 +4306,26 @@ done:
     *enabledGroupsCount = count;
     *enabledGroups = groups;
     return SECSuccess;
+}
+
+const char *
+SECU_NamedGroupToGroupName(SSLNamedGroup grp) {
+    int i;
+    static char unknownBuf[32];
+
+    if (grp == ssl_grp_none) {
+        return "None";
+    }
+
+    for (i=0; i < sslNamedGroupStringLen; i++) {
+        const struct SSLNamedGroupString *ngs = &sslNamedGroupStringArray[i];
+        if (grp == ngs->grp) {
+            return ngs->name;
+        }
+    }
+    snprintf(unknownBuf, sizeof(unknownBuf), "Unknown %d\n", grp);
+
+    return unknownBuf;
 }
 
 SSLSignatureScheme

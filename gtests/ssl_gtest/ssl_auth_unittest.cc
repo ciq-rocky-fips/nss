@@ -54,6 +54,7 @@ TEST_P(TlsConnectTls12Plus, ServerAuthRsaPss) {
                                PR_ARRAY_SIZE(kSignatureSchemePss));
   server_->SetSignatureSchemes(kSignatureSchemePss,
                                PR_ARRAY_SIZE(kSignatureSchemePss));
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
   Connect();
   CheckKeys(ssl_kea_ecdh, ssl_grp_ec_curve25519, ssl_auth_rsa_pss,
             ssl_sig_rsa_pss_pss_sha256);
@@ -84,6 +85,7 @@ TEST_P(TlsConnectTls12Plus, ServerAuthRsaPssNoParameters) {
                                PR_ARRAY_SIZE(kSignatureSchemePss));
   server_->SetSignatureSchemes(kSignatureSchemePss,
                                PR_ARRAY_SIZE(kSignatureSchemePss));
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
   Connect();
   CheckKeys(ssl_kea_ecdh, ssl_grp_ec_curve25519, ssl_auth_rsa_pss,
             ssl_sig_rsa_pss_pss_sha256);
@@ -947,7 +949,7 @@ TEST_P(TlsConnectClientAuth, ClientAuthEcdsa) {
   client_->SetupClientAuth(std::get<2>(GetParam()), true);
   server_->RequestClientAuth(true);
   Connect();
-  CheckKeys(ssl_kea_ecdh, ssl_auth_ecdsa);
+  CheckKeys(ssl_auth_ecdsa);
 }
 
 TEST_P(TlsConnectClientAuth, ClientAuthWithEch) {
@@ -960,7 +962,7 @@ TEST_P(TlsConnectClientAuth, ClientAuthWithEch) {
   client_->SetupClientAuth(std::get<2>(GetParam()), true);
   server_->RequestClientAuth(true);
   Connect();
-  CheckKeys(ssl_kea_ecdh, ssl_auth_ecdsa);
+  CheckKeys(ssl_auth_ecdsa);
 }
 
 TEST_P(TlsConnectClientAuth, ClientAuthBigRsa) {
@@ -1304,14 +1306,14 @@ static const SSLSignatureScheme kSignatureSchemeRsaSha384[] = {
 static const SSLSignatureScheme kSignatureSchemeRsaSha256[] = {
     ssl_sig_rsa_pkcs1_sha256};
 
-static SSLNamedGroup NamedGroupForEcdsa384(uint16_t version) {
+static SSLNamedGroup NamedGroupForEcdsa384(const TlsConnectTestBase *ctbase) {
   // NSS tries to match the group size to the symmetric cipher. In TLS 1.1 and
   // 1.0, TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA is the highest priority suite, so
   // we use P-384. With TLS 1.2 on we pick AES-128 GCM so use x25519.
-  if (version <= SSL_LIBRARY_VERSION_TLS_1_1) {
+  if (ctbase->GetVersion() <= SSL_LIBRARY_VERSION_TLS_1_1) {
     return ssl_grp_ec_secp384r1;
   }
-  return ssl_grp_ec_curve25519;
+  return ctbase->GetDefaultGroupFromKEA(ctbase->GetDefaultKEA());
 }
 
 // When signature algorithms match up, this should connect successfully; even
@@ -1323,7 +1325,7 @@ TEST_P(TlsConnectGeneric, SignatureAlgorithmServerAuth) {
   server_->SetSignatureSchemes(kSignatureSchemeEcdsaSha384,
                                PR_ARRAY_SIZE(kSignatureSchemeEcdsaSha384));
   Connect();
-  CheckKeys(ssl_kea_ecdh, NamedGroupForEcdsa384(version_), ssl_auth_ecdsa,
+  CheckKeys(GetDefaultKEA(), NamedGroupForEcdsa384(this), ssl_auth_ecdsa,
             ssl_sig_ecdsa_secp384r1_sha384);
 }
 
@@ -1342,7 +1344,7 @@ TEST_P(TlsConnectGeneric, SignatureAlgorithmClientOnly) {
             SSL_SignaturePrefSet(client_->ssl_fd(), clientAlgorithms,
                                  PR_ARRAY_SIZE(clientAlgorithms)));
   Connect();
-  CheckKeys(ssl_kea_ecdh, NamedGroupForEcdsa384(version_), ssl_auth_ecdsa,
+  CheckKeys(GetDefaultKEA(), NamedGroupForEcdsa384(this), ssl_auth_ecdsa,
             ssl_sig_ecdsa_secp384r1_sha384);
 }
 
@@ -1353,7 +1355,7 @@ TEST_P(TlsConnectGeneric, SignatureAlgorithmServerOnly) {
   server_->SetSignatureSchemes(kSignatureSchemeEcdsaSha384,
                                PR_ARRAY_SIZE(kSignatureSchemeEcdsaSha384));
   Connect();
-  CheckKeys(ssl_kea_ecdh, NamedGroupForEcdsa384(version_), ssl_auth_ecdsa,
+  CheckKeys(GetDefaultKEA(), NamedGroupForEcdsa384(this), ssl_auth_ecdsa,
             ssl_sig_ecdsa_secp384r1_sha384);
 }
 
@@ -1445,6 +1447,7 @@ TEST_P(TlsConnectTls12, SignatureAlgorithmDrop) {
 
 TEST_P(TlsConnectTls13, UnsupportedSignatureSchemeAlert) {
   EnsureTlsSetup();
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
   auto filter =
       MakeTlsFilter<TlsReplaceSignatureSchemeFilter>(server_, ssl_sig_none);
   filter->EnableDecryption();
@@ -1456,6 +1459,8 @@ TEST_P(TlsConnectTls13, UnsupportedSignatureSchemeAlert) {
 
 TEST_P(TlsConnectTls13, InconsistentSignatureSchemeAlert) {
   EnsureTlsSetup();
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
+  server_->ConfigNamedGroups(kNonPQDHEGroups);
 
   // This won't work because we use an RSA cert by default.
   auto filter = MakeTlsFilter<TlsReplaceSignatureSchemeFilter>(
@@ -1603,6 +1608,7 @@ static SECStatus AuthCompleteBlock(TlsAgent*, PRBool, PRBool) {
 // processed by the client, SSL_AuthCertificateComplete() is called.
 TEST_F(TlsConnectDatagram13, AuthCompleteBeforeFinished) {
   client_->SetAuthCertificateCallback(AuthCompleteBlock);
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
   MakeTlsFilter<BeforeFinished13>(server_, client_, [this]() {
     EXPECT_EQ(SECSuccess, SSL_AuthCertificateComplete(client_->ssl_fd(), 0));
   });
@@ -2036,8 +2042,7 @@ class TlsSignatureSchemeConfiguration
     EnsureTlsSetup();
     configPeer->SetSignatureSchemes(&signature_scheme_, 1);
     Connect();
-    CheckKeys(ssl_kea_ecdh, ssl_grp_ec_curve25519, auth_type_,
-              signature_scheme_);
+    CheckKeys(auth_type_, signature_scheme_);
   }
 
   std::string certificate_;
@@ -2071,7 +2076,7 @@ TEST_P(TlsSignatureSchemeConfiguration, SignatureSchemeConfigBoth) {
   client_->SetSignatureSchemes(&signature_scheme_, 1);
   server_->SetSignatureSchemes(&signature_scheme_, 1);
   Connect();
-  CheckKeys(ssl_kea_ecdh, ssl_grp_ec_curve25519, auth_type_, signature_scheme_);
+  CheckKeys(auth_type_, signature_scheme_);
 }
 
 class Tls12CertificateRequestReplacer : public TlsHandshakeFilter {

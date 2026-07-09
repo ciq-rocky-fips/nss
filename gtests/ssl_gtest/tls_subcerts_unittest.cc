@@ -449,6 +449,7 @@ class ReplaceDCSigScheme : public TlsHandshakeFilter {
 // Aborted because of incorrect DC signature algorithm indication.
 TEST_P(TlsConnectTls13, DCAbortBadExpectedCertVerifyAlg) {
   Reset(kEcdsaDelegatorId);
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
   client_->EnableDelegatedCredentials();
   server_->AddDelegatedCredential(TlsAgent::kServerEcdsa256,
                                   ssl_sig_ecdsa_secp256r1_sha256, kDCValidFor,
@@ -569,6 +570,7 @@ TEST_P(TlsConnectTls13, DCConnectClientNoTls13) {
 // Connected without DC because server doesn't support TLS 1.3.
 TEST_P(TlsConnectTls13, DCConnectServerNoTls13) {
   Reset(kEcdsaDelegatorId);
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
   client_->EnableDelegatedCredentials();
   server_->AddDelegatedCredential(kDCId, kDCScheme, kDCValidFor, now());
 
@@ -613,6 +615,7 @@ TEST_P(TlsConnectTls13, DCConnectExpectedCertVerifyAlgNotSupported) {
 TEST_P(TlsConnectTls13, DCCheckPreliminaryInfo) {
   Reset(kEcdsaDelegatorId);
   EnsureTlsSetup();
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
   client_->EnableDelegatedCredentials();
   server_->AddDelegatedCredential(TlsAgent::kServerEcdsa256,
                                   ssl_sig_ecdsa_secp256r1_sha256, kDCValidFor,
@@ -638,6 +641,7 @@ TEST_P(TlsConnectTls13, DCCheckPreliminaryInfo) {
 TEST_P(TlsConnectTls13, DCCheckPreliminaryInfoNoDC) {
   Reset(kEcdsaDelegatorId);
   EnsureTlsSetup();
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
   client_->EnableDelegatedCredentials();
   auto filter = MakeTlsFilter<TlsHandshakeDropper>(server_);
   filter->SetHandshakeTypes(

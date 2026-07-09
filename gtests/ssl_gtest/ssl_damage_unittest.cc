@@ -60,6 +60,8 @@ TEST_F(TlsConnectTest, DamageSecretHandleServerFinished) {
 
 TEST_P(TlsConnectGenericPre13, DamageServerSignature) {
   EnsureTlsSetup();
+  server_->ConfigNamedGroups(kNonPQDHEGroups);
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
   auto filter = MakeTlsFilter<TlsLastByteDamager>(
       server_, kTlsHandshakeServerKeyExchange);
   ExpectAlert(client_, kTlsAlertDecryptError);
@@ -70,6 +72,8 @@ TEST_P(TlsConnectGenericPre13, DamageServerSignature) {
 
 TEST_P(TlsConnectTls13, DamageServerSignature) {
   EnsureTlsSetup();
+  server_->ConfigNamedGroups(kNonPQDHEGroups);
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
   auto filter = MakeTlsFilter<TlsLastByteDamager>(
       server_, kTlsHandshakeCertificateVerify);
   filter->EnableDecryption();

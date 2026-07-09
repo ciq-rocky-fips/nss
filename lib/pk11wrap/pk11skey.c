@@ -3107,6 +3107,30 @@ pk11_KEMCiphertextLength(SECKEYPublicKey *pubKey)
     }
 }
 
+/* only one of privKey and pubKey is set. */
+static SECStatus
+pk11_GetKEMMechanism(KeyType keyType, CK_MECHANISM_PTR mechp,
+                     SECKEYPrivateKey *privKey, SECKEYPublicKey *pubKey)
+{
+    switch (keyType) {
+        case kyberKey:
+            /* we don't need to set the parameter set for the official
+             * mlkem interface, it can it it from the key. If we have
+             * kyber support, this still works because CKM_ML_KEM
+             * will see the CP_NSS_KYBER_786_ROUND3 parameter and use
+             * kyber.*/
+            mechp->mechanism = CKM_ML_KEM;
+            mechp->pParameter = NULL;
+            mechp->ulParameterLen = 0;
+            break;
+         /* add other kems here */
+         default:
+            PORT_SetError(SEC_ERROR_INVALID_KEY);
+            return SECFailure;
+    }
+    return SECSuccess;
+}
+
 SECStatus
 PK11_Encapsulate(SECKEYPublicKey *pubKey, CK_MECHANISM_TYPE target, PK11AttrFlags attrFlags, CK_FLAGS opFlags, PK11SymKey **outKey, SECItem **outCiphertext)
 {
@@ -3138,20 +3162,11 @@ PK11_Encapsulate(SECKEYPublicKey *pubKey, CK_MECHANISM_TYPE target, PK11AttrFlag
     *outKey = NULL;
     *outCiphertext = NULL;
 
-    CK_MECHANISM_TYPE kemType;
-    CK_NSS_KEM_PARAMETER_SET_TYPE kemParameterSet = PK11_ReadULongAttribute(slot, pubKey->pkcs11ID, CKA_NSS_PARAMETER_SET);
-    switch (kemParameterSet) {
-        case CKP_NSS_KYBER_768_ROUND3:
-            kemType = CKM_NSS_KYBER;
-            break;
-        case CKP_NSS_ML_KEM_768:
-            kemType = CKM_NSS_ML_KEM;
-            break;
-        default:
-            PORT_SetError(SEC_ERROR_INVALID_KEY);
-            return SECFailure;
+    CK_MECHANISM mech;
+    SECStatus rv = pk11_GetKEMMechanism(pubKey->keyType, &mech, NULL, pubKey);
+    if (rv != SECSuccess) {
+        return rv;
     }
-    CK_MECHANISM mech = { kemType, &kemParameterSet, sizeof(kemParameterSet) };
 
     sharedSecret = pk11_CreateSymKey(slot, target, PR_TRUE, PR_TRUE, NULL);
     if (sharedSecret == NULL) {
@@ -3243,20 +3258,11 @@ PK11_Decapsulate(SECKEYPrivateKey *privKey, const SECItem *ciphertext, CK_MECHAN
 
     *outKey = NULL;
 
-    CK_MECHANISM_TYPE kemType;
-    CK_NSS_KEM_PARAMETER_SET_TYPE kemParameterSet = PK11_ReadULongAttribute(slot, privKey->pkcs11ID, CKA_NSS_PARAMETER_SET);
-    switch (kemParameterSet) {
-        case CKP_NSS_KYBER_768_ROUND3:
-            kemType = CKM_NSS_KYBER;
-            break;
-        case CKP_NSS_ML_KEM_768:
-            kemType = CKM_NSS_ML_KEM;
-            break;
-        default:
-            PORT_SetError(SEC_ERROR_INVALID_KEY);
-            return SECFailure;
+    CK_MECHANISM mech;
+    SECStatus rv = pk11_GetKEMMechanism(privKey->keyType, &mech, privKey, NULL);
+    if (rv != SECSuccess) {
+        return rv;
     }
-    CK_MECHANISM mech = { kemType, &kemParameterSet, sizeof(kemParameterSet) };
 
     sharedSecret = pk11_CreateSymKey(slot, target, PR_TRUE, PR_TRUE, NULL);
     if (sharedSecret == NULL) {

@@ -42,6 +42,7 @@ class TlsCipherSuiteTestBase : public TlsConnectTestBase {
     EXPECT_EQ(SECSuccess, rv);
     if (rv == SECSuccess) {
       std::cerr << "Cipher suite: " << csinfo_.cipherSuiteName << std::endl;
+      std::cerr << "KEA: " << csinfo_.keaType << std::endl;
     }
     auth_type_ = csinfo_.authType;
     kea_type_ = csinfo_.keaType;

@@ -344,6 +344,8 @@ static void SendForwardReceive(std::shared_ptr<TlsAgent>& sender,
 }
 
 TEST_P(TlsConnectStream, ReplaceRecordLayer) {
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
+  server_->ConfigNamedGroups(kNonPQDHEGroups);
   StartConnect();
   client_->SetServerKeyBits(server_->server_key_bits());
 
@@ -387,7 +389,7 @@ TEST_P(TlsConnectStream, ReplaceRecordLayer) {
     client_stage.ForwardAll(server_, TlsAgent::STATE_CONNECTED);
     server_stage.ForwardAll(client_, TlsAgent::STATE_CONNECTED);
   }
-  CheckKeys();
+  CheckKeys(ssl_kea_ecdh, ssl_auth_rsa_sign); // why?
 
   // Reading and writing application data should work.
   SendForwardReceive(client_, client_stage, server_);
@@ -445,6 +447,8 @@ static SECStatus AuthCompleteBlock(TlsAgent*, PRBool, PRBool) {
 }
 
 TEST_P(TlsConnectStream, ReplaceRecordLayerAsyncLateAuth) {
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
+  server_->ConfigNamedGroups(kNonPQDHEGroups);
   StartConnect();
   client_->SetServerKeyBits(server_->server_key_bits());
 
@@ -494,7 +498,7 @@ TEST_P(TlsConnectStream, ReplaceRecordLayerAsyncLateAuth) {
     client_stage.ForwardAll(server_, TlsAgent::STATE_CONNECTED);
     server_stage.ForwardAll(client_, TlsAgent::STATE_CONNECTED);
   }
-  CheckKeys();
+  CheckKeys(ssl_kea_ecdh, ssl_auth_rsa_sign); // why?
 
   // Reading and writing application data should work.
   SendForwardReceive(client_, client_stage, server_);

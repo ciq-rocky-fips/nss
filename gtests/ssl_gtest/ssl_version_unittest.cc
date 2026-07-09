@@ -370,6 +370,7 @@ TEST_F(DtlsConnectTest, DtlsSupportedVersionsEncoding) {
                            SSL_LIBRARY_VERSION_TLS_1_3);
   auto capture = MakeTlsFilter<TlsExtensionCapture>(
       client_, ssl_tls13_supported_versions_xtn);
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
   Connect();
 
   ASSERT_EQ(7U, capture->extension().len());
@@ -393,6 +394,7 @@ TEST_F(DtlsConnectTest, Dtls13VersionWorkaround) {
 
   // Toggle the workaround, then verify both encodings are present.
   EnsureTlsSetup();
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
   SSL_SetDtls13VersionWorkaround(client_->ssl_fd(), PR_TRUE);
   SSL_SetDtls13VersionWorkaround(client_->ssl_fd(), PR_FALSE);
   SSL_SetDtls13VersionWorkaround(client_->ssl_fd(), PR_TRUE);

@@ -54,6 +54,7 @@ const PK11DefaultArrayEntry PK11_DefaultArray[] = {
     { "MD2", SECMOD_MD2_FLAG, CKM_MD2 },
     { "SSL", SECMOD_SSL_FLAG, CKM_SSL3_PRE_MASTER_KEY_GEN },
     { "TLS", SECMOD_TLS_FLAG, CKM_TLS_MASTER_KEY_DERIVE },
+    { "MLKEM", SECMOD_MLKEM_FLAG, CKM_ML_KEM },
     { "SKIPJACK", SECMOD_FORTEZZA_FLAG, CKM_SKIPJACK_CBC64 },
     { "Publicly-readable certs", SECMOD_FRIENDLY_FLAG, CKM_INVALID_MECHANISM },
     { "Random Num Generator", SECMOD_RANDOM_FLAG, CKM_FAKE_RANDOM },
@@ -89,6 +90,7 @@ static PK11SlotList
     pk11_dsaSlotList,
     pk11_dhSlotList,
     pk11_ecSlotList,
+    pk11_mlkemSlotList,
     pk11_ideaSlotList,
     pk11_sslSlotList,
     pk11_tlsSlotList,
@@ -843,6 +845,7 @@ PK11_InitSlotLists(void)
     pk11_InitSlotListStatic(&pk11_dsaSlotList);
     pk11_InitSlotListStatic(&pk11_dhSlotList);
     pk11_InitSlotListStatic(&pk11_ecSlotList);
+    pk11_InitSlotListStatic(&pk11_mlkemSlotList);
     pk11_InitSlotListStatic(&pk11_ideaSlotList);
     pk11_InitSlotListStatic(&pk11_sslSlotList);
     pk11_InitSlotListStatic(&pk11_tlsSlotList);
@@ -869,6 +872,7 @@ PK11_DestroySlotLists(void)
     pk11_FreeSlotListStatic(&pk11_dsaSlotList);
     pk11_FreeSlotListStatic(&pk11_dhSlotList);
     pk11_FreeSlotListStatic(&pk11_ecSlotList);
+    pk11_FreeSlotListStatic(&pk11_mlkemSlotList);
     pk11_FreeSlotListStatic(&pk11_ideaSlotList);
     pk11_FreeSlotListStatic(&pk11_sslSlotList);
     pk11_FreeSlotListStatic(&pk11_tlsSlotList);
@@ -945,11 +949,14 @@ PK11_GetSlotList(CK_MECHANISM_TYPE type)
         case CKM_EC_KEY_PAIR_GEN: /* aka CKM_ECDSA_KEY_PAIR_GEN */
         case CKM_NSS_ECDHE_NO_PAIRWISE_CHECK_KEY_PAIR_GEN:
         case CKM_ECDH1_DERIVE:
+            return &pk11_ecSlotList;
         case CKM_NSS_KYBER_KEY_PAIR_GEN: /* Bug 1893029 */
         case CKM_NSS_KYBER:
         case CKM_NSS_ML_KEM_KEY_PAIR_GEN: /* Bug 1893029 */
         case CKM_NSS_ML_KEM:
-            return &pk11_ecSlotList;
+        case CKM_ML_KEM_KEY_PAIR_GEN: /* Bug 1893029 */
+        case CKM_ML_KEM:
+            return &pk11_mlkemSlotList;
         case CKM_SSL3_PRE_MASTER_KEY_GEN:
         case CKM_SSL3_MASTER_KEY_DERIVE:
         case CKM_SSL3_SHA1_MAC:

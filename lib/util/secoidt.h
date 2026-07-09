@@ -536,6 +536,12 @@ typedef enum {
 
     SEC_OID_TLS_REQUIRE_EMS = 390,
 
+    /* these will change upstream. for now apps shouldn't use it */
+    /* give it an obscure name here */
+
+    SEC_OID_PRIVATE_1 = 391,
+    SEC_OID_PRIVATE_2 = 392,
+
     SEC_OID_TOTAL
 } SECOidTag;
 

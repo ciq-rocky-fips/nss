@@ -275,6 +275,7 @@ TEST_F(TlsConnectStreamTls13, ClientHelloF5Padding) {
   auto filter =
       MakeTlsFilter<TlsHandshakeRecorder>(client_, kTlsHandshakeClientHello);
 
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
   // Add PSK with label long enough to push CH length into [256, 511].
   std::vector<uint8_t> label(100);
   EXPECT_EQ(SECSuccess,

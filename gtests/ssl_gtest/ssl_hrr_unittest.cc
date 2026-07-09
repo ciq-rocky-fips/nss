@@ -22,6 +22,7 @@ TEST_P(TlsConnectTls13, HelloRetryRequestAbortsZeroRtt) {
   const PRInt32 k0RttDataLen = static_cast<PRInt32>(strlen(k0RttData));
 
   SetupForZeroRtt();  // initial handshake as normal
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
 
   static const std::vector<SSLNamedGroup> groups = {ssl_grp_ec_secp384r1,
                                                     ssl_grp_ec_secp521r1};
@@ -107,6 +108,7 @@ TEST_P(TlsConnectTls13, SecondClientHelloRejectEarlyDataXtn) {
   auto orig_client =
       std::make_shared<TlsAgent>(client_->name(), TlsAgent::CLIENT, variant_);
   client_.swap(orig_client);
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
   client_->SetVersionRange(SSL_LIBRARY_VERSION_TLS_1_1,
                            SSL_LIBRARY_VERSION_TLS_1_3);
   client_->ConfigureSessionCache(RESUME_BOTH);
@@ -370,6 +372,7 @@ TEST_P(TlsConnectTls13, RetryCallbackRetry) {
   size_t cb_called = 0;
   EXPECT_EQ(SECSuccess, SSL_HelloRetryRequestCallback(server_->ssl_fd(),
                                                       RetryHello, &cb_called));
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
 
   // Do the first message exchange.
   StartConnect();
@@ -417,6 +420,7 @@ TEST_P(TlsConnectTls13, RetryCallbackRetryWithAdditionalShares) {
   size_t cb_called = 0;
   EXPECT_EQ(SECSuccess, SSL_HelloRetryRequestCallback(server_->ssl_fd(),
                                                       RetryHello, &cb_called));
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
 
   // Do the first message exchange.
   StartConnect();
@@ -950,7 +954,7 @@ TEST_P(TlsKeyExchange13, ConnectEcdhePreferenceMismatchHrr) {
   client_->ConfigNamedGroups(client_groups);
   server_->ConfigNamedGroups(server_groups);
   Connect();
-  CheckKeys();
+  CheckKeys(ssl_kea_ecdh, ssl_grp_ec_curve25519);
   static const std::vector<SSLNamedGroup> expectedShares = {
       ssl_grp_ec_secp384r1};
   CheckKEXDetails(client_groups, expectedShares, ssl_grp_ec_curve25519);
@@ -997,7 +1001,7 @@ TEST_P(TlsKeyExchange13, ConnectEcdhePreferenceMismatchHrrExtraShares) {
   EXPECT_EQ(SECSuccess, SSL_SendAdditionalKeyShares(client_->ssl_fd(), 1));
 
   Connect();
-  CheckKeys();
+  CheckKeys(ssl_kea_ecdh, ssl_grp_ec_curve25519);
   CheckKEXDetails(client_groups, client_groups);
 }
 
@@ -1043,7 +1047,7 @@ TEST_P(TlsKeyExchange13,
   EXPECT_EQ(2U, cb_called);
   EXPECT_TRUE(shares_capture2_->captured()) << "client should send shares";
 
-  CheckKeys();
+  CheckKeys(ssl_kea_ecdh, ssl_grp_ec_curve25519);
   static const std::vector<SSLNamedGroup> client_shares(
       client_groups.begin(), client_groups.begin() + 2);
   CheckKEXDetails(client_groups, client_shares, server_groups[0]);

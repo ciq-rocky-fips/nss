@@ -482,6 +482,7 @@ TEST_F(TlsConnectDatagram13, CompatModeDtlsClient) {
   client_->SetOption(SSL_ENABLE_TLS13_COMPAT_MODE, PR_TRUE);
   auto client_records = MakeTlsFilter<TlsRecordRecorder>(client_);
   auto server_records = MakeTlsFilter<TlsRecordRecorder>(server_);
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
   Connect();
 
   ASSERT_EQ(2U, client_records->count());  // CH, Fin
@@ -522,6 +523,7 @@ class AddSessionIdFilter : public TlsHandshakeFilter {
 // mode.  It should be ignored instead.
 TEST_F(TlsConnectDatagram13, CompatModeDtlsServer) {
   EnsureTlsSetup();
+  client_->ConfigNamedGroups(kNonPQDHEGroups);
   auto client_records = std::make_shared<TlsRecordRecorder>(client_);
   client_->SetFilter(
       std::make_shared<ChainedPacketFilter>(ChainedPacketFilterInit(

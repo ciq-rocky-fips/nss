@@ -202,4 +202,11 @@ struct PK11GenericObjectStr {
 /* This mask includes all CK_FLAGs with an equivalent CKA_ attribute. */
 #define CKF_KEY_OPERATION_FLAGS 0x000e7b00UL
 
+/*
+ * private header file, so we can set real names for oids that aren't upstream
+ * yet, so we applications don't try to use them and get hosed when they change
+ */
+#define SEC_OID_SECP256R1MLKEM768 SEC_OID_PRIVATE_1
+#define SEC_OID_MLKEM1024SECP256R1 SEC_OID_PRIVATE_2
+
 #endif /* _SECMODTI_H_ */
