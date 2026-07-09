@@ -174,7 +174,7 @@ NSS_CMSUtil_DecryptSymKey_RSA_OAEP(SECKEYPrivateKey *privkey, SECItem *parameter
 
 extern SECStatus
 NSS_CMSUtil_EncryptSymKey_ESECDH(PLArenaPool *poolp, CERTCertificate *cert, PK11SymKey *key,
-                                 SECItem *encKey, PRBool genUkm, SECItem *ukm,
+                                 SECItem *encKey, PRBool genUkm, SECItem **ukm,
                                  SECAlgorithmID *keyEncAlg, SECItem *originatorPubKey, void *wincx);
 
 PK11SymKey *
