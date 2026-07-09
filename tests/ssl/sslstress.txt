@@ -55,15 +55,6 @@
 
 
    noECC    0      -c_:0039  -V_ssl3:tls1.2_-c_100_-C_:0039_-N  Stress TLS DHE_RSA_WITH_AES_256_CBC_SHA (no reuse)
-   noECC    0      -c_:0040  -V_ssl3:tls1.2_-c_100_-C_:0040_-N  Stress TLS DHE_DSS_WITH_AES_128_CBC_SHA256 (no reuse)
-
-#  noECC    0   -c_:0038_-u  -V_ssl3:tls1.2_-c_1000_-C_:0038_-u Stress TLS DHE_DSS_WITH_AES_256_CBC_SHA (session ticket)
-# use the above session ticket test, once session tickets with DHE_DSS are working
-   noECC    0      -c_:0038  -V_ssl3:tls1.2_-c_1000_-C_:0038_-N Stress TLS DHE_DSS_WITH_AES_256_CBC_SHA (no reuse)
-
-#  noECC    0      -c_:006A  -V_ssl3:tls1.2_-c_1000_-C_:006A    Stress TLS DHE_DSS_WITH_AES_256_CBC_SHA256
-# use the above reuse test, once the session cache with DHE_DSS is working
-   noECC    0      -c_:006A  -V_ssl3:tls1.2_-c_1000_-C_:006A_-N Stress TLS DHE_DSS_WITH_AES_256_CBC_SHA256 (no reuse
 
    noECC    0      -c_:006B  -V_ssl3:tls1.2_-c_100_-C_:006B_-N  Stress TLS DHE_RSA_WITH_AES_256_CBC_SHA256 (no reuse)
    noECC    0      -c_:009E  -V_ssl3:tls1.2_-c_100_-C_:009E_-N  Stress TLS DHE_RSA_WITH_AES_128_GCM_SHA256 (no reuse)
@@ -71,11 +62,3 @@
 #
 # add client auth versions here...
 #
-   noECC    0      -r_-r_-c_:0032  -V_ssl3:tls1.2_-c_100_-C_:0032_-N_-n_TestUser-dsa     Stress TLS DHE_DSS_WITH_AES_128_CBC_SHA (no reuse, client auth)
-   noECC    0      -r_-r_-c_:0067  -V_ssl3:tls1.2_-c_1000_-C_:0067_-n_TestUser-dsamixed  Stress TLS DHE_RSA_WITH_AES_128_CBC_SHA256 (client auth)
-
-#  noECC    0   -r_-r_-c_:00A2_-u  -V_ssl3:tls1.2_-c_1000_-C_:00A2_-n_TestUser-dsa_-u       Stress TLS DHE_DSS_WITH_AES_128_GCM_SHA256 (session ticket, client auth)
-#  noECC    0   -r_-r_-c_:00A3_-u  -V_ssl3:tls1.2_-c_1000_-C_:00A3_-n_TestUser-dsa_-u       Stress TLS DHE_DSS_WITH_AES_256_GCM_SHA384 (session ticket, client auth)
-# use the above session ticket test, once session tickets with DHE_DSS are working
-   noECC    0   -r_-r_-c_:00A2_-u  -V_ssl3:tls1.2_-c_1000_-C_:00A2_-N_-n_TestUser-dsa    Stress TLS DHE_DSS_WITH_AES_128_GCM_SHA256 (no reuse, client auth)
-   noECC    0   -r_-r_-c_:00A3_-u  -V_ssl3:tls1.2_-c_1000_-C_:00A3_-N_-n_TestUser-dsa    Stress TLS DHE_DSS_WITH_AES_256_GCM_SHA384 (no reuse, client auth)

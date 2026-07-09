@@ -578,7 +578,7 @@ main(int argc, char **argv)
     }
 
     /*
-     * PKM_KeyTest creates RSA,DSA public keys
+     * PKM_KeyTest creates RSA,ECDSA public keys
      * and AES, DES3 secret keys.
      * then does digest, hmac, encrypt/decrypt, signing operations.
      */
@@ -793,19 +793,14 @@ PKM_KeyTests(CK_FUNCTION_LIST_PTR pFunctionList,
 
     CK_RV crv = CKR_OK;
 
-    /*** DSA Key ***/
-    CK_MECHANISM dsaParamGenMech;
-    CK_ULONG primeBits = 1024;
-    CK_ATTRIBUTE dsaParamGenTemplate[1];
-    CK_OBJECT_HANDLE hDsaParams = CK_INVALID_HANDLE;
-    CK_BYTE DSA_P[128];
-    CK_BYTE DSA_Q[20];
-    CK_BYTE DSA_G[128];
-    CK_MECHANISM dsaKeyPairGenMech;
-    CK_ATTRIBUTE dsaPubKeyTemplate[5];
-    CK_ATTRIBUTE dsaPrivKeyTemplate[5];
-    CK_OBJECT_HANDLE hDSApubKey = CK_INVALID_HANDLE;
-    CK_OBJECT_HANDLE hDSAprivKey = CK_INVALID_HANDLE;
+    /*** ECDSA Key ***/
+    CK_BYTE ECDSA_P256_PARAMS[] =
+     { 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07 };
+    CK_MECHANISM ecdsaKeyPairGenMech;
+    CK_ATTRIBUTE ecdsaPubKeyTemplate[3];
+    CK_ATTRIBUTE ecdsaPrivKeyTemplate[5];
+    CK_OBJECT_HANDLE hECDSApubKey = CK_INVALID_HANDLE;
+    CK_OBJECT_HANDLE hECDSAprivKey = CK_INVALID_HANDLE;
 
     /**** RSA Key ***/
     CK_KEY_TYPE rsatype = CKK_RSA;
@@ -840,8 +835,8 @@ PKM_KeyTests(CK_FUNCTION_LIST_PTR pFunctionList,
     CK_ATTRIBUTE sDES3KeyTemplate[9];
     CK_OBJECT_HANDLE hDES3SecKey;
 
-    CK_MECHANISM dsaWithSha1Mech = {
-        CKM_DSA_SHA1, NULL, 0
+    CK_MECHANISM ecdsaWithSha256Mech = {
+        CKM_ECDSA_SHA256, NULL, 0
     };
 
     CK_BYTE IV[16];
@@ -888,45 +883,33 @@ PKM_KeyTests(CK_FUNCTION_LIST_PTR pFunctionList,
     NUMTESTS++; /* increment NUMTESTS */
 
     /* DSA key init */
-    dsaParamGenMech.mechanism = CKM_DSA_PARAMETER_GEN;
-    dsaParamGenMech.pParameter = NULL_PTR;
-    dsaParamGenMech.ulParameterLen = 0;
-    dsaParamGenTemplate[0].type = CKA_PRIME_BITS;
-    dsaParamGenTemplate[0].pValue = &primeBits;
-    dsaParamGenTemplate[0].ulValueLen = sizeof(primeBits);
-    dsaPubKeyTemplate[0].type = CKA_PRIME;
-    dsaPubKeyTemplate[0].pValue = DSA_P;
-    dsaPubKeyTemplate[0].ulValueLen = sizeof(DSA_P);
-    dsaPubKeyTemplate[1].type = CKA_SUBPRIME;
-    dsaPubKeyTemplate[1].pValue = DSA_Q;
-    dsaPubKeyTemplate[1].ulValueLen = sizeof(DSA_Q);
-    dsaPubKeyTemplate[2].type = CKA_BASE;
-    dsaPubKeyTemplate[2].pValue = DSA_G;
-    dsaPubKeyTemplate[2].ulValueLen = sizeof(DSA_G);
-    dsaPubKeyTemplate[3].type = CKA_TOKEN;
-    dsaPubKeyTemplate[3].pValue = &true;
-    dsaPubKeyTemplate[3].ulValueLen = sizeof(true);
-    dsaPubKeyTemplate[4].type = CKA_VERIFY;
-    dsaPubKeyTemplate[4].pValue = &true;
-    dsaPubKeyTemplate[4].ulValueLen = sizeof(true);
-    dsaKeyPairGenMech.mechanism = CKM_DSA_KEY_PAIR_GEN;
-    dsaKeyPairGenMech.pParameter = NULL_PTR;
-    dsaKeyPairGenMech.ulParameterLen = 0;
-    dsaPrivKeyTemplate[0].type = CKA_TOKEN;
-    dsaPrivKeyTemplate[0].pValue = &true;
-    dsaPrivKeyTemplate[0].ulValueLen = sizeof(true);
-    dsaPrivKeyTemplate[1].type = CKA_PRIVATE;
-    dsaPrivKeyTemplate[1].pValue = &true;
-    dsaPrivKeyTemplate[1].ulValueLen = sizeof(true);
-    dsaPrivKeyTemplate[2].type = CKA_SENSITIVE;
-    dsaPrivKeyTemplate[2].pValue = &true;
-    dsaPrivKeyTemplate[2].ulValueLen = sizeof(true);
-    dsaPrivKeyTemplate[3].type = CKA_SIGN,
-    dsaPrivKeyTemplate[3].pValue = &true;
-    dsaPrivKeyTemplate[3].ulValueLen = sizeof(true);
-    dsaPrivKeyTemplate[4].type = CKA_EXTRACTABLE;
-    dsaPrivKeyTemplate[4].pValue = &true;
-    dsaPrivKeyTemplate[4].ulValueLen = sizeof(true);
+    ecdsaPubKeyTemplate[0].type = CKA_EC_PARAMS;
+    ecdsaPubKeyTemplate[0].pValue = ECDSA_P256_PARAMS;
+    ecdsaPubKeyTemplate[0].ulValueLen = sizeof(ECDSA_P256_PARAMS);
+    ecdsaPubKeyTemplate[1].type = CKA_TOKEN;
+    ecdsaPubKeyTemplate[1].pValue = &true;
+    ecdsaPubKeyTemplate[1].ulValueLen = sizeof(true);
+    ecdsaPubKeyTemplate[2].type = CKA_VERIFY;
+    ecdsaPubKeyTemplate[2].pValue = &true;
+    ecdsaPubKeyTemplate[2].ulValueLen = sizeof(true);
+    ecdsaKeyPairGenMech.mechanism = CKM_ECDSA_KEY_PAIR_GEN;
+    ecdsaKeyPairGenMech.pParameter = NULL_PTR;
+    ecdsaKeyPairGenMech.ulParameterLen = 0;
+    ecdsaPrivKeyTemplate[0].type = CKA_TOKEN;
+    ecdsaPrivKeyTemplate[0].pValue = &true;
+    ecdsaPrivKeyTemplate[0].ulValueLen = sizeof(true);
+    ecdsaPrivKeyTemplate[1].type = CKA_PRIVATE;
+    ecdsaPrivKeyTemplate[1].pValue = &true;
+    ecdsaPrivKeyTemplate[1].ulValueLen = sizeof(true);
+    ecdsaPrivKeyTemplate[2].type = CKA_SENSITIVE;
+    ecdsaPrivKeyTemplate[2].pValue = &true;
+    ecdsaPrivKeyTemplate[2].ulValueLen = sizeof(true);
+    ecdsaPrivKeyTemplate[3].type = CKA_SIGN,
+    ecdsaPrivKeyTemplate[3].pValue = &true;
+    ecdsaPrivKeyTemplate[3].ulValueLen = sizeof(true);
+    ecdsaPrivKeyTemplate[4].type = CKA_EXTRACTABLE;
+    ecdsaPrivKeyTemplate[4].pValue = &true;
+    ecdsaPrivKeyTemplate[4].ulValueLen = sizeof(true);
 
     /* RSA key init */
     rsaKeyPairGenMech.mechanism = CKM_RSA_PKCS_KEY_PAIR_GEN;
@@ -1148,52 +1131,18 @@ PKM_KeyTests(CK_FUNCTION_LIST_PTR pFunctionList,
         return crv;
     }
 
-    PKM_LogIt("Generate DSA PQG domain parameters ... \n");
-    /* Generate DSA domain parameters PQG */
-    crv = pFunctionList->C_GenerateKey(hRwSession, &dsaParamGenMech,
-                                       dsaParamGenTemplate,
-                                       1,
-                                       &hDsaParams);
+    PKM_LogIt("Generate a ECDSA key pair ... \n");
+    /* Generate a persistent ECDSA key pair */
+    crv = pFunctionList->C_GenerateKeyPair(hRwSession, &ecdsaKeyPairGenMech,
+                                           ecdsaPubKeyTemplate,
+                                           NUM_ELEM(ecdsaPubKeyTemplate),
+                                           ecdsaPrivKeyTemplate,
+                                           NUM_ELEM(ecdsaPrivKeyTemplate),
+                                           &hECDSApubKey, &hECDSAprivKey);
     if (crv == CKR_OK) {
-        PKM_LogIt("DSA domain parameter generation succeeded\n");
+        PKM_LogIt("ECDSA key pair generation succeeded\n");
     } else {
-        PKM_Error("DSA domain parameter generation failed "
-                  "with 0x%08X, %-26s\n",
-                  crv, PKM_CK_RVtoStr(crv));
-        return crv;
-    }
-    crv = pFunctionList->C_GetAttributeValue(hRwSession, hDsaParams,
-                                             dsaPubKeyTemplate, 3);
-    if (crv == CKR_OK) {
-        PKM_LogIt("Getting DSA domain parameters succeeded\n");
-    } else {
-        PKM_Error("Getting DSA domain parameters failed "
-                  "with 0x%08X, %-26s\n",
-                  crv, PKM_CK_RVtoStr(crv));
-        return crv;
-    }
-    crv = pFunctionList->C_DestroyObject(hRwSession, hDsaParams);
-    if (crv == CKR_OK) {
-        PKM_LogIt("Destroying DSA domain parameters succeeded\n");
-    } else {
-        PKM_Error("Destroying DSA domain parameters failed "
-                  "with 0x%08X, %-26s\n",
-                  crv, PKM_CK_RVtoStr(crv));
-        return crv;
-    }
-
-    PKM_LogIt("Generate a DSA key pair ... \n");
-    /* Generate a persistent DSA key pair */
-    crv = pFunctionList->C_GenerateKeyPair(hRwSession, &dsaKeyPairGenMech,
-                                           dsaPubKeyTemplate,
-                                           NUM_ELEM(dsaPubKeyTemplate),
-                                           dsaPrivKeyTemplate,
-                                           NUM_ELEM(dsaPrivKeyTemplate),
-                                           &hDSApubKey, &hDSAprivKey);
-    if (crv == CKR_OK) {
-        PKM_LogIt("DSA key pair generation succeeded\n");
-    } else {
-        PKM_Error("DSA key pair generation failed "
+        PKM_Error("ECDSA key pair generation failed "
                   "with 0x%08X, %-26s\n",
                   crv, PKM_CK_RVtoStr(crv));
         return crv;
@@ -1414,10 +1363,10 @@ PKM_KeyTests(CK_FUNCTION_LIST_PTR pFunctionList,
     } /* end of RSA for loop */
 
     crv = PKM_PubKeySign(pFunctionList, hRwSession,
-                         hDSApubKey, hDSAprivKey,
-                         &dsaWithSha1Mech, PLAINTEXT, sizeof(PLAINTEXT));
+                         hECDSApubKey, hECDSAprivKey,
+                         &ecdsaWithSha256Mech, PLAINTEXT, sizeof(PLAINTEXT));
     if (crv == CKR_OK) {
-        PKM_LogIt("PKM_PubKeySign for DSAwithSHA1 succeeded \n\n");
+        PKM_LogIt("PKM_PubKeySign for ECDSAwithSHA256 succeeded \n\n");
     } else {
         PKM_Error("PKM_PubKeySign failed "
                   "with 0x%08X, %-26s\n",
@@ -1425,8 +1374,8 @@ PKM_KeyTests(CK_FUNCTION_LIST_PTR pFunctionList,
         return crv;
     }
     crv = PKM_DualFuncSign(pFunctionList, hRwSession,
-                           hDSApubKey, hDSAprivKey,
-                           &dsaWithSha1Mech,
+                           hECDSApubKey, hECDSAprivKey,
+                           &ecdsaWithSha256Mech,
                            hAESSecKey, &mech_AES_CBC,
                            PLAINTEXT, sizeof(PLAINTEXT));
     if (crv == CKR_OK) {
@@ -1439,44 +1388,44 @@ PKM_KeyTests(CK_FUNCTION_LIST_PTR pFunctionList,
         return crv;
     }
     crv = PKM_DualFuncSign(pFunctionList, hRwSession,
-                           hDSApubKey, hDSAprivKey,
-                           &dsaWithSha1Mech,
+                           hECDSApubKey, hECDSAprivKey,
+                           &ecdsaWithSha256Mech,
                            hDES3SecKey, &mech_DES3_CBC,
                            PLAINTEXT, sizeof(PLAINTEXT));
     if (crv == CKR_OK) {
         PKM_LogIt("PKM_DualFuncSign with DES3 secret key succeeded "
-                  "for DSAWithSHA1\n\n");
+                  "for ECDSAWithSHA256\n\n");
     } else {
         PKM_Error("PKM_DualFuncSign with DES3 secret key failed "
-                  "for DSAWithSHA1 with 0x%08X, %-26s\n",
+                  "for ECDSAWithSHA256 with 0x%08X, %-26s\n",
                   crv, PKM_CK_RVtoStr(crv));
         return crv;
     }
     crv = PKM_DualFuncSign(pFunctionList, hRwSession,
-                           hDSApubKey, hDSAprivKey,
-                           &dsaWithSha1Mech,
+                           hECDSApubKey, hECDSAprivKey,
+                           &ecdsaWithSha256Mech,
                            hAESSecKey, &mech_AES_CBC_PAD,
                            PLAINTEXT_PAD, sizeof(PLAINTEXT_PAD));
     if (crv == CKR_OK) {
         PKM_LogIt("PKM_DualFuncSign with AES secret key CBC_PAD succeeded "
-                  "for DSAWithSHA1\n\n");
+                  "for DSAWithSHA256\n\n");
     } else {
         PKM_Error("PKM_DualFuncSign with AES secret key CBC_PAD failed "
-                  "for DSAWithSHA1 with 0x%08X, %-26s\n",
+                  "for DSAWithSHA256 with 0x%08X, %-26s\n",
                   crv, PKM_CK_RVtoStr(crv));
         return crv;
     }
     crv = PKM_DualFuncSign(pFunctionList, hRwSession,
-                           hDSApubKey, hDSAprivKey,
-                           &dsaWithSha1Mech,
+                           hECDSApubKey, hECDSAprivKey,
+                           &ecdsaWithSha256Mech,
                            hDES3SecKey, &mech_DES3_CBC_PAD,
                            PLAINTEXT_PAD, sizeof(PLAINTEXT_PAD));
     if (crv == CKR_OK) {
         PKM_LogIt("PKM_DualFuncSign with DES3 secret key CBC_PAD succeeded "
-                  "for DSAWithSHA1\n\n");
+                  "for ECDSAWithSHA256\n\n");
     } else {
         PKM_Error("PKM_DualFuncSign with DES3 secret key CBC_PAD failed "
-                  "for DSAWithSHA1 with 0x%08X, %-26s\n",
+                  "for ECDSAWithSHA256 with 0x%08X, %-26s\n",
                   crv, PKM_CK_RVtoStr(crv));
         return crv;
     }
@@ -3029,7 +2978,7 @@ PKM_PubKeySign(CK_FUNCTION_LIST_PTR pFunctionList,
     }
 
     /* Check that the mechanism is Multi-part */
-    if (signMech->mechanism == CKM_DSA ||
+    if (signMech->mechanism == CKM_ECDSA ||
         signMech->mechanism == CKM_RSA_PKCS) {
         return crv;
     }
@@ -3083,6 +3032,7 @@ PKM_PubKeySign(CK_FUNCTION_LIST_PTR pFunctionList,
     return crv;
 }
 
+#define SHA256_LENGTH 32
 CK_RV
 PKM_PublicKey(CK_FUNCTION_LIST_PTR pFunctionList,
               CK_SLOT_ID *pSlotList,
@@ -3092,19 +3042,14 @@ PKM_PublicKey(CK_FUNCTION_LIST_PTR pFunctionList,
     CK_SESSION_HANDLE hSession;
     CK_RV crv = CKR_OK;
 
-    /*** DSA Key ***/
-    CK_MECHANISM dsaParamGenMech;
-    CK_ULONG primeBits = 1024;
-    CK_ATTRIBUTE dsaParamGenTemplate[1];
-    CK_OBJECT_HANDLE hDsaParams = CK_INVALID_HANDLE;
-    CK_BYTE DSA_P[128];
-    CK_BYTE DSA_Q[20];
-    CK_BYTE DSA_G[128];
-    CK_MECHANISM dsaKeyPairGenMech;
-    CK_ATTRIBUTE dsaPubKeyTemplate[5];
-    CK_ATTRIBUTE dsaPrivKeyTemplate[5];
-    CK_OBJECT_HANDLE hDSApubKey = CK_INVALID_HANDLE;
-    CK_OBJECT_HANDLE hDSAprivKey = CK_INVALID_HANDLE;
+    /*** ECDSA Key ***/
+    CK_MECHANISM ecdsaKeyPairGenMech;
+    CK_ATTRIBUTE ecdsaPubKeyTemplate[3];
+    CK_ATTRIBUTE ecdsaPrivKeyTemplate[5];
+    CK_OBJECT_HANDLE hECDSApubKey = CK_INVALID_HANDLE;
+    CK_OBJECT_HANDLE hECDSAprivKey = CK_INVALID_HANDLE;
+    CK_BYTE ECDSA_P256_PARAMS[] =
+     { 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07 };
 
     /* From SHA1ShortMsg.req, Len = 136 */
     CK_BYTE MSG[] = {
@@ -3115,69 +3060,57 @@ PKM_PublicKey(CK_FUNCTION_LIST_PTR pFunctionList,
         0x44
     };
     CK_BYTE MD[] = {
-        0xf7, 0x5d, 0x92, 0xa4,
-        0xbb, 0x4d, 0xec, 0xc3,
-        0x7c, 0x5c, 0x72, 0xfa,
-        0x04, 0x75, 0x71, 0x0a,
-        0x06, 0x75, 0x8c, 0x1d
+        0x88, 0x78, 0xe1, 0x1e,
+        0x63, 0x74, 0xa9, 0xd9,
+        0x90, 0xd0, 0xeb, 0x2c,
+        0xeb, 0x62, 0x2b, 0x04,
+        0x53, 0x9f, 0xa0, 0xfc
     };
 
-    CK_BYTE sha1Digest[20];
-    CK_ULONG sha1DigestLen;
-    CK_BYTE dsaSig[40];
-    CK_ULONG dsaSigLen;
-    CK_MECHANISM sha1Mech = {
-        CKM_SHA_1, NULL, 0
+    CK_BYTE sha256Digest[SHA256_LENGTH];
+    CK_ULONG sha256DigestLen;
+    CK_BYTE ecdsaSig[SHA256_LENGTH*2+1];
+    CK_ULONG ecdsaSigLen;
+    CK_MECHANISM sha256Mech = {
+        CKM_SHA256, NULL, 0
     };
-    CK_MECHANISM dsaMech = {
-        CKM_DSA, NULL, 0
+    CK_MECHANISM ecdsaMech = {
+        CKM_ECDSA, NULL, 0
     };
-    CK_MECHANISM dsaWithSha1Mech = {
-        CKM_DSA_SHA1, NULL, 0
+    CK_MECHANISM ecdsaWithSha256Mech = {
+        CKM_ECDSA_SHA256, NULL, 0
     };
 
     NUMTESTS++; /* increment NUMTESTS */
 
-    /* DSA key init */
-    dsaParamGenMech.mechanism = CKM_DSA_PARAMETER_GEN;
-    dsaParamGenMech.pParameter = NULL_PTR;
-    dsaParamGenMech.ulParameterLen = 0;
-    dsaParamGenTemplate[0].type = CKA_PRIME_BITS;
-    dsaParamGenTemplate[0].pValue = &primeBits;
-    dsaParamGenTemplate[0].ulValueLen = sizeof(primeBits);
-    dsaPubKeyTemplate[0].type = CKA_PRIME;
-    dsaPubKeyTemplate[0].pValue = DSA_P;
-    dsaPubKeyTemplate[0].ulValueLen = sizeof(DSA_P);
-    dsaPubKeyTemplate[1].type = CKA_SUBPRIME;
-    dsaPubKeyTemplate[1].pValue = DSA_Q;
-    dsaPubKeyTemplate[1].ulValueLen = sizeof(DSA_Q);
-    dsaPubKeyTemplate[2].type = CKA_BASE;
-    dsaPubKeyTemplate[2].pValue = DSA_G;
-    dsaPubKeyTemplate[2].ulValueLen = sizeof(DSA_G);
-    dsaPubKeyTemplate[3].type = CKA_TOKEN;
-    dsaPubKeyTemplate[3].pValue = &true;
-    dsaPubKeyTemplate[3].ulValueLen = sizeof(true);
-    dsaPubKeyTemplate[4].type = CKA_VERIFY;
-    dsaPubKeyTemplate[4].pValue = &true;
-    dsaPubKeyTemplate[4].ulValueLen = sizeof(true);
-    dsaKeyPairGenMech.mechanism = CKM_DSA_KEY_PAIR_GEN;
-    dsaKeyPairGenMech.pParameter = NULL_PTR;
-    dsaKeyPairGenMech.ulParameterLen = 0;
-    dsaPrivKeyTemplate[0].type = CKA_TOKEN;
-    dsaPrivKeyTemplate[0].pValue = &true;
-    dsaPrivKeyTemplate[0].ulValueLen = sizeof(true);
-    dsaPrivKeyTemplate[1].type = CKA_PRIVATE;
-    dsaPrivKeyTemplate[1].pValue = &true;
-    dsaPrivKeyTemplate[1].ulValueLen = sizeof(true);
-    dsaPrivKeyTemplate[2].type = CKA_SENSITIVE;
-    dsaPrivKeyTemplate[2].pValue = &true;
-    dsaPrivKeyTemplate[2].ulValueLen = sizeof(true);
-    dsaPrivKeyTemplate[3].type = CKA_SIGN,
-    dsaPrivKeyTemplate[3].pValue = &true;
-    dsaPrivKeyTemplate[3].ulValueLen = sizeof(true);
-    dsaPrivKeyTemplate[4].type = CKA_EXTRACTABLE;
-    dsaPrivKeyTemplate[4].pValue = &true;
-    dsaPrivKeyTemplate[4].ulValueLen = sizeof(true);
+    /* ECDSA key init */
+    ecdsaPubKeyTemplate[0].type = CKA_EC_PARAMS;
+    ecdsaPubKeyTemplate[0].pValue = ECDSA_P256_PARAMS;
+    ecdsaPubKeyTemplate[0].ulValueLen = sizeof(ECDSA_P256_PARAMS);
+    ecdsaPubKeyTemplate[1].type = CKA_TOKEN;
+    ecdsaPubKeyTemplate[1].pValue = &true;
+    ecdsaPubKeyTemplate[1].ulValueLen = sizeof(true);
+    ecdsaPubKeyTemplate[2].type = CKA_VERIFY;
+    ecdsaPubKeyTemplate[2].pValue = &true;
+    ecdsaPubKeyTemplate[2].ulValueLen = sizeof(true);
+    ecdsaKeyPairGenMech.mechanism = CKM_ECDSA_KEY_PAIR_GEN;
+    ecdsaKeyPairGenMech.pParameter = NULL_PTR;
+    ecdsaKeyPairGenMech.ulParameterLen = 0;
+    ecdsaPrivKeyTemplate[0].type = CKA_TOKEN;
+    ecdsaPrivKeyTemplate[0].pValue = &true;
+    ecdsaPrivKeyTemplate[0].ulValueLen = sizeof(true);
+    ecdsaPrivKeyTemplate[1].type = CKA_PRIVATE;
+    ecdsaPrivKeyTemplate[1].pValue = &true;
+    ecdsaPrivKeyTemplate[1].ulValueLen = sizeof(true);
+    ecdsaPrivKeyTemplate[2].type = CKA_SENSITIVE;
+    ecdsaPrivKeyTemplate[2].pValue = &true;
+    ecdsaPrivKeyTemplate[2].ulValueLen = sizeof(true);
+    ecdsaPrivKeyTemplate[3].type = CKA_SIGN,
+    ecdsaPrivKeyTemplate[3].pValue = &true;
+    ecdsaPrivKeyTemplate[3].ulValueLen = sizeof(true);
+    ecdsaPrivKeyTemplate[4].type = CKA_EXTRACTABLE;
+    ecdsaPrivKeyTemplate[4].pValue = &true;
+    ecdsaPrivKeyTemplate[4].ulValueLen = sizeof(true);
 
     crv = pFunctionList->C_OpenSession(pSlotList[slotID],
                                        CKF_RW_SESSION | CKF_SERIAL_SESSION,
@@ -3198,88 +3131,60 @@ PKM_PublicKey(CK_FUNCTION_LIST_PTR pFunctionList,
         return crv;
     }
 
-    PKM_LogIt("Generate DSA PQG domain parameters ... \n");
-    /* Generate DSA domain parameters PQG */
-    crv = pFunctionList->C_GenerateKey(hSession, &dsaParamGenMech,
-                                       dsaParamGenTemplate,
-                                       1,
-                                       &hDsaParams);
+    PKM_LogIt("Generate a ECDSA key pair ... \n");
+    /* Generate a persistent ECDSA key pair */
+    crv = pFunctionList->C_GenerateKeyPair(hSession, &ecdsaKeyPairGenMech,
+                                           ecdsaPubKeyTemplate,
+                                           NUM_ELEM(ecdsaPubKeyTemplate),
+                                           ecdsaPrivKeyTemplate,
+                                           NUM_ELEM(ecdsaPrivKeyTemplate),
+                                           &hECDSApubKey, &hECDSAprivKey);
     if (crv == CKR_OK) {
-        PKM_LogIt("DSA domain parameter generation succeeded\n");
+        PKM_LogIt("ECDSA key pair generation succeeded\n");
     } else {
-        PKM_Error("DSA domain parameter generation failed "
-                  "with 0x%08X, %-26s\n",
-                  crv, PKM_CK_RVtoStr(crv));
-        return crv;
-    }
-    crv = pFunctionList->C_GetAttributeValue(hSession, hDsaParams,
-                                             dsaPubKeyTemplate, 3);
-    if (crv == CKR_OK) {
-        PKM_LogIt("Getting DSA domain parameters succeeded\n");
-    } else {
-        PKM_Error("Getting DSA domain parameters failed "
-                  "with 0x%08X, %-26s\n",
-                  crv, PKM_CK_RVtoStr(crv));
-        return crv;
-    }
-    crv = pFunctionList->C_DestroyObject(hSession, hDsaParams);
-    if (crv == CKR_OK) {
-        PKM_LogIt("Destroying DSA domain parameters succeeded\n");
-    } else {
-        PKM_Error("Destroying DSA domain parameters failed "
-                  "with 0x%08X, %-26s\n",
-                  crv, PKM_CK_RVtoStr(crv));
-        return crv;
-    }
-
-    PKM_LogIt("Generate a DSA key pair ... \n");
-    /* Generate a persistent DSA key pair */
-    crv = pFunctionList->C_GenerateKeyPair(hSession, &dsaKeyPairGenMech,
-                                           dsaPubKeyTemplate,
-                                           NUM_ELEM(dsaPubKeyTemplate),
-                                           dsaPrivKeyTemplate,
-                                           NUM_ELEM(dsaPrivKeyTemplate),
-                                           &hDSApubKey, &hDSAprivKey);
-    if (crv == CKR_OK) {
-        PKM_LogIt("DSA key pair generation succeeded\n");
-    } else {
-        PKM_Error("DSA key pair generation failed "
+        PKM_Error("ECDSA key pair generation failed "
                   "with 0x%08X, %-26s\n",
                   crv, PKM_CK_RVtoStr(crv));
         return crv;
     }
 
     /* Compute SHA-1 digest */
-    crv = pFunctionList->C_DigestInit(hSession, &sha1Mech);
+    crv = pFunctionList->C_DigestInit(hSession, &sha256Mech);
     if (crv != CKR_OK) {
         PKM_Error("C_DigestInit failed with 0x%08X, %-26s\n", crv,
                   PKM_CK_RVtoStr(crv));
         return crv;
     }
-    sha1DigestLen = sizeof(sha1Digest);
+    sha256DigestLen = sizeof(sha256Digest);
     crv = pFunctionList->C_Digest(hSession, MSG, sizeof(MSG),
-                                  sha1Digest, &sha1DigestLen);
+                                  sha256Digest, &sha256DigestLen);
     if (crv != CKR_OK) {
         PKM_Error("C_Digest failed with 0x%08X, %-26s\n", crv,
                   PKM_CK_RVtoStr(crv));
         return crv;
     }
-    if (sha1DigestLen != sizeof(sha1Digest)) {
-        PKM_Error("sha1DigestLen is %lu\n", sha1DigestLen);
+    if (sha256DigestLen != sizeof(sha256Digest)) {
+        PKM_Error("sha1DigestLen is %lu\n", sha256DigestLen);
         return crv;
     }
 
-    if (memcmp(sha1Digest, MD, sizeof(MD)) == 0) {
-        PKM_LogIt("SHA-1 SHA1ShortMsg test case Len = 136 passed\n");
+    if (memcmp(sha256Digest, MD, sizeof(MD)) == 0) {
+        PKM_LogIt("SHA-256 SHA256ShortMsg test case Len = 136 passed\n");
     } else {
-        PKM_Error("SHA-1 SHA1ShortMsg test case Len = 136 failed\n");
+        int i;
+        PKM_Error("SHA-256 SHA256ShortMsg test case Len = 136 failed\n");
+        fprintf(stderr, "sha256Digest: ");
+        for (i=0; i < sizeof(MD); i++) fprintf(stderr, " 0x%02x", sha256Digest[i]);
+        fprintf(stderr, "\nMD: ");
+        for (i=0; i < sizeof(MD); i++) fprintf(stderr, " 0x%02x", MD[i]);
+        fprintf(stderr, "\n");
     }
 
     crv = PKM_PubKeySign(pFunctionList, hSession,
-                         hDSApubKey, hDSAprivKey,
-                         &dsaMech, sha1Digest, sizeof(sha1Digest));
+                         hECDSApubKey, hECDSAprivKey,
+                         &ecdsaMech, sha256Digest, sizeof(sha256Digest));
     if (crv == CKR_OK) {
-        PKM_LogIt("PKM_PubKeySign CKM_DSA succeeded \n");
+        PKM_LogIt("PKM_PubKeySign CKM_ECDSA succeeded \n");
     } else {
         PKM_Error("PKM_PubKeySign failed "
                   "with 0x%08X, %-26s\n",
@@ -3287,10 +3192,10 @@ PKM_PublicKey(CK_FUNCTION_LIST_PTR pFunctionList,
         return crv;
     }
     crv = PKM_PubKeySign(pFunctionList, hSession,
-                         hDSApubKey, hDSAprivKey,
-                         &dsaWithSha1Mech, PLAINTEXT, sizeof(PLAINTEXT));
+                         hECDSApubKey, hECDSAprivKey,
+                         &ecdsaWithSha256Mech, PLAINTEXT, sizeof(PLAINTEXT));
     if (crv == CKR_OK) {
-        PKM_LogIt("PKM_PubKeySign CKM_DSA_SHA1 succeeded \n");
+        PKM_LogIt("PKM_PubKeySign CKM_DSA_SHA256 succeeded \n");
     } else {
         PKM_Error("PKM_PubKeySign failed "
                   "with 0x%08X, %-26s\n",
@@ -3298,16 +3203,16 @@ PKM_PublicKey(CK_FUNCTION_LIST_PTR pFunctionList,
         return crv;
     }
 
-    /* Sign with DSA */
-    crv = pFunctionList->C_SignInit(hSession, &dsaMech, hDSAprivKey);
+    /* Sign with ECDSA */
+    crv = pFunctionList->C_SignInit(hSession, &ecdsaMech, hECDSAprivKey);
     if (crv != CKR_OK) {
         PKM_Error("C_SignInit failed with 0x%08X, %-26s\n", crv,
                   PKM_CK_RVtoStr(crv));
         return crv;
     }
-    dsaSigLen = sizeof(dsaSig);
-    crv = pFunctionList->C_Sign(hSession, sha1Digest, sha1DigestLen,
-                                dsaSig, &dsaSigLen);
+    ecdsaSigLen = sizeof(ecdsaSig);
+    crv = pFunctionList->C_Sign(hSession, sha256Digest, sha256DigestLen,
+                                ecdsaSig, &ecdsaSigLen);
     if (crv != CKR_OK) {
         PKM_Error("C_Sign failed with 0x%08X, %-26s\n", crv,
                   PKM_CK_RVtoStr(crv));
@@ -3315,14 +3220,14 @@ PKM_PublicKey(CK_FUNCTION_LIST_PTR pFunctionList,
     }
 
     /* Verify the DSA signature */
-    crv = pFunctionList->C_VerifyInit(hSession, &dsaMech, hDSApubKey);
+    crv = pFunctionList->C_VerifyInit(hSession, &ecdsaMech, hECDSApubKey);
     if (crv != CKR_OK) {
         PKM_Error("C_VerifyInit failed with 0x%08X, %-26s\n", crv,
                   PKM_CK_RVtoStr(crv));
         return crv;
     }
-    crv = pFunctionList->C_Verify(hSession, sha1Digest, sha1DigestLen,
-                                  dsaSig, dsaSigLen);
+    crv = pFunctionList->C_Verify(hSession, sha256Digest, sha256DigestLen,
+                                  ecdsaSig, ecdsaSigLen);
     if (crv == CKR_OK) {
         PKM_LogIt("C_Verify succeeded\n");
     } else {
@@ -3332,8 +3237,8 @@ PKM_PublicKey(CK_FUNCTION_LIST_PTR pFunctionList,
     }
 
     /* Verify the signature in a different way */
-    crv = pFunctionList->C_VerifyInit(hSession, &dsaWithSha1Mech,
-                                      hDSApubKey);
+    crv = pFunctionList->C_VerifyInit(hSession, &ecdsaWithSha256Mech,
+                                      hECDSApubKey);
     if (crv != CKR_OK) {
         PKM_Error("C_VerifyInit failed with 0x%08X, %-26s\n", crv,
                   PKM_CK_RVtoStr(crv));
@@ -3351,7 +3256,7 @@ PKM_PublicKey(CK_FUNCTION_LIST_PTR pFunctionList,
                   PKM_CK_RVtoStr(crv));
         return crv;
     }
-    crv = pFunctionList->C_VerifyFinal(hSession, dsaSig, dsaSigLen);
+    crv = pFunctionList->C_VerifyFinal(hSession, ecdsaSig, ecdsaSigLen);
     if (crv == CKR_OK) {
         PKM_LogIt("C_VerifyFinal succeeded\n");
     } else {
@@ -3361,8 +3266,8 @@ PKM_PublicKey(CK_FUNCTION_LIST_PTR pFunctionList,
     }
 
     /* Verify the signature in a different way */
-    crv = pFunctionList->C_VerifyInit(hSession, &dsaWithSha1Mech,
-                                      hDSApubKey);
+    crv = pFunctionList->C_VerifyInit(hSession, &ecdsaWithSha256Mech,
+                                      hECDSApubKey);
     if (crv != CKR_OK) {
         PKM_Error("C_VerifyInit failed with 0x%08X, %-26s\n",
                   crv, PKM_CK_RVtoStr(crv));
@@ -3380,7 +3285,7 @@ PKM_PublicKey(CK_FUNCTION_LIST_PTR pFunctionList,
                   crv, PKM_CK_RVtoStr(crv));
         return crv;
     }
-    crv = pFunctionList->C_VerifyFinal(hSession, dsaSig, dsaSigLen);
+    crv = pFunctionList->C_VerifyFinal(hSession, ecdsaSig, ecdsaSigLen);
     if (crv == CKR_OK) {
         PKM_LogIt("C_VerifyFinal of multi update succeeded.\n");
     } else {
@@ -3391,28 +3296,28 @@ PKM_PublicKey(CK_FUNCTION_LIST_PTR pFunctionList,
     /* Now modify the data */
     MSG[0] += 1;
     /* Compute SHA-1 digest */
-    crv = pFunctionList->C_DigestInit(hSession, &sha1Mech);
+    crv = pFunctionList->C_DigestInit(hSession, &sha256Mech);
     if (crv != CKR_OK) {
         PKM_Error("C_DigestInit failed with 0x%08X, %-26s\n", crv,
                   PKM_CK_RVtoStr(crv));
         return crv;
     }
-    sha1DigestLen = sizeof(sha1Digest);
+    sha256DigestLen = sizeof(sha256Digest);
     crv = pFunctionList->C_Digest(hSession, MSG, sizeof(MSG),
-                                  sha1Digest, &sha1DigestLen);
+                                  sha256Digest, &sha256DigestLen);
     if (crv != CKR_OK) {
         PKM_Error("C_Digest failed with 0x%08X, %-26s\n", crv,
                   PKM_CK_RVtoStr(crv));
         return crv;
     }
-    crv = pFunctionList->C_VerifyInit(hSession, &dsaMech, hDSApubKey);
+    crv = pFunctionList->C_VerifyInit(hSession, &ecdsaMech, hECDSApubKey);
     if (crv != CKR_OK) {
         PKM_Error("C_VerifyInit failed with 0x%08X, %-26s\n", crv,
                   PKM_CK_RVtoStr(crv));
         return crv;
     }
-    crv = pFunctionList->C_Verify(hSession, sha1Digest, sha1DigestLen,
-                                  dsaSig, dsaSigLen);
+    crv = pFunctionList->C_Verify(hSession, sha256Digest, sha256DigestLen,
+                                  ecdsaSig, ecdsaSigLen);
     if (crv != CKR_SIGNATURE_INVALID) {
         PKM_Error("C_Verify of modified data succeeded\n");
         return crv;
@@ -5021,7 +4926,7 @@ PKM_DualFuncSign(CK_FUNCTION_LIST_PTR pFunctionList,
     NUMTESTS++; /* increment NUMTESTS */
 
     /* Check that the mechanism is Multi-part */
-    if (sigMech->mechanism == CKM_DSA || sigMech->mechanism == CKM_RSA_PKCS) {
+    if (sigMech->mechanism == CKM_ECDSA || sigMech->mechanism == CKM_RSA_PKCS) {
         PKM_Error("PKM_DualFuncSign must be called with a Multi-part "
                   "operation mechanism\n");
         return CKR_DEVICE_ERROR;

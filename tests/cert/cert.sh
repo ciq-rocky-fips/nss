@@ -288,12 +288,14 @@ cert_create_cert()
         return $RET
     fi
 
+    if [ -z "$NSS_DISABLE_DSA" ]; then
 	CU_ACTION="Import DSA Root CA for $CERTNAME"
 	certu -A -n "TestCA-dsa" -t "TC,TC,TC" -f "${R_PWFILE}" \
 	    -d "${PROFILEDIR}" -i "${R_CADIR}/TestCA-dsa.ca.cert" 2>&1
 	if [ "$RET" -ne 0 ]; then
             return $RET
 	fi
+    fi
 
 
 	CU_ACTION="Import EC Root CA for $CERTNAME"
@@ -342,6 +344,7 @@ cert_add_cert()
 #
 #   Generate and add DSA cert
 #
+    if [ -z "$NSS_DISABLE_DSA" ]; then
 	CU_ACTION="Generate DSA Cert Request for $CERTNAME"
 	CU_SUBJECT="CN=$CERTNAME, E=${CERTNAME}-dsa@example.com, O=BOGUS NSS, L=Mountain View, ST=California, C=US"
 	certu -R -k dsa -d "${PROFILEDIR}" -f "${R_PWFILE}" \
@@ -392,6 +395,7 @@ cert_add_cert()
             return $RET
 	fi
 	cert_log "SUCCESS: $CERTNAME's mixed DSA Cert Created"
+    fi
 
 #
 #   Generate and add EC cert
@@ -504,6 +508,7 @@ cert_all_CA()
     # in the chain
 
 
+    if [ -z "$NSS_DISABLE_DSA" ]; then
 #
 #       Create DSA version of TestCA
 	ALL_CU_SUBJECT="CN=NSS Test CA (DSA), O=BOGUS NSS, L=Mountain View, ST=California, C=US"
@@ -527,6 +532,7 @@ cert_all_CA()
 	rm $CLIENT_CADIR/dsaroot.cert $SERVER_CADIR/dsaroot.cert
 #	dsaroot.cert in $CLIENT_CADIR and in $SERVER_CADIR is one of the last 
 #	in the chain
+    fi
 
 #
 #       Create RSA-PSS version of TestCA
@@ -988,6 +994,7 @@ cert_extended_ssl()
   certu -A -n "clientCA" -t "T,," -f "${R_PWFILE}" -d "${PROFILEDIR}" \
           -i "${CLIENT_CADIR}/clientCA.ca.cert" 2>&1
 
+    if [ -z "$NSS_DISABLE_DSA" ]; then
 #
 #     Repeat the above for DSA certs
 #
@@ -1031,6 +1038,7 @@ cert_extended_ssl()
 #      certu -A -n "clientCA-dsamixed" -t "T,," -f "${R_PWFILE}" \
 #	  -d "${PROFILEDIR}" -i "${CLIENT_CADIR}/clientCA-dsamixed.ca.cert" \
 #	  2>&1
+     fi
 
 #
 #     Repeat the above for EC certs
@@ -1084,18 +1092,18 @@ cert_extended_ssl()
   # we'll use one of the longer nicknames for testing.
   # (Because "grep -w hostname" matches "grep -w hostname-dsamixed")
   MYDBPASS="-d ${PROFILEDIR} -f ${R_PWFILE}"
-  TESTNAME="Ensure there's exactly one match for ${CERTNAME}-dsamixed"
-  cert_check_nickname_exists "$MYDBPASS" "${CERTNAME}-dsamixed" 0 1 "${TESTNAME}"
+  TESTNAME="Ensure there's exactly one match for ${CERTNAME}-ecmixed"
+  cert_check_nickname_exists "$MYDBPASS" "${CERTNAME}-ecmixed" 0 1 "${TESTNAME}"
 
-  CU_ACTION="Repeated import of $CERTNAME's mixed DSA Cert with different nickname"
-  certu -A -n "${CERTNAME}-repeated-dsamixed" -t "u,u,u" -d "${PROFILEDIR}" \
-        -f "${R_PWFILE}" -i "${CERTNAME}-dsamixed.cert" 2>&1
+  CU_ACTION="Repeated import of $CERTNAME's mixed EC Cert with different nickname"
+  certu -A -n "${CERTNAME}-repeated-ecmixed" -t "u,u,u" -d "${PROFILEDIR}" \
+        -f "${R_PWFILE}" -i "${CERTNAME}-ecmixed.cert" 2>&1
 
-  TESTNAME="Ensure there's still exactly one match for ${CERTNAME}-dsamixed"
-  cert_check_nickname_exists "$MYDBPASS" "${CERTNAME}-dsamixed" 0 1 "${TESTNAME}"
+  TESTNAME="Ensure there's still exactly one match for ${CERTNAME}-ecmixed"
+  cert_check_nickname_exists "$MYDBPASS" "${CERTNAME}-ecmixed" 0 1 "${TESTNAME}"
 
-  TESTNAME="Ensure there's zero matches for ${CERTNAME}-repeated-dsamixed"
-  cert_check_nickname_exists "$MYDBPASS" "${CERTNAME}-repeated-dsamixed" 0 0 "${TESTNAME}"
+  TESTNAME="Ensure there's zero matches for ${CERTNAME}-repeated-ecmixed"
+  cert_check_nickname_exists "$MYDBPASS" "${CERTNAME}-repeated-ecmixed" 0 0 "${TESTNAME}"
 
   echo "Importing all the server's own CA chain into the servers DB"
   for CA in `find ${SERVER_CADIR} -name "?*.ca.cert"` ;
@@ -1140,6 +1148,7 @@ cert_extended_ssl()
 #
 #     Repeat the above for DSA certs
 #
+  if [ -z "$NSS_DISABLE_DSA" ]; then
       CU_ACTION="Generate DSA Cert Request for $CERTNAME (ext)"
       CU_SUBJECT="CN=$CERTNAME, E=${CERTNAME}-dsa@example.com, O=BOGUS NSS, L=Mountain View, ST=California, C=US"
       certu -R -d "${PROFILEDIR}" -k dsa -f "${R_PWFILE}" \
@@ -1183,6 +1192,7 @@ cert_extended_ssl()
 #
 # done with mixed DSA certs
 #
+    fi
 
 #
 #     Repeat the above for EC certs
@@ -1273,8 +1283,10 @@ cert_ssl()
   CU_ACTION="Modify trust attributes of Root CA -t TC,TC,TC"
   certu -M -n "TestCA" -t "TC,TC,TC" -d ${PROFILEDIR} -f "${R_PWFILE}"
 
+  if [ -z "$NSS_DISABLE_DSA" ]; then
   CU_ACTION="Modify trust attributes of DSA Root CA -t TC,TC,TC"
   certu -M -n "TestCA-dsa" -t "TC,TC,TC" -d ${PROFILEDIR} -f "${R_PWFILE}"
+  fi
 
   CU_ACTION="Modify trust attributes of EC Root CA -t TC,TC,TC"
   certu -M -n "TestCA-ec" -t "TC,TC,TC" -d ${PROFILEDIR} -f "${R_PWFILE}"
@@ -1383,9 +1395,14 @@ MODSCRIPT
   certu -G -k rsa -g 2048 -y 17 -d "${PROFILEDIR}" -z ${R_NOISE_FILE} -f "${R_FIPSPWFILE}" 
   RETEXPECTED=0
 
+  if [ -z "$NSS_DISABLE_DSA" ]; then
+      FIPS_KEY="-k dsa"
+  else
+      FIPS_KEY="-k ec -q nistp256"
+  fi
   CU_ACTION="Generate Certificate for ${CERTNAME}"
   CU_SUBJECT="CN=${CERTNAME}, E=fips@example.com, O=BOGUS NSS, OU=FIPS PUB 140, L=Mountain View, ST=California, C=US"
-  certu -S -n ${FIPSCERTNICK} -x -t "Cu,Cu,Cu" -d "${PROFILEDIR}" -f "${R_FIPSPWFILE}" -k dsa -v 600 -m 500 -z "${R_NOISE_FILE}" 2>&1
+  certu -S -n ${FIPSCERTNICK} -x -t "Cu,Cu,Cu" -d "${PROFILEDIR}" -f "${R_FIPSPWFILE}" ${FIPS_KEY} -v 600 -m 500 -z "${R_NOISE_FILE}" 2>&1
   if [ "$RET" -eq 0 ]; then
     cert_log "SUCCESS: FIPS passed"
   fi
@@ -1817,6 +1834,7 @@ EOF_CRLINI
   chmod 600 ${CRL_FILE_GRP_1}_or
 
 
+  if [ -z "$NSS_DISABLE_DSA" ]; then
       CU_ACTION="Generating CRL (DSA) for range ${CRL_GRP_1_BEGIN}-${CRL_GRP_END} TestCA-dsa authority"
 
 #     Until Bug 292285 is resolved, do not encode x400 Addresses. After
@@ -1831,6 +1849,7 @@ addext issuerAltNames 0 "rfc822Name:ca-dsaemail@ca.com|dnsName:ca-dsa.com|direct
 EOF_CRLINI
       CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
       chmod 600 ${CRL_FILE_GRP_1}_or-dsa
+  fi
 
 
 
@@ -1867,6 +1886,7 @@ EOF_CRLINI
   TEMPFILES="$TEMPFILES ${CRL_FILE_GRP_1}_or"
 
 
+  if [ -z "$NSS_DISABLE_DSA" ]; then
   CU_ACTION="Modify CRL (DSA) by adding one more cert"
   crlu -d $CADIR -M -n "TestCA-dsa" -f ${R_PWFILE} -o ${CRL_FILE_GRP_1}_or1-dsa \
       -i ${CRL_FILE_GRP_1}_or-dsa <<EOF_CRLINI
@@ -1876,6 +1896,7 @@ EOF_CRLINI
   CRL_GEN_RES=`expr $? + $CRL_GEN_RES`
   chmod 600 ${CRL_FILE_GRP_1}_or1-dsa
   TEMPFILES="$TEMPFILES ${CRL_FILE_GRP_1}_or-dsa"
+  fi
 
 
       CU_ACTION="Modify CRL (ECC) by adding one more cert"
@@ -1902,6 +1923,7 @@ EOF_CRLINI
   TEMPFILES="$TEMPFILES ${CRL_FILE_GRP_1}_or1"
 
 
+  if [ -z "$NSS_DISABLE_DSA" ]; then
   CU_ACTION="Modify CRL (DSA) by removing one cert"
   sleep 2
   CRLUPDATE=`date -u "+%Y%m%d%H%M%SZ"`
@@ -1912,6 +1934,7 @@ rmcert  ${UNREVOKED_CERT_GRP_1}
 EOF_CRLINI
   chmod 600 ${CRL_FILE_GRP_1}
   TEMPFILES="$TEMPFILES ${CRL_FILE_GRP_1}_or1-dsa"
+  fi
 
 
 

@@ -262,7 +262,9 @@ TEST_P(Pk11KeyImportTest, GenerateExportImport) {
 
 INSTANTIATE_TEST_SUITE_P(Pk11KeyImportTest, Pk11KeyImportTest,
                          ::testing::Values(CKM_RSA_PKCS_KEY_PAIR_GEN,
+#ifndef NSS_DISABLE_DSA
                                            CKM_DSA_KEY_PAIR_GEN,
+#endif
                                            CKM_DH_PKCS_KEY_PAIR_GEN));
 
 class Pk11KeyImportTestEC : public Pk11KeyImportTestBase,
