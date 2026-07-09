@@ -543,7 +543,7 @@ sftk_InitGeneric(SFTKSession *session, CK_MECHANISM *pMechanism,
     context->blockSize = 0;
     context->maxLen = 0;
     context->isFIPS = sftk_operationIsFIPS(session->slot, pMechanism,
-                                           operation, key);
+                                           operation, key, 0);
     *contextPtr = context;
     return CKR_OK;
 }
@@ -4802,6 +4802,7 @@ NSC_GenerateKey(CK_SESSION_HANDLE hSession,
     sftk_DeleteAttributeType(key, CKA_KEY_TYPE);
     sftk_DeleteAttributeType(key, CKA_VALUE);
 
+
     /* Now Set up the parameters to generate the key (based on mechanism) */
     key_gen_type = nsc_bulk; /* bulk key by default */
     switch (pMechanism->mechanism) {
@@ -4998,6 +4999,10 @@ NSC_GenerateKey(CK_SESSION_HANDLE hSession,
      * handle the base object stuff
      */
     crv = sftk_handleObject(key, session);
+    /* we need to do this check at the end, so we can check the generated key length against
+     * fips requirements */
+    key->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_NSS_GENERATE, key, 0);
+    session->lastOpWasFIPS = key->isFIPS;
     sftk_FreeSession(session);
     if (crv == CKR_OK && sftk_isTrue(key, CKA_SENSITIVE)) {
         crv = sftk_forceAttribute(key, CKA_ALWAYS_SENSITIVE, &cktrue, sizeof(CK_BBOOL));
@@ -6085,8 +6090,8 @@ NSC_GenerateKeyPair(CK_SESSION_HANDLE hSession,
      * created and linked.
      */
     crv = sftk_handleObject(publicKey, session);
-    sftk_FreeSession(session);
     if (crv != CKR_OK) {
+        sftk_FreeSession(session);
         sftk_FreeObject(publicKey);
         NSC_DestroyObject(hSession, privateKey->handle);
         sftk_FreeObject(privateKey);
@@ -6128,12 +6133,19 @@ NSC_GenerateKeyPair(CK_SESSION_HANDLE hSession,
     }
 
     if (crv != CKR_OK) {
+        sftk_FreeSession(session);
         NSC_DestroyObject(hSession, publicKey->handle);
         sftk_FreeObject(publicKey);
         NSC_DestroyObject(hSession, privateKey->handle);
         sftk_FreeObject(privateKey);
         return crv;
     }
+    /* we need to do this check at the end to make sure the generated key meets the key length requirements */
+    privateKey->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_NSS_GENERATE_KEY_PAIR, privateKey, 0);
+    publicKey->isFIPS = privateKey->isFIPS;
+    session->lastOpWasFIPS = privateKey->isFIPS;
+
+    sftk_FreeSession(session);
     *phPrivateKey = privateKey->handle;
     *phPublicKey = publicKey->handle;
     sftk_FreeObject(publicKey);
@@ -7329,6 +7341,10 @@ sftk_HKDF(CK_HKDF_PARAMS_PTR params, CK_SESSION_HANDLE hSession,
         return CKR_TEMPLATE_INCONSISTENT;
     }
 
+    if (!params->bExpand) {
+        keySize = hashLen;
+    }
+
     /* sourceKey is NULL if we are called from the POST, skip the
      * sensitiveCheck */
     if (sourceKey != NULL) {
@@ -7343,6 +7359,7 @@ sftk_HKDF(CK_HKDF_PARAMS_PTR params, CK_SESSION_HANDLE hSession,
         CK_ULONG saltLen;
         HMACContext *hmac;
         unsigned int bufLen;
+        SFTKSource saltKeySource = SFTK_SOURCE_DEFAULT;
 
         switch (params->ulSaltType) {
             case CKF_HKDF_SALT_NULL:
@@ -7377,8 +7394,10 @@ sftk_HKDF(CK_HKDF_PARAMS_PTR params, CK_SESSION_HANDLE hSession,
                     mech.pParameter = params;
                     mech.ulParameterLen = sizeof(*params);
                     key->isFIPS = sftk_operationIsFIPS(saltKey->slot, &mech,
-                                                       CKA_DERIVE, saltKey);
+                                                       CKA_DERIVE, saltKey,
+                                                       keySize*PR_BITS_PER_BYTE);
                 }
+                saltKeySource = saltKey->source;
                 saltKey_att = sftk_FindAttribute(saltKey, CKA_VALUE);
                 if (saltKey_att == NULL) {
                     sftk_FreeObject(saltKey);
@@ -7392,6 +7411,30 @@ sftk_HKDF(CK_HKDF_PARAMS_PTR params, CK_SESSION_HANDLE hSession,
                 return CKR_MECHANISM_PARAM_INVALID;
                 break;
         }
+        /* only TLS style usage is FIPS approved,
+         * turn off the FIPS indicator for other usages */
+        if (isFIPS && key && sourceKey) {
+            PRBool fipsOK = PR_FALSE;
+            /* case one: mix the kea with a previous or default
+             * salt */
+            if ((sourceKey->source == SFTK_SOURCE_KEA) &&
+                (saltKeySource == SFTK_SOURCE_HKDF_EXPAND) &&
+                (saltLen == rawHash->length)) {
+                fipsOK = PR_TRUE;
+            }
+            /* case two: restart, remix the previous secret as a salt */
+            if ((sourceKey->objclass == CKO_DATA) &&
+                (NSS_SecureMemcmpZero(sourceKeyBytes, sourceKeyLen) == 0) &&
+                (sourceKeyLen == rawHash->length) &&
+                (saltKeySource == SFTK_SOURCE_HKDF_EXPAND) &&
+                (saltLen == rawHash->length)) {
+                fipsOK = PR_TRUE;
+            }
+            if (!fipsOK) {
+                key->isFIPS = PR_FALSE;
+            }
+        }
+        if (key) key->source = SFTK_SOURCE_HKDF_EXTRACT;
 
         hmac = HMAC_Create(rawHash, salt, saltLen, isFIPS);
         if (saltKey_att) {
@@ -7419,7 +7462,7 @@ sftk_HKDF(CK_HKDF_PARAMS_PTR params, CK_SESSION_HANDLE hSession,
     /* HKDF-Expand */
     if (!params->bExpand) {
         okm = prk;
-        keySize = genLen = hashLen;
+        genLen = hashLen;
     } else {
         /* T(1) = HMAC-Hash(prk, "" | info | 0x01)
          * T(n) = HMAC-Hash(prk, T(n-1) | info | n
@@ -7428,6 +7471,30 @@ sftk_HKDF(CK_HKDF_PARAMS_PTR params, CK_SESSION_HANDLE hSession,
         HMACContext *hmac;
         CK_BYTE bi;
         unsigned iterations;
+
+        /* only TLS style usage is FIPS approved,
+         * turn off the FIPS indicator for other usages */
+        if (isFIPS && key && key->isFIPS && sourceKey) {
+            unsigned char *info=&params->pInfo[3];
+            /* only one case,
+             *  1) Expand only
+             *  2) with a key whose source was
+             *  SFTK_SOURCE_HKDF_EXPAND or SFTK_SOURCE_HKDF_EXTRACT
+             *  3) source key length == rawHash->length
+             *  4) Info has tls or dtls
+             * If any of those conditions aren't met, then we turn
+             * off the fips indicator */
+            if (params->bExtract ||
+               ((sourceKey->source != SFTK_SOURCE_HKDF_EXTRACT) &&
+                (sourceKey->source != SFTK_SOURCE_HKDF_EXPAND)) ||
+               (sourceKeyLen != rawHash->length) ||
+               (params->ulInfoLen < 7) ||
+               ((PORT_Memcmp(info,"tls",3) != 0) &&
+               (PORT_Memcmp(info,"dtls",4) != 0))) {
+               key->isFIPS = PR_FALSE;
+            }
+        }
+        if (key) key->source = SFTK_SOURCE_HKDF_EXPAND;
 
         genLen = PR_ROUNDUP(keySize, hashLen);
         iterations = genLen / hashLen;
@@ -7643,7 +7710,8 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
             return CKR_KEY_HANDLE_INVALID;
         }
     }
-    key->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_DERIVE, sourceKey);
+    key->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_DERIVE, sourceKey,
+                                       keySize*PR_BITS_PER_BYTE);
 
     switch (mechanism) {
         /* get a public key from a private key. nsslowkey_ConvertToPublickey()
@@ -8801,6 +8869,7 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
             SECITEM_ZfreeItem(&dhValue, PR_FALSE);
 
             if (rv == SECSuccess) {
+                key->source = SFTK_SOURCE_KEA;
                 sftk_forceAttribute(key, CKA_VALUE, derived.data, derived.len);
                 SECITEM_ZfreeItem(&derived, PR_FALSE);
                 crv = CKR_OK;
@@ -8898,6 +8967,7 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
                 secretlen = tmp.len;
             } else {
                 secretlen = keySize;
+                key->isFIPS = PR_FALSE;
                 crv = sftk_ANSI_X9_63_kdf(&secret, keySize,
                                           &tmp, mechParams->pSharedData,
                                           mechParams->ulSharedDataLen, mechParams->kdf);
@@ -8931,6 +9001,7 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
                 }
                 secretlen = keySize;
             }
+            key->source = SFTK_SOURCE_KEA;
 
             sftk_forceAttribute(key, CKA_VALUE, secret, secretlen);
             PORT_ZFree(tmp.data, tmp.len);
