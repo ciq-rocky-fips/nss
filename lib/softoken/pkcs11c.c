@@ -5820,7 +5820,7 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
             goto kem_done;
         }
         if (!sftk_compareKeysEqual(hSession, key1, key2)) {
-            crv = CKR_DEVICE_ERROR;
+            crv = CKR_GENERAL_ERROR;
             goto kem_done;
         }
 kem_done:
@@ -7110,6 +7110,10 @@ sftk_unwrapPrivateKey(SFTKObject *key, SECItem *bpki)
         case SEC_OID_ML_DSA_87:
             paramSet = CKP_ML_DSA_87;
 mldsa_next:
+            if (pki->privateKey.data == NULL || pki->privateKey.len == 0) {
+                PORT_SetError(SEC_ERROR_BAD_KEY);
+                goto loser;
+            }
             switch (pki->privateKey.data[0]) {
                 case SEC_ASN1_CONTEXT_SPECIFIC|0:
                     keyTemplate = nsslowkey_PQSeedTemplate;
