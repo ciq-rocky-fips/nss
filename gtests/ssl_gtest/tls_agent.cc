@@ -526,6 +526,7 @@ const std::vector<SSLNamedGroup> kAllDHEGroups = {
     ssl_grp_kem_xyber768d00,
 #endif
     ssl_grp_kem_mlkem768x25519, ssl_grp_kem_secp256r1mlkem768,
+    ssl_grp_kem_secp384r1mlkem1024,
 };
 
 const std::vector<SSLNamedGroup> kNonPQDHEGroups = {
@@ -540,7 +541,8 @@ const std::vector<SSLNamedGroup> kECDHEGroups = {
 #ifndef NSS_DISABLE_KYBER
     ssl_grp_kem_xyber768d00,
 #endif
-    ssl_grp_kem_mlkem768x25519, ssl_grp_kem_secp256r1mlkem768
+    ssl_grp_kem_mlkem768x25519, ssl_grp_kem_secp256r1mlkem768,
+    ssl_grp_kem_secp384r1mlkem1024,
 };
 
 const std::vector<SSLNamedGroup> kFFDHEGroups = {
@@ -555,6 +557,7 @@ const std::vector<SSLNamedGroup> kFasterDHEGroups = {
     ssl_grp_kem_xyber768d00,
 #endif
     ssl_grp_kem_mlkem768x25519, ssl_grp_kem_secp256r1mlkem768,
+    ssl_grp_kem_secp384r1mlkem1024,
 };
 
 const std::vector<SSLNamedGroup> kEcdhHybridGroups = {
@@ -563,6 +566,7 @@ const std::vector<SSLNamedGroup> kEcdhHybridGroups = {
 #endif
     ssl_grp_kem_mlkem768x25519,
     ssl_grp_kem_secp256r1mlkem768,
+    ssl_grp_kem_secp384r1mlkem1024,
 };
 
 void TlsAgent::EnableCiphersByKeyExchange(SSLKEAType kea) {
@@ -739,6 +743,9 @@ void TlsAgent::CheckKEA(SSLKEAType kea, SSLNamedGroup kea_group,
       case ssl_grp_ec_secp256r1:
       case ssl_grp_kem_secp256r1mlkem768:
         kea_size = 256;
+        break;
+      case ssl_grp_kem_secp384r1mlkem1024:
+        kea_size = 384;
         break;
       case ssl_grp_ec_secp384r1:
         kea_size = 384;

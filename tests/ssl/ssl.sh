@@ -124,9 +124,9 @@ ssl_init()
   # FIPS specific options for both clients and servers
   FIPS_OPTIONS=""
   # in fips mode, turn off curve25519 until it's NIST approved
-  ALL_GROUPS="P256,P384,P521,x25519,FF2048,FF3072,FF4096,FF6144,FF8192,mlkem768secp256r1,mlkem768x25519"
+  ALL_GROUPS="P256,P384,P521,x25519,FF2048,FF3072,FF4096,FF6144,FF8192,secp256r1mlkem768,secp384r1mlkem1024, mlkem768x25519"
   NON_PQ_GROUPS="P256,P384,P521,x25519,FF2048,FF3072,FF4096,FF6144,FF8192"
-  FIPS_GROUPS="P256,P384,P521,FF2048,FF3072,FF4096,FF6144,FF8192,mlkem768secp256r1,mlkem768x25519"
+  FIPS_GROUPS="P256,P384,P521,FF2048,FF3072,FF4096,FF6144,FF8192,secp256r1mlkem768,secp384r1mlkem1024,mlkem768x25519"
 
   # in non-fips mode, tstclnt may run without the db password in some
   # cases, but in fips mode it's always needed
@@ -383,9 +383,11 @@ ssl_cov()
 
       TLS_GROUPS=${CLIENT_GROUPS}
       if [ "$ectype" = "MLKEM256" ]; then
-          TLS_GROUPS="mlkem768secp256r1"
+          TLS_GROUPS="secp256r1mlkem768"
       elif [ "$ectype" = "MLKEM219" ]; then
-          TLS_GROUPS="mlkem768x25519"
+          TLS_GROUPS="x25519mlkem768"
+      elif [ "$ectype" = "MLKEM384" ]; then
+          TLS_GROUPS="secp384r1mlkem1024"
       fi
       echo "TLS_GROUPS=${TLS_GROUPS}"
 

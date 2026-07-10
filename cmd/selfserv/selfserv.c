@@ -231,7 +231,7 @@ PrintParameterUsage()
 #ifndef NSS_DISABLE_KYBER
         "xyber768d00, "
 #endif
-        "mlkem768x25519, mlkem768secp256r1\n"
+        "x25519mlkem768, secp256r1mlkem768, secp384r1mlkem1024\n"
         "-J comma separated list of enabled signature schemes in preference order.\n"
         "   The following values are valid:\n"
         "     rsa_pkcs1_sha1, rsa_pkcs1_sha256, rsa_pkcs1_sha384, rsa_pkcs1_sha512,\n"

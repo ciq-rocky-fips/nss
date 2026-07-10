@@ -260,8 +260,9 @@ typedef enum {
     ssl_grp_ffdhe_4096 = 258,
     ssl_grp_ffdhe_6144 = 259,
     ssl_grp_ffdhe_8192 = 260,
-    ssl_grp_kem_mlkem768x25519 = 4588,
+    ssl_grp_kem_x25519mlkem768 = 4588,
     ssl_grp_kem_secp256r1mlkem768 = 4587,
+    ssl_grp_kem_secp384r1mlkem1024 = 4589,
 #ifndef NSS_DISABLE_KYBER
     ssl_grp_kem_xyber768d00 = 25497, /* draft-tls-westerbaan-xyber768d00-02 */
 #endif
@@ -269,6 +270,9 @@ typedef enum {
     ssl_grp_ffdhe_custom = 65538     /* special value */
 } SSLNamedGroup;
 
+/* alias old names */
+#define ssl_grp_kem_mlkem768x25519 ssl_grp_kem_x25519mlkem768
+#define ssl_grp_kem_mlkem768secp256r1 ssl_grp_kem_secp256r1mlkem768
 typedef struct SSLExtraServerCertDataStr {
     /* When this struct is passed to SSL_ConfigServerCert, and authType is set
      * to a value other than ssl_auth_null, this limits the use of the key to
