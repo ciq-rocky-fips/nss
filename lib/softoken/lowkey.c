@@ -314,6 +314,8 @@ nsslowkey_ConvertToPublicKey(NSSLOWKEYPrivateKey *privk)
                     if (rv == SECSuccess)
                         return pubk;
                 }
+                /* this key was already verified fully as a private key */
+                pubk->u.rsa.needVerify = PR_FALSE; 
             } else {
                 PORT_SetError(SEC_ERROR_NO_MEMORY);
             }

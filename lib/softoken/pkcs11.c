@@ -2035,6 +2035,9 @@ sftk_GetPubKey(SFTKObject *object, CK_KEY_TYPE key_type,
     switch (key_type) {
         case CKK_RSA:
             pubKey->keyType = NSSLOWKEYRSAKey;
+            /* if we claim the object is fix, then make sure it's verified
+             * before we do an OAEP operation */
+            pubKey->u.rsa.needVerify = object->isFIPS;
             crv = sftk_Attribute2SSecItem(arena, &pubKey->u.rsa.modulus,
                                           object, CKA_MODULUS);
             if (crv != CKR_OK)
