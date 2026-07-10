@@ -2951,5 +2951,12 @@ SECStatus MLDSA_VerifyFinal(MLDSAContext *ctx, const SECItem *signature)
         return SECFailure;
     return (vector->p_MLDSA_VerifyFinal)(ctx, signature);
 }
+SECStatus
+RSA_FIPS_CheckPublicKey(RSAPublicKey *publicKey)
+{
+    if (!vector && PR_SUCCESS != freebl_RunLoaderOnce())
+        return SECFailure;
+    return (vector->p_RSA_FIPS_CheckPublicKey)(publicKey);
+}
 
 
