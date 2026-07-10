@@ -747,6 +747,8 @@ sftk_modifyType(CK_ATTRIBUTE_TYPE type, CK_OBJECT_CLASS inClass)
         case CKA_ALWAYS_SENSITIVE:
         case CKA_NEVER_EXTRACTABLE:
         case CKA_NSS_DB:
+        case CKA_SEED:
+        case CKA_PARAMETER_SET:
             mtype = SFTK_NEVER;
             break;
 
@@ -814,6 +816,7 @@ sftk_isSensitive(CK_ATTRIBUTE_TYPE type, CK_OBJECT_CLASS inClass)
         case CKA_EXPONENT_1:
         case CKA_EXPONENT_2:
         case CKA_COEFFICIENT:
+        case CKA_SEED:
             return PR_TRUE;
 
         /* DEPENDS ON CLASS */
@@ -873,6 +876,28 @@ sftk_GetULongAttribute(SFTKObject *object, CK_ATTRIBUTE_TYPE type,
     }
 
     *longData = *(CK_ULONG *)attribute->attrib.pValue;
+    sftk_FreeAttribute(attribute);
+    return CKR_OK;
+}
+
+CK_RV
+sftk_ReadAttribute(SFTKObject *object, CK_ATTRIBUTE_TYPE type,
+                   unsigned char *data, unsigned int maxLen, unsigned int *lenp)
+{
+    SFTKAttribute *attribute;
+
+    attribute = sftk_FindAttribute(object, type);
+    if (attribute == NULL)
+        return CKR_TEMPLATE_INCOMPLETE;
+
+    *lenp = attribute->attrib.ulValueLen;
+    if (*lenp > maxLen) {
+        /* normally would be CKR_BUFFER_TOO_SMALL, but
+         * it used with internal buffers, so if the value is
+         * to long, the original attribute was invalid */
+        return CKR_ATTRIBUTE_VALUE_INVALID;
+    }
+    PORT_Memcpy(data, attribute->attrib.pValue, *lenp);
     sftk_FreeAttribute(attribute);
     return CKR_OK;
 }
@@ -1406,6 +1431,11 @@ static const CK_ATTRIBUTE_TYPE ecPubKeyAttrs[] = {
 static const CK_ULONG ecPubKeyAttrsCount =
     sizeof(ecPubKeyAttrs) / sizeof(ecPubKeyAttrs[0]);
 
+static const CK_ATTRIBUTE_TYPE mldsaPubKeyAttrs[] = {
+    CKA_PARAMETER_SET, CKA_VALUE
+};
+static const CK_ULONG mldsaPubKeyAttrsCount = PR_ARRAY_SIZE(mldsaPubKeyAttrs);
+
 static const CK_ATTRIBUTE_TYPE commonPrivKeyAttrs[] = {
     CKA_DECRYPT, CKA_SIGN, CKA_SIGN_RECOVER, CKA_UNWRAP, CKA_SUBJECT,
     CKA_SENSITIVE, CKA_EXTRACTABLE, CKA_NSS_DB, CKA_PUBLIC_KEY_INFO
@@ -1442,6 +1472,11 @@ static const CK_ATTRIBUTE_TYPE certAttrs[] = {
 };
 static const CK_ULONG certAttrsCount =
     sizeof(certAttrs) / sizeof(certAttrs[0]);
+
+static const CK_ATTRIBUTE_TYPE mldsaPrivKeyAttrs[] = {
+    CKA_PARAMETER_SET, CKA_VALUE, CKA_SEED
+};
+static const CK_ULONG mldsaPrivKeyAttrsCount = PR_ARRAY_SIZE(mldsaPrivKeyAttrs);
 
 static const CK_ATTRIBUTE_TYPE trustAttrs[] = {
     CKA_ISSUER, CKA_SERIAL_NUMBER, CKA_CERT_SHA1_HASH, CKA_CERT_MD5_HASH,
@@ -1536,6 +1571,12 @@ stfk_CopyTokenPrivateKey(SFTKObject *destObject, SFTKTokenObject *src_to)
             crv = stfk_CopyTokenAttributes(destObject, src_to, dsaPrivKeyAttrs,
                                            dsaPrivKeyAttrsCount);
             break;
+#ifdef NSS_ENABLE_ML_DSA
+        case CKK_ML_DSA:
+            crv = stfk_CopyTokenAttributes(destObject, src_to, mldsaPrivKeyAttrs,
+                                           mldsaPrivKeyAttrsCount);
+            break;
+#endif
         case CKK_DH:
             crv = stfk_CopyTokenAttributes(destObject, src_to, dhPrivKeyAttrs,
                                            dhPrivKeyAttrsCount);
@@ -1596,6 +1637,12 @@ stfk_CopyTokenPublicKey(SFTKObject *destObject, SFTKTokenObject *src_to)
             crv = stfk_CopyTokenAttributes(destObject, src_to, dsaPubKeyAttrs,
                                            dsaPubKeyAttrsCount);
             break;
+#ifdef NSS_ENABLE_ML_DSA
+        case CKK_ML_DSA:
+            crv = stfk_CopyTokenAttributes(destObject, src_to, mldsaPubKeyAttrs,
+                                           mldsaPubKeyAttrsCount);
+            break;
+#endif
         case CKK_DH:
             crv = stfk_CopyTokenAttributes(destObject, src_to, dhPubKeyAttrs,
                                            dhPubKeyAttrsCount);

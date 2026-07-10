@@ -296,14 +296,33 @@ cert_create_cert()
             return $RET
 	fi
     fi
-
-
-	CU_ACTION="Import EC Root CA for $CERTNAME"
-	certu -A -n "TestCA-ec" -t "TC,TC,TC" -f "${R_PWFILE}" \
-	    -d "${PROFILEDIR}" -i "${R_CADIR}/TestCA-ec.ca.cert" 2>&1
+    if [ -n "$NSS_ENABLE_ML_DSA" ]; then
+	CU_ACTION="Import ML-DSA-44 Root CA for $CERTNAME"
+	certu -A -n "TestCA-ml-dsa-44" -t "TC,TC,TC" -f "${R_PWFILE}" \
+	    -d "${PROFILEDIR}" -i "${R_CADIR}/TestCA-ml-dsa-44.ca.cert" 2>&1
 	if [ "$RET" -ne 0 ]; then
             return $RET
 	fi
+	CU_ACTION="Import ML-DSA-65 Root CA for $CERTNAME"
+	certu -A -n "TestCA-ml-dsa-65" -t "TC,TC,TC" -f "${R_PWFILE}" \
+	    -d "${PROFILEDIR}" -i "${R_CADIR}/TestCA-ml-dsa-65.ca.cert" 2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
+	CU_ACTION="Import ML-DSA-87 Root CA for $CERTNAME"
+	certu -A -n "TestCA-ml-dsa-87" -t "TC,TC,TC" -f "${R_PWFILE}" \
+	    -d "${PROFILEDIR}" -i "${R_CADIR}/TestCA-ml-dsa-87.ca.cert" 2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
+    fi
+
+    CU_ACTION="Import EC Root CA for $CERTNAME"
+    certu -A -n "TestCA-ec" -t "TC,TC,TC" -f "${R_PWFILE}" \
+        -d "${PROFILEDIR}" -i "${R_CADIR}/TestCA-ec.ca.cert" 2>&1
+    if [ "$RET" -ne 0 ]; then
+        return $RET
+    fi
 
     cert_add_cert "$5"
     return $?
@@ -395,6 +414,77 @@ cert_add_cert()
             return $RET
 	fi
 	cert_log "SUCCESS: $CERTNAME's mixed DSA Cert Created"
+    fi
+    if [ -n "$NSS_ENABLE_ML_DSA" ]; then
+	CU_ACTION="Generate ML-DSA-44 Cert Request for $CERTNAME"
+	CU_SUBJECT="CN=$CERTNAME, E=${CERTNAME}-ml-dsa-44@example.com, O=BOGUS NSS, L=Mountain View, ST=California, C=US"
+	certu -R -k mldsa -q ml-dsa-44 -d "${PROFILEDIR}" -f "${R_PWFILE}" \
+	    -z "${R_NOISE_FILE}" -o req  2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
+
+	CU_ACTION="Sign ${CERTNAME}'s ML-DSA-44 Request"
+	certu -C -c "TestCA-ml-dsa-44" -m "$CERTSERIAL" -v 60 -d "${P_R_CADIR}" \
+            -i req -o "${CERTNAME}-ml-dsa-44.cert" -f "${R_PWFILE}" "$1" 2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
+
+	CU_ACTION="Import $CERTNAME's ML-DSA-44 Cert"
+	certu -A -n "${CERTNAME}-ml-dsa-44" -t "u,u,u" -d "${PROFILEDIR}" \
+	    -f "${R_PWFILE}" -i "${CERTNAME}-ml-dsa-44.cert" 2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
+	cert_log "SUCCESS: $CERTNAME's ML-DSA-44 Cert Created"
+
+	CU_ACTION="Generate ML-DSA-65 Cert Request for $CERTNAME"
+	CU_SUBJECT="CN=$CERTNAME, E=${CERTNAME}-ml-dsa-65@example.com, O=BOGUS NSS, L=Mountain View, ST=California, C=US"
+	certu -R -k mldsa -q ml-dsa-65 -d "${PROFILEDIR}" -f "${R_PWFILE}" \
+	    -z "${R_NOISE_FILE}" -o req  2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
+
+	CU_ACTION="Sign ${CERTNAME}'s ML-DSA-65 Request"
+	certu -C -c "TestCA-ml-dsa-65" -m "$CERTSERIAL" -v 60 -d "${P_R_CADIR}" \
+            -i req -o "${CERTNAME}-ml-dsa-65.cert" -f "${R_PWFILE}" "$1" 2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
+
+	CU_ACTION="Import $CERTNAME's ML-DSA-65 Cert"
+	certu -A -n "${CERTNAME}-ml-dsa-65" -t "u,u,u" -d "${PROFILEDIR}" \
+	    -f "${R_PWFILE}" -i "${CERTNAME}-ml-dsa-65.cert" 2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
+	cert_log "SUCCESS: $CERTNAME's ML-DSA-65 Cert Created"
+
+	CU_ACTION="Generate ML-DSA-87 Cert Request for $CERTNAME"
+	CU_SUBJECT="CN=$CERTNAME, E=${CERTNAME}-ml-dsa-87@example.com, O=BOGUS NSS, L=Mountain View, ST=California, C=US"
+	cert_log "SUCCESS: $CERTNAME's ML-DSA-87 Cert Created"
+	certu -R -k mldsa -q ml-dsa-87 -d "${PROFILEDIR}" -f "${R_PWFILE}" \
+	    -z "${R_NOISE_FILE}" -o req  2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
+
+	CU_ACTION="Sign ${CERTNAME}'s ML-DSA-87 Request"
+	certu -C -c "TestCA-ml-dsa-87" -m "$CERTSERIAL" -v 60 -d "${P_R_CADIR}" \
+            -i req -o "${CERTNAME}-ml-dsa-87.cert" -f "${R_PWFILE}" "$1" 2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
+
+	CU_ACTION="Import $CERTNAME's ML-DSA-87 Cert"
+	certu -A -n "${CERTNAME}-ml-dsa-87" -t "u,u,u" -d "${PROFILEDIR}" \
+	    -f "${R_PWFILE}" -i "${CERTNAME}-ml-dsa-87.cert" 2>&1
+	if [ "$RET" -ne 0 ]; then
+            return $RET
+	fi
+	cert_log "SUCCESS: $CERTNAME's ML-DSA-87 Cert Created"
     fi
 
 #
@@ -532,6 +622,42 @@ cert_all_CA()
 	rm $CLIENT_CADIR/dsaroot.cert $SERVER_CADIR/dsaroot.cert
 #	dsaroot.cert in $CLIENT_CADIR and in $SERVER_CADIR is one of the last 
 #	in the chain
+    fi
+    if [ -n "$NSS_ENABLE_ML_DSA" ]; then
+#
+#       Create ML-DSA-44 version of TestCA
+	ALL_CU_SUBJECT="CN=NSS Test CA (ML-DSA-44), O=BOGUS NSS, L=Mountain View, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-44 $CADIR TestCA-ml-dsa-44 -x "CTu,CTu,CTu" ${D_CA} "1"
+#
+#       Create ML-DSA-44 versions of the intermediate CA certs
+	ALL_CU_SUBJECT="CN=NSS Server Test CA (ML-DSA-44), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-44 $SERVER_CADIR serverCA-ml-dsa-44 -x "Cu,Cu,Cu" ${D_SERVER_CA} "2"
+
+	ALL_CU_SUBJECT="CN=NSS Client Test CA (ML-DSA-44), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
+	cert_m_ldsa_CA ml-dsa-44 $CLIENT_CADIR clientCA-dsa -x "Tu,Cu,Cu" ${D_CLIENT_CA} "5"
+#
+#       Create ML-DSA-65 version of TestCA
+	ALL_CU_SUBJECT="CN=NSS Test CA (ML-DSA-65), O=BOGUS NSS, L=Mountain View, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-65 $CADIR TestCA-ml-dsa-65 -x "CTu,CTu,CTu" ${D_CA} "1"
+#
+#       Create ML-DSA-65 versions of the intermediate CA certs
+	ALL_CU_SUBJECT="CN=NSS Server Test CA (ML-DSA-65), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-65 $SERVER_CADIR serverCA-ml-dsa-65 -x "Cu,Cu,Cu" ${D_SERVER_CA} "2"
+
+	ALL_CU_SUBJECT="CN=NSS Client Test CA (ML-DSA-65), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
+	cert_m_ldsa_CA ml-dsa-65 $CLIENT_CADIR clientCA-dsa -x "Tu,Cu,Cu" ${D_CLIENT_CA} "5"
+#
+#       Create ML-DSA-87 version of TestCA
+	ALL_CU_SUBJECT="CN=NSS Test CA (ML-DSA-87), O=BOGUS NSS, L=Mountain View, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-87 $CADIR TestCA-ml-dsa-87 -x "CTu,CTu,CTu" ${D_CA} "1"
+#
+#       Create ML-DSA-87 versions of the intermediate CA certs
+	ALL_CU_SUBJECT="CN=NSS Server Test CA (ML-DSA-87), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
+	cert_ml_dsa_CA ml-dsa-87 $SERVER_CADIR serverCA-ml-dsa-87 -x "Cu,Cu,Cu" ${D_SERVER_CA} "2"
+
+	ALL_CU_SUBJECT="CN=NSS Client Test CA (ML-DSA-87), O=BOGUS NSS, L=Santa Clara, ST=California, C=US"
+	cert_m_ldsa_CA ml-dsa-87 $CLIENT_CADIR clientCA-dsa -x "Tu,Cu,Cu" ${D_CLIENT_CA} "5"
+
     fi
 
 #
@@ -716,6 +842,69 @@ CERTSCRIPT
       Exit 7 "Fatal - failed to export dsa root cert"
   fi
   cp dsaroot.cert ${NICKNAME}.ca.cert
+}
+
+################################ cert_ml_dsa_CA #############################
+# local shell function to build the Temp. Certificate Authority (CA)
+# used for testing purposes, creating  a CA Certificate and a root cert
+# This is the ML-DSA version of cert_CA.
+##########################################################################
+cert_ml_dsa_CA()
+{
+  PARAM_SET=$1
+  CUR_CADIR=$2
+  NICKNAME=$3
+  SIGNER=$4
+  TRUSTARG=$5
+  DOMAIN=$6
+  CERTSERIAL=$7
+
+  echo "$SCRIPTNAME: Creating a ML-DSA ($PARAM_SET) CA Certificate $NICKNAME =========================="
+
+  if [ ! -d "${CUR_CADIR}" ]; then
+      mkdir -p "${CUR_CADIR}"
+  fi
+  cd ${CUR_CADIR}
+  pwd
+
+  LPROFILE=.
+  if [ -n "${MULTIACCESS_DBM}" ]; then
+	LPROFILE="multiaccess:${DOMAIN}"
+  fi
+
+  ################# Creating a ML-DSA CA Cert ###############################
+  #
+  CU_ACTION="Creating ML-DSA ($PARAM_SET) CA Cert $NICKNAME "
+  CU_SUBJECT=$ALL_CU_SUBJECT
+  certu -S -n $NICKNAME -k mldsa -q $PARAM_SET -t $TRUSTARG -v 600 $SIGNER \
+    -d ${LPROFILE} -1 -2 -5 -f ${R_PWFILE} -z ${R_NOISE_FILE} \
+    -m $CERTSERIAL 2>&1 <<CERTSCRIPT
+5
+6
+9
+n
+y
+-1
+n
+5
+6
+7
+9
+n
+CERTSCRIPT
+
+  if [ "$RET" -ne 0 ]; then
+      echo "return value is $RET"
+      Exit 6 "Fatal - failed to create ML-DSA ($PARAM_SET) CA cert"
+  fi
+
+  ################# Exporting ML-DSA Root Cert ###############################
+  #
+  CU_ACTION="Exporting ML-DSA ($PARAM_SET) Root Cert"
+  certu -L -n  $NICKNAME -r -d ${LPROFILE} -o ${NICKNAME}.ca.cert
+  if [ "$RET" -ne 0 ]; then
+      Exit 7 "Fatal - failed to export $PARAM_SET root cert"
+  fi
 }
 
 
@@ -1288,6 +1477,15 @@ cert_ssl()
   certu -M -n "TestCA-dsa" -t "TC,TC,TC" -d ${PROFILEDIR} -f "${R_PWFILE}"
   fi
 
+  if [ -n "$NSS_ENABLE_ML_DSA" ]; then
+  CU_ACTION="Modify trust attributes of ML-DSA-44 Root CA -t TC,TC,TC"
+  certu -M -n "TestCA-ml-dsa-44" -t "TC,TC,TC" -d ${PROFILEDIR} -f "${R_PWFILE}"
+  CU_ACTION="Modify trust attributes of ML-DSA-65 Root CA -t TC,TC,TC"
+  certu -M -n "TestCA-ml-dsa-65" -t "TC,TC,TC" -d ${PROFILEDIR} -f "${R_PWFILE}"
+  CU_ACTION="Modify trust attributes of ML-DSA-87 Root CA -t TC,TC,TC"
+  certu -M -n "TestCA-ml-dsa-87" -t "TC,TC,TC" -d ${PROFILEDIR} -f "${R_PWFILE}"
+  fi
+
   CU_ACTION="Modify trust attributes of EC Root CA -t TC,TC,TC"
   certu -M -n "TestCA-ec" -t "TC,TC,TC" -d ${PROFILEDIR} -f "${R_PWFILE}"
 #  cert_init_cert ${SERVERDIR} "${HOSTADDR}" 1 ${D_SERVER}
@@ -1363,7 +1561,7 @@ cert_stresscerts()
 cert_fips()
 {
   CERTFAILED=0
-  echo "$SCRIPTNAME: Creating FIPS 140 DSA Certificates =============="
+  echo "$SCRIPTNAME: Creating FIPS 140 Certificates =============="
   cert_init_cert "${FIPSDIR}" "FIPS PUB 140 Test Certificate" 1000 "${D_FIPS}"
 
   CU_ACTION="Initializing ${CERTNAME}'s Cert DB"
@@ -1397,6 +1595,8 @@ MODSCRIPT
 
   if [ -z "$NSS_DISABLE_DSA" ]; then
       FIPS_KEY="-k dsa"
+  elif [ -n "$NSS_ENABLE_ML_DSA" ]; then
+      FIPS_KEY="-k mldsa -q ml-dsa-44"
   else
       FIPS_KEY="-k ec -q nistp256"
   fi

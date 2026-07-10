@@ -2892,6 +2892,9 @@ sec_pkcs12_get_public_value_and_type(SECKEYPublicKey *pubKey,
 
     *type = pubKey->keyType;
     switch (pubKey->keyType) {
+        case mldsaKey:
+            pubValue = &pubKey->u.mldsa.publicValue;
+            break;
         case dsaKey:
             pubValue = &pubKey->u.dsa.publicValue;
             break;

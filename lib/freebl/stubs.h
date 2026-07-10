@@ -23,6 +23,7 @@
 #define PORT_Alloc PORT_Alloc_stub
 #define PORT_ArenaAlloc PORT_ArenaAlloc_stub
 #define PORT_ArenaZAlloc PORT_ArenaZAlloc_stub
+#define PORT_ArenaGrow PORT_ArenaGrow_stub
 #define PORT_Free PORT_Free_stub
 #define PORT_FreeArena PORT_FreeArena_stub
 #define PORT_GetError PORT_GetError_stub

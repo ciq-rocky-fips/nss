@@ -26,6 +26,7 @@
 #include "pki3hack.h"
 #include "base.h"
 #include "keyi.h"
+#include "secmodti.h"
 
 /*
  * Check the validity times of a certificate
@@ -157,6 +158,17 @@ checkKeyParams(const SECAlgorithmID *sigAlgorithm, const SECKEYPublicKey *key)
             }
 
             return SECSuccess;
+        case SEC_OID_ML_DSA_44:
+        case SEC_OID_ML_DSA_65:
+        case SEC_OID_ML_DSA_87:
+            if (key->keyType != mldsaKey) {
+                PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+                return SECFailure;
+            }
+            if (key->u.mldsa.params != sigAlg) {
+                PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+                return SECFailure;
+            }
         default:
             return SECSuccess;
     }

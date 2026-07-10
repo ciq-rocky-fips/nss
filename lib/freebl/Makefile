@@ -608,6 +608,61 @@ VERIFIED_SRCS += libcrux_mlkem1024_portable.c
 VERIFIED_SRCS += Hacl_Ed25519.c
 VERIFIED_SRCS += Hacl_Curve25519_51.c
 
+ifdef  NSS_ENABLE_ML_DSA
+ifdef ML_DSA_OQS
+INCLUDES += -Ioqs
+ML_DSA_SRCS += ml_dsa_44_ref_ntt.c
+ML_DSA_SRCS += ml_dsa_44_ref_packing.c
+ML_DSA_SRCS += ml_dsa_44_ref_poly.c
+ML_DSA_SRCS += ml_dsa_44_ref_polyvec.c
+ML_DSA_SRCS += ml_dsa_44_ref_reduce.c
+ML_DSA_SRCS += ml_dsa_44_ref_rounding.c
+ML_DSA_SRCS += ml_dsa_44_ref_sign.c
+ML_DSA_SRCS += ml_dsa_44_ref_symmetric-shake.c
+ML_DSA_SRCS += ml_dsa_65_ref_ntt.c
+ML_DSA_SRCS += ml_dsa_65_ref_packing.c
+ML_DSA_SRCS += ml_dsa_65_ref_poly.c
+ML_DSA_SRCS += ml_dsa_65_ref_polyvec.c
+ML_DSA_SRCS += ml_dsa_65_ref_reduce.c
+ML_DSA_SRCS += ml_dsa_65_ref_rounding.c
+ML_DSA_SRCS += ml_dsa_65_ref_sign.c
+ML_DSA_SRCS += ml_dsa_65_ref_symmetric-shake.c
+ML_DSA_SRCS += ml_dsa_87_ref_ntt.c
+ML_DSA_SRCS += ml_dsa_87_ref_packing.c
+ML_DSA_SRCS += ml_dsa_87_ref_poly.c
+ML_DSA_SRCS += ml_dsa_87_ref_polyvec.c
+ML_DSA_SRCS += ml_dsa_87_ref_reduce.c
+ML_DSA_SRCS += ml_dsa_87_ref_rounding.c
+ML_DSA_SRCS += ml_dsa_87_ref_sign.c
+ML_DSA_SRCS += ml_dsa_87_ref_symmetric-shake.c
+else
+INCLUDES += -Ileancrypto
+ML_DSA_SRCS += ml_dsa_44_ntt.c
+ML_DSA_SRCS += ml_dsa_44_poly.c
+ML_DSA_SRCS += ml_dsa_44_rounding.c
+ML_DSA_SRCS += ml_dsa_44_signature_c.c
+ML_DSA_SRCS += ml_dsa_44_signature_helper.c
+ML_DSA_SRCS += ml_dsa_65_ntt.c
+ML_DSA_SRCS += ml_dsa_65_poly.c
+ML_DSA_SRCS += ml_dsa_65_rounding.c
+ML_DSA_SRCS += ml_dsa_65_signature_c.c
+ML_DSA_SRCS += ml_dsa_65_signature_helper.c
+ML_DSA_SRCS += ml_dsa_87_ntt.c
+ML_DSA_SRCS += ml_dsa_87_poly.c
+ML_DSA_SRCS += ml_dsa_87_rounding.c
+ML_DSA_SRCS += ml_dsa_87_signature_c.c
+ML_DSA_SRCS += ml_dsa_87_signature_helper.c
+ML_DSA_SRCS += signature_domain_separation.c
+ML_DSA_SRCS += mldsa_api.c
+ML_DSA_SRCS += mldsa_zetas.c
+#ML_DSA_SRCS += ml_dsa_44_debug.c
+#ML_DSA_SRCS += ml_dsa_65_debug.c
+#ML_DSA_SRCS += ml_dsa_87_debug.c
+endif
+endif
+
+
+
 # Bug 1918767 / Bug 1918711 - by setting KRML_MUSTINLINE=inline here, we
 # avoid it being defined to `inline __forceinline` (for msvc) or `inline
 # __attribute__((always_inline))` (for gcc/clang) in
@@ -645,8 +700,8 @@ rijndael_tables:
 	         $(DEFINES) $(INCLUDES) $(OBJDIR)/libfreebl.a
 	$(OBJDIR)/make_rijndael_tab
 
-vpath %.h mpi ecl verified deprecated
-vpath %.c mpi ecl verified deprecated
+vpath %.h mpi ecl verified oqs leancrypto deprecated
+vpath %.c mpi ecl verified oqs leancrypto deprecated
 vpath %.S mpi ecl
 vpath %.s mpi ecl
 vpath %.asm mpi ecl

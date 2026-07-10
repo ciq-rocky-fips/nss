@@ -1,0 +1,1 @@
+#define LC_DILITHIUM_TYPE_87 1

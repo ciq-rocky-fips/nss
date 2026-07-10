@@ -18,7 +18,7 @@
 #include "keyi.h"
 #include "nss.h"
 #include "prenv.h"
-
+#include "secmodti.h"
 /*
 ** Recover the DigestInfo from an RSA PKCS#1 signature.
 **
@@ -190,6 +190,9 @@ checkedSignatureLen(const SECKEYPublicKey *pubk)
         case ecKey:
             maxSigLen = 2 * MAX_ECKEY_LEN;
             break;
+        case mldsaKey:
+            maxSigLen = MAX_ML_DSA_SIGNATURE_LEN;
+            break;
         default:
             PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
             return 0;
@@ -294,6 +297,10 @@ sec_GetEncAlgFromSigAlg(SECOidTag sigAlg)
         case SEC_OID_ANSIX962_ECDSA_SIGNATURE_RECOMMENDED_DIGEST:
         case SEC_OID_ANSIX962_ECDSA_SIGNATURE_SPECIFIED_DIGEST:
             return SEC_OID_ANSIX962_EC_PUBLIC_KEY;
+        case SEC_OID_ML_DSA_44:
+        case SEC_OID_ML_DSA_65:
+        case SEC_OID_ML_DSA_87:
+            return sigAlg;
         /* we don't implement MD4 hashes */
         case SEC_OID_PKCS1_MD4_WITH_RSA_ENCRYPTION:
         default:
@@ -397,6 +404,10 @@ sec_GetCombinedMech(SECOidTag encalg, SECOidTag hashalg)
             return sec_ECDSAGetCombinedMech(hashalg);
         case SEC_OID_ANSIX9_DSA_SIGNATURE:
             return sec_DSAGetCombinedMech(hashalg);
+        case SEC_OID_ML_DSA_44:
+        case SEC_OID_ML_DSA_65:
+        case SEC_OID_ML_DSA_87:
+            return CKM_ML_DSA; /* ignore hashalg */
         default:
             break;
     }
@@ -430,6 +441,7 @@ sec_DecodeSigAlg(const SECKEYPublicKey *key, SECOidTag sigAlg,
     SECStatus rv;
     SECItem oid;
     SECOidTag encalg;
+    PRBool comboRequired = PR_TRUE;
     char *evp;
 
     PR_ASSERT(hashalg != NULL);
@@ -588,6 +600,13 @@ sec_DecodeSigAlg(const SECKEYPublicKey *key, SECOidTag sigAlg,
             }
             *mechp = sec_ECDSAGetCombinedMech(*hashalg);
             break;
+        case SEC_OID_ML_DSA_44:
+        case SEC_OID_ML_DSA_65:
+        case SEC_OID_ML_DSA_87:
+            comboRequired = PR_TRUE;
+            *hashalg = sigAlg;
+            /* decode params to get the sign context and set (mechparamsp) */
+            break;
         /* we don't implement MD4 hashes */
         case SEC_OID_PKCS1_MD4_WITH_RSA_ENCRYPTION:
         default:
@@ -611,7 +630,7 @@ sec_DecodeSigAlg(const SECKEYPublicKey *key, SECOidTag sigAlg,
      * We know if we are signing or verifying based on the value of 'key'.
      * Since key is a public key, then it's set to NULL for signing */
     evp = PR_GetEnvSecure("NSS_COMBO_SIGNATURES");
-    if (evp) {
+    if (evp && !comboRequired) {
         if (PORT_Strcasecmp(evp, "none") == 0) {
             *mechp = CKM_INVALID_MECHANISM;
         } else if (key && (PORT_Strcasecmp(evp, "signonly") == 0)) {
@@ -620,6 +639,11 @@ sec_DecodeSigAlg(const SECKEYPublicKey *key, SECOidTag sigAlg,
             *mechp = CKM_INVALID_MECHANISM;
         }
         /* anything else we take as use combo, which is the default */
+    }
+    /* now enforce the combo requires requirement */
+    if (comboRequired && (*mechp == CKM_INVALID_MECHANISM)) {
+        SECITEM_FreeItem(mechparamsp, PR_FALSE);
+        return SECFailure;
     }
 
     return SECSuccess;
@@ -810,7 +834,9 @@ vfy_CreateContext(const SECKEYPublicKey *key, const SECItem *sig,
     }
 
     /* check hash alg again, RSA may have changed it.*/
-    if (HASH_GetHashTypeByOidTag(cx->hashAlg) == HASH_AlgNULL) {
+    /* combo mechs set the hash to the sigAlg */
+    if ((cx->hashAlg != cx->encAlg) &&
+            (HASH_GetHashTypeByOidTag(cx->hashAlg) == HASH_AlgNULL)) {
         /* error set by HASH_GetHashTypeByOidTag */
         goto loser;
     }
@@ -1088,6 +1114,12 @@ vfy_VerifyDigest(const SECItem *digest, const SECKEYPublicKey *key,
                     break;
                 }
                 rv = PK11_Verify(cx->key, &dsasig, (SECItem *)digest, cx->wincx);
+                if (rv != SECSuccess) {
+                    PORT_SetError(SEC_ERROR_BAD_SIGNATURE);
+                }
+                break;
+            case mldsaKey:
+                rv = PK11_Verify(cx->key, sig, (SECItem *)digest, cx->wincx);
                 if (rv != SECSuccess) {
                     PORT_SetError(SEC_ERROR_BAD_SIGNATURE);
                 }

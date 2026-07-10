@@ -96,6 +96,7 @@ sftkdb_isPrivateAttribute(CK_ATTRIBUTE_TYPE type)
         case CKA_EXPONENT_1:
         case CKA_EXPONENT_2:
         case CKA_COEFFICIENT:
+        case CKA_SEED:
             return PR_TRUE;
         default:
             break;

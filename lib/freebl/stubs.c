@@ -140,6 +140,7 @@
 STUB_DECLARE(void *, PORT_Alloc_Util, (size_t len));
 STUB_DECLARE(void *, PORT_ArenaAlloc_Util, (PLArenaPool * arena, size_t size));
 STUB_DECLARE(void *, PORT_ArenaZAlloc_Util, (PLArenaPool * arena, size_t size));
+STUB_DECLARE(void *, PORT_ArenaGrow_Util, (PLArenaPool * arena, void *ptr, size_t oldsize, size_t newsize));
 STUB_DECLARE(void, PORT_Free_Util, (void *ptr));
 STUB_DECLARE(void, PORT_FreeArena_Util, (PLArenaPool * arena, PRBool zero));
 STUB_DECLARE(int, PORT_GetError_Util, (void));
@@ -327,6 +328,15 @@ PORT_ArenaZAlloc_stub(PLArenaPool *arena, size_t size)
 {
 
     STUB_SAFE_CALL2(PORT_ArenaZAlloc_Util, arena, size);
+    abort();
+    return NULL;
+}
+
+extern void *
+PORT_ArenaGrow_stub(PLArenaPool *arena, void *ptr, size_t oldsize, size_t newsize)
+{
+
+    STUB_SAFE_CALL4(PORT_ArenaGrow_Util, arena, ptr, oldsize, newsize);
     abort();
     return NULL;
 }
@@ -813,6 +823,7 @@ freebl_InitNSSUtil(void *lib)
     STUB_FETCH_FUNCTION(PORT_NewArena_Util);
     STUB_FETCH_FUNCTION(PORT_ArenaAlloc_Util);
     STUB_FETCH_FUNCTION(PORT_ArenaZAlloc_Util);
+    STUB_FETCH_FUNCTION(PORT_ArenaGrow_Util);
     STUB_FETCH_FUNCTION(PORT_FreeArena_Util);
     STUB_FETCH_FUNCTION(PORT_GetError_Util);
     STUB_FETCH_FUNCTION(PORT_SetError_Util);

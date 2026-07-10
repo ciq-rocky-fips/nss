@@ -54,6 +54,22 @@ SECStatus sec_DecodeRSAPSSParamsToMechanism(PLArenaPool *arena,
                                             CK_RSA_PKCS_PSS_PARAMS *mech,
                                             SECOidTag *hashAlg);
 
+/* MLDSA mapping functions... private for now */
+/* map various mldsa parameters and lengths back and forth */
+typedef enum {
+     SECKEYPubKeyType=1,
+     SECKEYPrivKeyType,
+     SECKEYSignatureType,
+} SECKEYSizeType;
+
+SECOidTag SECKEY_MLDSAPkcs11ParamsToOidParams(CK_ML_DSA_PARAMETER_SET_TYPE paramSet);
+CK_ML_DSA_PARAMETER_SET_TYPE SECKEY_MLDSAOidParamsToPkcs11Params(SECOidTag tag);
+unsigned int SECKEY_MLDSAOidParamsToLen(SECOidTag oid, SECKEYSizeType type);
+unsigned int SECKEY_MLDSAPkcs11ParamsToLen(CK_ML_DSA_PARAMETER_SET_TYPE paramSet,
+                                         SECKEYSizeType type);
+SECOidTag SECKEY_MLDSAOidParamsFromLen(unsigned int len, SECKEYSizeType type);
+/* get the parameter set, converted to a key oid, only for new keys like mldsa, mlkem, and shldsa */
+SECOidTag SECKEY_GetParameterSet(const SECKEYPrivateKey *key);
 SEC_END_PROTOS
 
 #endif /* _KEYHI_H_ */

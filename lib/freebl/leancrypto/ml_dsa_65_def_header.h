@@ -1,0 +1,1 @@
+#define LC_DILITHIUM_TYPE_65 1

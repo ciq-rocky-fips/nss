@@ -1,0 +1,1 @@
+* master 70cabeec Poly1305: move function delcarations to internal header

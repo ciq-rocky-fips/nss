@@ -521,10 +521,17 @@ sec_DerSignData(PLArenaPool *arena, SECItem *result,
             case ecKey:
                 algID = SEC_OID_ANSIX962_ECDSA_SHA256_SIGNATURE;
                 break;
+            case mldsaKey:
+                algID = SECKEY_GetParameterSet(pk);
+                break;
             default:
-                PORT_SetError(SEC_ERROR_INVALID_KEY);
-                return SECFailure;
+                algID = SEC_OID_UNKNOWN;
+                break;
         }
+    }
+    if (algID == SEC_OID_UNKNOWN) {
+        PORT_SetError(SEC_ERROR_INVALID_KEY);
+        return SECFailure;
     }
 
     /* Sign input buffer */
@@ -584,6 +591,7 @@ SGN_Digest(SECKEYPrivateKey *privKey,
 
     result->data = 0;
 
+
     if (NSS_OptionGet(NSS_KEY_SIZE_POLICY_FLAGS, &optFlags) != SECFailure) {
         if (optFlags & NSS_KEY_SIZE_POLICY_SIGN_FLAG) {
             rv = SECKEY_EnforceKeySize(privKey->keyType,
@@ -599,6 +607,13 @@ SGN_Digest(SECKEYPrivateKey *privKey,
         !(policyFlags & NSS_USE_ALG_IN_ANY_SIGNATURE)) {
         PORT_SetError(SEC_ERROR_SIGNATURE_ALGORITHM_DISABLED);
         return SECFailure;
+    }
+
+    if (privKey->keyType == mldsaKey) {
+        /* whatever the input  hash was, we now mark it
+         * as the signature value since mldsaKey is a full
+         * hash and sign */
+        algtag = SECKEY_GetParameterSet(privKey);
     }
     /* check the policy on the encryption algorithm */
     enctag = sec_GetEncAlgFromSigAlg(
@@ -718,6 +733,9 @@ SEC_GetSignatureAlgorithmOidTag(KeyType keyType, SECOidTag hashAlgTag)
                 default:
                     break;
             }
+            break;
+        case mldsaKey:
+            sigTag = hashAlgTag;
             break;
         case ecKey:
             switch (hashAlgTag) {
@@ -974,7 +992,6 @@ SEC_CreateSignatureAlgorithmParameters(PLArenaPool *arena,
         case SEC_OID_PKCS1_RSA_PSS_SIGNATURE:
             return sec_CreateRSAPSSParameters(arena, result,
                                               hashAlgTag, params, key);
-
         default:
             if (params == NULL)
                 return NULL;

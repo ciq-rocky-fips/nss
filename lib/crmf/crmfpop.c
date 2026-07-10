@@ -61,12 +61,16 @@ loser:
 static SECOidTag
 crmf_get_key_sign_tag(SECKEYPublicKey *inPubKey)
 {
+    SECOidTag hashAlg = SEC_OID_UNKNOWN;
     /* maintain backward compatibility with older
      * implementations */
     if (inPubKey->keyType == rsaKey) {
         return SEC_OID_PKCS1_SHA1_WITH_RSA_ENCRYPTION;
     }
-    return SEC_GetSignatureAlgorithmOidTag(inPubKey->keyType, SEC_OID_UNKNOWN);
+    if (inPubKey->keyType == mldsaKey) {
+        hashAlg = inPubKey->u.mldsa.params;
+    }
+    return SEC_GetSignatureAlgorithmOidTag(inPubKey->keyType, hashAlg);
 }
 
 static SECAlgorithmID *

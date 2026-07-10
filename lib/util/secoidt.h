@@ -541,6 +541,9 @@ typedef enum {
 
     SEC_OID_PRIVATE_1 = 391,
     SEC_OID_PRIVATE_2 = 392,
+    SEC_OID_PRIVATE_3 = 393,
+    SEC_OID_PRIVATE_4 = 394,
+    SEC_OID_PRIVATE_5 = 395,
 
     SEC_OID_TOTAL
 } SECOidTag;

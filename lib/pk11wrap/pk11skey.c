@@ -2128,13 +2128,7 @@ PK11_PubDerive(SECKEYPrivateKey *privKey, SECKEYPublicKey *pubKey,
     symKey->origin = PK11_OriginDerive;
 
     switch (privKey->keyType) {
-        case rsaKey:
-        case rsaPssKey:
-        case rsaOaepKey:
-        case kyberKey:
-        case nullKey:
-        case edKey:
-        case ecMontKey:
+        default:
             PORT_SetError(SEC_ERROR_BAD_KEY);
             break;
         case dsaKey:

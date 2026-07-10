@@ -567,6 +567,9 @@ crmf_get_public_value(SECKEYPublicKey *pubKey, SECItem *dest)
     SECItem *src;
 
     switch (pubKey->keyType) {
+        case mldsaKey:
+            src = &pubKey->u.mldsa.publicValue;
+            break;
         case dsaKey:
             src = &pubKey->u.dsa.publicValue;
             break;
@@ -702,6 +705,11 @@ crmf_encrypted_value_unwrap_priv_key(PLArenaPool *poolp,
             break;
         case dsaKey:
             keyType = CKK_DSA;
+            usage = dsaUsage;
+            usageCount = sizeof(dsaUsage) / sizeof(dsaUsage[0]);
+            break;
+        case mldsaKey:
+            keyType = CKK_ML_DSA;
             usage = dsaUsage;
             usageCount = sizeof(dsaUsage) / sizeof(dsaUsage[0]);
             break;

@@ -113,7 +113,7 @@ static const CK_ATTRIBUTE_TYPE known_attributes[] = {
     CKA_RESOLUTION, CKA_CHAR_ROWS, CKA_CHAR_COLUMNS, CKA_COLOR,
     CKA_BITS_PER_PIXEL, CKA_CHAR_SETS, CKA_ENCODING_METHODS, CKA_MIME_TYPES,
     CKA_MECHANISM_TYPE, CKA_REQUIRED_CMS_ATTRIBUTES,
-    CKA_ENCAPSULATE, CKA_DECAPSULATE, CKA_PARAMETER_SET,
+    CKA_ENCAPSULATE, CKA_DECAPSULATE, CKA_PARAMETER_SET, CKA_SEED,
     CKA_DEFAULT_CMS_ATTRIBUTES, CKA_SUPPORTED_CMS_ATTRIBUTES,
     CKA_WRAP_TEMPLATE, CKA_UNWRAP_TEMPLATE, CKA_NSS_TRUST, CKA_NSS_URL,
     CKA_NSS_EMAIL, CKA_NSS_SMIME_INFO, CKA_NSS_SMIME_TIMESTAMP,
@@ -128,7 +128,7 @@ static const CK_ATTRIBUTE_TYPE known_attributes[] = {
     CKA_TRUST_CLIENT_AUTH, CKA_TRUST_CODE_SIGNING, CKA_TRUST_EMAIL_PROTECTION,
     CKA_TRUST_IPSEC_END_SYSTEM, CKA_TRUST_IPSEC_TUNNEL, CKA_TRUST_IPSEC_USER,
     CKA_TRUST_TIME_STAMPING, CKA_TRUST_STEP_UP_APPROVED, CKA_CERT_SHA1_HASH,
-    CKA_CERT_MD5_HASH, CKA_NSS_DB
+    CKA_CERT_MD5_HASH, CKA_NSS_DB,
 };
 
 static const int known_attributes_size = PR_ARRAY_SIZE(known_attributes);
@@ -1942,6 +1942,101 @@ sdb_attributeComparator(const void *a, const void *b)
     return 0;
 }
 
+static const char ADD_COLUMN_CMD[] = "ALTER TABLE %s ADD COLUMN %s";
+static CK_RV
+sdb_add_column(sqlite3 *sqlDB, const char *table, sdbDataType type,
+               const char *typeString)
+{
+    char *newStr = sqlite3_mprintf(ADD_COLUMN_CMD, table, typeString);
+    int sqlerr;
+
+    sqlerr = sqlite3_exec(sqlDB, newStr, NULL, 0, NULL);
+    sqlite3_free(newStr);
+    if (sqlerr != SQLITE_OK) {
+        return sdb_mapSQLError(type, sqlerr);
+    }
+    return CKR_OK;
+}
+
+static const char COLUMN_QUERY_CMD[] =
+    "SELECT * FROM %s";
+
+/*
+ * if our current database does not have all the attributes in the columns, 
+ * we  need to add those columns or attempts to add objects with those
+ * attributes will fail. We only need this on R/W databases because we only
+ * add objects to R/W databases.
+ */
+static CK_RV
+sdb_update_column(sqlite3 *sqlDB, const char *table, sdbDataType type)
+{
+    char *newStr = sqlite3_mprintf(COLUMN_QUERY_CMD, table);
+    sqlite3_stmt *stmt;
+    int columnCount;
+    int sqlerr;
+    CK_RV error;
+
+    if (!newStr) {
+        return CKR_HOST_MEMORY;
+    }
+
+    sqlerr = sqlite3_prepare_v2(sqlDB, newStr, -1, &stmt, NULL);
+    sqlite3_free(newStr);
+    if (sqlerr != SQLITE_OK) {
+        return sdb_mapSQLError(type, sqlerr);
+    }
+
+    columnCount= sqlite3_column_count(stmt);
+    /* columns include the first  column, which is id, which is not
+     * and attribute. check to make sure we have at least as many attributes
+     * as there are id in out list. This assumes we never add some
+     * attributes in some NSS version and not others, which is generally
+     * true. */
+    if (columnCount >= known_attributes_size+1) {
+        sqlite3_finalize(stmt);
+        return CKR_OK;
+    }
+    /* we have more attributes than in the database, so we know things 
+     * are missing, find what was missing */
+    for (int i=0; i < known_attributes_size; i++) {
+        char *typeString = sqlite3_mprintf("a%x", known_attributes[i]);
+        PRBool found=PR_FALSE;
+        /* this one index is important, we skip the first column (id), since
+         * it will never match, starting at zero isn't a bug,
+         * just inefficient */
+        for (int j=1; j < columnCount; j++) {
+            const char *columnName = sqlite3_column_name(stmt, j);
+            if (columnName == NULL) {
+                sqlite3_free(typeString);
+                sqlite3_finalize(stmt);
+                /* if we couldnt' get the colmun name, it's only because
+                 * we couldn't get the memory */
+                return CKR_HOST_MEMORY;
+            }
+            if (PORT_Strcmp(typeString, columnName) == 0) {
+                /* we found this one, no need to add it */
+                found=PR_TRUE;
+                break;
+            }
+        }
+        if (found) {
+            sqlite3_free(typeString);
+            continue;
+        }
+        /* we didn't find the attribute, so now add it */
+        error = sdb_add_column(sqlDB, table, type, typeString);
+        if (error != CKR_OK) {
+            sqlite3_free(typeString);
+            sqlite3_finalize(stmt);
+            return error;
+        }
+        sqlite3_free(typeString);
+    }
+    sqlite3_finalize(stmt);
+    return CKR_OK;
+}
+    
+
 /*
  * initialize a single database
  */
@@ -2086,7 +2181,16 @@ sdb_init(char *dbname, char *table, sdbDataType type, int *inUpdate,
             error = sdb_mapSQLError(type, sqlerr);
             goto loser;
         }
+    } else if (flags != SDB_RDONLY) {
+        /* check to see if we need to update the scheme, only need to
+         * do  this if we open r/w, since that's the only case where
+         * it's a problem is attribute colmumn are missing */
+        error = sdb_update_column(sqlDB, table, type);
+        if (error != CKR_OK) {
+            goto loser;
+        }
     }
+
     /*
      * detect the case where we have created the database, but have
      * not yet updated it.

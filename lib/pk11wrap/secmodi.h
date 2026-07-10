@@ -170,6 +170,7 @@ SECItem *pk11_GenerateNewParamWithKeyLen(CK_MECHANISM_TYPE type, int keyLen);
 SECItem *pk11_ParamFromIVWithLen(CK_MECHANISM_TYPE type,
                                  SECItem *iv, int keyLen);
 SECItem *pk11_mkcertKeyID(CERTCertificate *cert);
+const SECItem *pk11_GetPublicKeyComponent(SECKEYPublicKey *pubKey);
 
 SEC_END_PROTOS
 

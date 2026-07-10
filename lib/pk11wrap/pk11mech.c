@@ -1939,6 +1939,8 @@ PK11_MapSignKeyType(KeyType keyType)
             return CKM_ECDSA;
         case edKey:
             return CKM_EDDSA;
+        case mldsaKey:
+            return CKM_ML_DSA;
         case dhKey:
         default:
             break;

@@ -73,6 +73,10 @@
  * before we start freeing them */
 #define MAX_KEY_LEN 256 /* maximum symmetric key length in bytes */
 
+#define SEC_OID_ML_DSA_44 SEC_OID_PRIVATE_3
+#define SEC_OID_ML_DSA_65 SEC_OID_PRIVATE_4
+#define SEC_OID_ML_DSA_87 SEC_OID_PRIVATE_5
+
 /*
  * LOG2_BUCKETS_PER_SESSION_LOCK must be a prime number.
  * With SESSION_HASH_SIZE=1024, LOG2 can be 9, 5, 1, or 0.
@@ -769,6 +773,9 @@ extern char *sftk_getString(SFTKObject *object, CK_ATTRIBUTE_TYPE type);
 extern void sftk_nullAttribute(SFTKObject *object, CK_ATTRIBUTE_TYPE type);
 extern CK_RV sftk_GetULongAttribute(SFTKObject *object, CK_ATTRIBUTE_TYPE type,
                                     CK_ULONG *longData);
+extern CK_RV sftk_ReadAttribute(SFTKObject *object, CK_ATTRIBUTE_TYPE type,
+                                unsigned char *data, unsigned int maxlen,
+                                unsigned int *lenp);
 extern CK_RV sftk_forceAttribute(SFTKObject *object, CK_ATTRIBUTE_TYPE type,
                                  const void *value, unsigned int len);
 extern CK_RV sftk_defaultAttribute(SFTKObject *object, CK_ATTRIBUTE_TYPE type,
@@ -983,6 +990,10 @@ PRBool sftk_operationIsFIPS(SFTKSlot *slot, CK_MECHANISM *mech,
                             CK_ULONG targetKeySize);
 /* add validation objects to the slot */
 CK_RV sftk_CreateValidationObjects(SFTKSlot *slot);
+
+/* get the length of an MLDSASignature based on the PKCS #11 parameter set */
+unsigned int sftk_MLDSAGetSigLen(CK_ML_DSA_PARAMETER_SET_TYPE paramSet);
+
 
 SEC_END_PROTOS
 
