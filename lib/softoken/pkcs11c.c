@@ -5241,7 +5241,7 @@ sftk_compareKeysEqual(CK_SESSION_HANDLE hSession,
     /* fetch the pkcs11 objects from the handles */
     session = sftk_SessionFromHandle(hSession);
     if (session == NULL) {
-        return CKR_SESSION_HANDLE_INVALID;
+        return PR_FALSE;
     }
 
     key1obj = sftk_ObjectFromHandle(key1, session);
@@ -5273,7 +5273,7 @@ loser:
         sftk_FreeObject(key1obj);
     }
     if (key2obj) {
-        sftk_FreeObject(key1obj);
+        sftk_FreeObject(key2obj);
     }
     if (att1) {
         sftk_FreeAttribute(att1);
@@ -5763,14 +5763,14 @@ sftk_PairwiseConsistencyCheck(CK_SESSION_HANDLE hSession, SFTKSlot *slot,
             return crv;
         }
     }
-    isKEM = sftk_isTrue(privateKey, CKA_ENCAPSULATE);
+    isKEM = sftk_isTrue(privateKey, CKA_DECAPSULATE);
     if (isKEM) {
         unsigned char *cipher_text = NULL;
         CK_ULONG cipher_text_length = 0;
         CK_OBJECT_HANDLE key1 =  CK_INVALID_HANDLE;
         CK_OBJECT_HANDLE key2 =  CK_INVALID_HANDLE;
         CK_KEY_TYPE genType = CKO_SECRET_KEY;
-        CK_ATTRIBUTE template = { CKA_KEY_TYPE, NULL, 0 };
+        CK_ATTRIBUTE template = { CKA_CLASS, NULL, 0 };
 
         template.pValue = &genType;
         template.ulValueLen = sizeof(genType);
@@ -5833,7 +5833,7 @@ kem_done:
             NSC_DestroyObject(hSession, key2);
         }
         if (crv != CKR_OK) {
-            return CKR_DEVICE_ERROR;
+            return crv;
         }
     }
 
@@ -7910,6 +7910,7 @@ sftk_DeriveEncrypt(SFTKCipher encrypt, void *cipherInfo,
     return crv;
 }
 
+
 CK_RV
 sftk_HKDF(CK_HKDF_PARAMS_PTR params, CK_SESSION_HANDLE hSession,
           SFTKObject *sourceKey, const unsigned char *sourceKeyBytes,
@@ -7963,6 +7964,11 @@ sftk_HKDF(CK_HKDF_PARAMS_PTR params, CK_SESSION_HANDLE hSession,
         crv = sftk_DeriveSensitiveCheck(sourceKey, key, canBeData);
         if (crv != CKR_OK)
             return crv;
+         /* if the source key is data, clear the FIPS flag
+          * and only get the FIPS state from the salt */
+         if (sourceKey->objclass == CKO_DATA) {
+             key->isFIPS = PR_FALSE;
+         }
     }
 
     /* HKDF-Extract(salt, base key value) */
@@ -7992,6 +7998,7 @@ sftk_HKDF(CK_HKDF_PARAMS_PTR params, CK_SESSION_HANDLE hSession,
                 if (session == NULL) {
                     return CKR_SESSION_HANDLE_INVALID;
                 }
+
 
                 saltKey = sftk_ObjectFromHandle(params->hSaltKey, session);
                 sftk_FreeSession(session);
@@ -9195,7 +9202,13 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
             crv = sftk_forceAttribute(key, CKA_VALUE, buf, keySize);
             PORT_ZFree(buf, tmpKeySize);
             /* preserve the source of the original base key */
-            /* key->source = sourceKey->source; */
+            key->source = sourceKey->source;
+
+            /* make sure this is fully fips approved, and mark it
+             * unapproved if not */
+            if (key->isFIPS) {
+                key->isFIPS = paramKey->isFIPS;
+            }
             sftk_FreeAttribute(att2);
             sftk_FreeObject(paramKey);
             break;

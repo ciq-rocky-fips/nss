@@ -203,6 +203,8 @@ NSC_EncapsulateKey(CK_SESSION_HANDLE hSession,
                             * different param set types based on the
                             * Mechanism value */
     KyberParams kyberParams;
+    CK_OBJECT_CLASS ckclass = CKO_SECRET_KEY;
+    CK_KEY_TYPE ckkeyType = CKK_GENERIC_SECRET;
 
     CHECK_FORK();
 
@@ -237,6 +239,15 @@ NSC_EncapsulateKey(CK_SESSION_HANDLE hSession,
         }
     }
 
+    crv = sftk_defaultAttribute(key, CKA_CLASS, &ckclass, sizeof(ckclass));
+    if (crv != CKR_OK) {
+        goto cleanup;
+    }
+    crv = sftk_defaultAttribute(key, CKA_KEY_TYPE, &ckkeyType, sizeof(ckkeyType));
+    if (crv != CKR_OK) {
+        goto cleanup;
+    }
+
     encapsulationKeyObject = sftk_ObjectFromHandle(hPublicKey, session);
     if (encapsulationKeyObject == NULL) {
         crv = CKR_KEY_HANDLE_INVALID;
@@ -269,7 +280,7 @@ NSC_EncapsulateKey(CK_SESSION_HANDLE hSession,
     SECItem secret = { siBuffer, secretBuf, sizeof secretBuf };
 
     key->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_ENCAPSULATE,
-                                       key, 0);
+                                       encapsulationKeyObject, 0);
     key->source = SFTK_SOURCE_KEA;
     switch (pMechanism->mechanism) {
 #ifndef NSS_DISABLE_KYBER
@@ -352,6 +363,8 @@ NSC_DecapsulateKey(CK_SESSION_HANDLE hSession,
     CK_RV crv;
     SFTKFreeStatus status;
     KyberParams kyberParams;
+    CK_OBJECT_CLASS ckclass = CKO_SECRET_KEY;
+    CK_KEY_TYPE ckkeyType = CKK_GENERIC_SECRET;
 
     CHECK_FORK();
 
@@ -386,6 +399,15 @@ NSC_DecapsulateKey(CK_SESSION_HANDLE hSession,
         }
     }
 
+    crv = sftk_defaultAttribute(key, CKA_CLASS, &ckclass, sizeof(ckclass));
+    if (crv != CKR_OK) {
+        goto cleanup;
+    }
+    crv = sftk_defaultAttribute(key, CKA_KEY_TYPE, &ckkeyType, sizeof(ckkeyType));
+    if (crv != CKR_OK) {
+        goto cleanup;
+    }
+
     decapsulationKeyObject = sftk_ObjectFromHandle(hPrivateKey, session);
     if (decapsulationKeyObject == NULL) {
         crv = CKR_KEY_HANDLE_INVALID;
@@ -417,7 +439,7 @@ NSC_DecapsulateKey(CK_SESSION_HANDLE hSession,
     uint8_t secretBuf[MAX_KEM_SHARED_SECRET_BYTES] = { 0 };
     SECItem secret = { siBuffer, secretBuf, sizeof secretBuf };
     key->isFIPS = sftk_operationIsFIPS(slot, pMechanism, CKA_DECAPSULATE,
-                                       key, 0);
+                                       decapsulationKeyObject, 0);
     key->source = SFTK_SOURCE_KEA;
 
     switch (pMechanism->mechanism) {

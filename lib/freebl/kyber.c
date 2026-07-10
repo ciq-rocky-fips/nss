@@ -9,6 +9,7 @@
 #include <stdbool.h>
 
 #include "blapi.h"
+#include "blapii.h"
 #include "secerr.h"
 #include "secitem.h"
 
@@ -203,18 +204,28 @@ Kyber_NewKey(KyberParams params, const SECItem *keypair_seed, SECItem *privkey, 
         libcrux_ml_kem_mlkem768_MlKem768KeyPair keys = libcrux_ml_kem_mlkem768_portable_generate_key_pair(coins);
         memcpy(pubkey->data, keys.pk.value, KYBER768_PUBLIC_KEY_BYTES);
         memcpy(privkey->data, keys.sk.value, KYBER768_PRIVATE_KEY_BYTES);
+        PORT_SafeZero(&keys, sizeof(keys));
     } else if (params == params_ml_kem1024 || params == params_ml_kem1024_test_mode) {
         libcrux_ml_kem_mlkem1024_MlKem1024KeyPair keys = libcrux_ml_kem_mlkem1024_portable_generate_key_pair(coins);
         memcpy(pubkey->data, keys.pk.value, MLKEM1024_PUBLIC_KEY_BYTES);
         memcpy(privkey->data, keys.sk.value, MLKEM1024_PRIVATE_KEY_BYTES);
+        PORT_SafeZero(&keys, sizeof(keys));
 #ifndef NSS_DISABLE_KYBER
     } else if (params == params_kyber768_round3 || params == params_kyber768_round3_test_mode) {
         pqcrystals_kyber768_ref_keypair_derand(pubkey->data, privkey->data, coins);
 #endif
     } else {
         /* unreachable */
+        if (coins == randbuf) {
+            PORT_SafeZero(randbuf, sizeof(randbuf));
+        }
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
         return SECFailure;
+    }
+    /* manual max stack count 68000 */
+    BLAPI_CLEAR_STACK(70000);
+    if (coins == randbuf) {
+        PORT_SafeZero(randbuf, sizeof(randbuf));
     }
     NSS_DECLASSIFY(pubkey->data, pubkey->len);
     return SECSuccess;
@@ -244,6 +255,7 @@ Kyber_Encapsulate(KyberParams params, const SECItem *enc_seed, const SECItem *pu
         }
         coins = randbuf;
     }
+    SECStatus rv = SECSuccess;
     NSS_CLASSIFY(coins, KYBER_ENC_COIN_BYTES);
     if (params == params_ml_kem768 || params == params_ml_kem768_test_mode) {
         /* shouldn't this just use the typedef im libcrux_mlkem768.h? */
@@ -252,13 +264,17 @@ Kyber_Encapsulate(KyberParams params, const SECItem *enc_seed, const SECItem *pu
 
         bool valid_pk = libcrux_ml_kem_mlkem768_portable_validate_public_key(&pk_value);
         if (!valid_pk) {
+            PORT_SafeZero(&pk_value, sizeof(pk_value));
             PORT_SetError(SEC_ERROR_INVALID_ARGS);
-            return SECFailure;
+            rv = SECFailure;
+            goto loser;
         }
 
         tuple_3c encap = libcrux_ml_kem_mlkem768_portable_encapsulate(&pk_value, coins);
         memcpy(ciphertext->data, encap.fst.value, KYBER768_CIPHERTEXT_BYTES);
         memcpy(secret->data, encap.snd, KYBER_SHARED_SECRET_BYTES);
+        PORT_SafeZero(&pk_value, sizeof(pk_value));
+        PORT_SafeZero(&encap, sizeof(encap));
     } else if (params == params_ml_kem1024 || params == params_ml_kem1024_test_mode) {
         /* shouldn't this just use the typedef im libcrux_mlkem1024.h? */
         libcrux_ml_kem_types_MlKemPublicKey_1f pk_value;
@@ -266,13 +282,17 @@ Kyber_Encapsulate(KyberParams params, const SECItem *enc_seed, const SECItem *pu
 
         bool valid_pk = libcrux_ml_kem_mlkem1024_portable_validate_public_key(&pk_value);
         if (!valid_pk) {
+            PORT_SafeZero(&pk_value, sizeof(pk_value));
             PORT_SetError(SEC_ERROR_INVALID_ARGS);
-            return SECFailure;
+            rv = SECFailure;
+            goto loser;
         }
 
         tuple_21 encap = libcrux_ml_kem_mlkem1024_portable_encapsulate(&pk_value, coins);
         memcpy(ciphertext->data, encap.fst.value, MLKEM1024_CIPHERTEXT_BYTES);
         memcpy(secret->data, encap.snd, KYBER_SHARED_SECRET_BYTES);
+        PORT_SafeZero(&pk_value, sizeof(pk_value));
+        PORT_SafeZero(&encap, sizeof(encap));
 #ifndef NSS_DISABLE_KYBER
     } else if (params == params_kyber768_round3 || params == params_kyber768_round3_test_mode) {
         pqcrystals_kyber768_ref_enc_derand(ciphertext->data, secret->data, pubkey->data, coins);
@@ -280,10 +300,17 @@ Kyber_Encapsulate(KyberParams params, const SECItem *enc_seed, const SECItem *pu
     } else {
         /* unreachable */
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
-        return SECFailure;
+        rv = SECFailure;
+        goto loser;
     }
+loser:
+    if (coins == randbuf) {
+        PORT_SafeZero(randbuf, sizeof(randbuf));
+    }
+    /* manual max stack count 6700 */
+    BLAPI_CLEAR_STACK(10000);
 
-    return SECSuccess;
+    return rv;
 }
 
 SECStatus
@@ -299,6 +326,7 @@ Kyber_Decapsulate(KyberParams params, const SECItem *privkey, const SECItem *cip
         return SECFailure;
     }
 
+    SECStatus rv = SECSuccess;
     if (params == params_ml_kem768 || params == params_ml_kem768_test_mode) {
         libcrux_ml_kem_types_MlKemPrivateKey_55 private_key;
         memcpy(private_key.value, privkey->data, KYBER768_PRIVATE_KEY_BYTES);
@@ -308,11 +336,16 @@ Kyber_Decapsulate(KyberParams params, const SECItem *privkey, const SECItem *cip
 
         bool valid = libcrux_ml_kem_mlkem768_portable_validate_private_key(&private_key, &cipher_text);
         if (!valid) {
+            PORT_SafeZero(&private_key, sizeof(private_key));
+            PORT_SafeZero(&cipher_text, sizeof(cipher_text));
             PORT_SetError(SEC_ERROR_INVALID_ARGS);
-            return SECFailure;
+            rv = SECFailure;
+            goto loser;
         }
 
         libcrux_ml_kem_mlkem768_portable_decapsulate(&private_key, &cipher_text, secret->data);
+        PORT_SafeZero(&private_key, sizeof(private_key));
+        PORT_SafeZero(&cipher_text, sizeof(cipher_text));
     } else if (params == params_ml_kem1024 || params == params_ml_kem1024_test_mode) {
         libcrux_ml_kem_types_MlKemPrivateKey_95 private_key;
         memcpy(private_key.value, privkey->data, MLKEM1024_PRIVATE_KEY_BYTES);
@@ -322,11 +355,16 @@ Kyber_Decapsulate(KyberParams params, const SECItem *privkey, const SECItem *cip
 
         bool valid = libcrux_ml_kem_mlkem1024_portable_validate_private_key(&private_key, &cipher_text);
         if (!valid) {
+            PORT_SafeZero(&private_key, sizeof(private_key));
+            PORT_SafeZero(&cipher_text, sizeof(cipher_text));
             PORT_SetError(SEC_ERROR_INVALID_ARGS);
-            return SECFailure;
+            rv = SECFailure;
+            goto loser;
         }
 
         libcrux_ml_kem_mlkem1024_portable_decapsulate(&private_key, &cipher_text, secret->data);
+        PORT_SafeZero(&private_key, sizeof(private_key));
+        PORT_SafeZero(&cipher_text, sizeof(cipher_text));
 #ifndef NSS_DISABLE_KYBER
     } else if (params == params_kyber768_round3 || params == params_kyber768_round3_test_mode) {
         pqcrystals_kyber768_ref_dec(secret->data, ciphertext->data, privkey->data);
@@ -336,6 +374,9 @@ Kyber_Decapsulate(KyberParams params, const SECItem *privkey, const SECItem *cip
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
         return SECFailure;
     }
+loser:
+    /* manual max stack count 8200 */
+    BLAPI_CLEAR_STACK(10000);
 
-    return SECSuccess;
+    return rv;
 }
