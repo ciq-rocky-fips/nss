@@ -94,7 +94,7 @@ SFTKFIPSAlgorithmList sftk_fips_mechs[] = {
 #define AES_FB_KEY 128, 256
 #define AES_FB_STEP 64
     { CKM_RSA_PKCS_KEY_PAIR_GEN, { RSA_FB_KEY, CKF_KPG }, RSA_FB_STEP, SFTKFIPSNone },
-    { CKM_RSA_PKCS_OAEP, { RSA_FB_KEY, CKF_ENC }, RSA_FB_STEP, SFTKFIPSRSAOAEP },
+    { CKM_RSA_PKCS_OAEP, { RSA_FB_KEY, CKF_WRP }, RSA_FB_STEP, SFTKFIPSRSAOAEP },
 
     /* -------------- RSA Multipart Signing Operations -------------------- */
     { CKM_SHA224_RSA_PKCS, { RSA_FB_KEY, CKF_SGN }, RSA_FB_STEP, SFTKFIPSNone },
