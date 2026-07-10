@@ -166,7 +166,7 @@ void Pk11SignatureTest::Verify(ScopedSECKEYPublicKey& pubKey,
     EXPECT_EQ(rv, valid ? SECSuccess : SECFailure);
   }
 
-  // test the hash and verify interface */
+  // test the hash and verify interface
   PK11Context* context = PK11_CreateContextByPubKey(
       combo_, CKA_VERIFY, pubKey.get(), parameters(), NULL);
   /* we assert here because we'll crash if we try to continue

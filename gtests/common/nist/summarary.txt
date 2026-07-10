@@ -1,0 +1,120 @@
+tcID 1: ML-DSA-44 key(1334.0) message(5175.0) signature(2420.0) ctx(35.0) False
+tcID 2: ML-DSA-44 key(1334.0) message(765.0) signature(2420.0) ctx(240.0) False
+tcID 3: ML-DSA-44 key(1334.0) message(4313.0) signature(2420.0) ctx(242.0) False
+tcID 4: ML-DSA-44 key(1334.0) message(7031.0) signature(2420.0) ctx(204.0) False
+tcID 5: ML-DSA-44 key(1334.0) message(8192.0) signature(2420.0) ctx(246.0) False
+tcID 6: ML-DSA-44 key(1334.0) message(3965.0) signature(2420.0) ctx(180.0) True
+tcID 7: ML-DSA-44 key(1334.0) message(6982.0) signature(2420.0) ctx(92.0) True
+tcID 8: ML-DSA-44 key(1334.0) message(4366.0) signature(2420.0) ctx(255.0) False
+tcID 9: ML-DSA-44 key(1334.0) message(1.0) signature(2420.0) ctx(2.0) False
+tcID 10: ML-DSA-44 key(1334.0) message(775.0) signature(2420.0) ctx(12.0) False
+tcID 11: ML-DSA-44 key(1334.0) message(3964.0) signature(2420.0) ctx(21.0) True
+tcID 12: ML-DSA-44 key(1334.0) message(2880.0) signature(2420.0) ctx(0.0) False
+tcID 13: ML-DSA-44 key(1334.0) message(5679.0) signature(2420.0) ctx(155.0) False
+tcID 14: ML-DSA-44 key(1334.0) message(2638.0) signature(2420.0) ctx(37.0) False
+tcID 15: ML-DSA-44 key(1334.0) message(2724.0) signature(2420.0) ctx(251.0) False
+tcID 31: ML-DSA-65 key(1974.0) message(2793.0) signature(3309.0) ctx(183.0) True
+tcID 32: ML-DSA-65 key(1974.0) message(6935.0) signature(3309.0) ctx(37.0) False
+tcID 33: ML-DSA-65 key(1974.0) message(7913.0) signature(3309.0) ctx(111.0) False
+tcID 34: ML-DSA-65 key(1974.0) message(6232.0) signature(3309.0) ctx(77.0) False
+tcID 35: ML-DSA-65 key(1974.0) message(1554.0) signature(3309.0) ctx(0.0) True
+tcID 36: ML-DSA-65 key(1974.0) message(5919.0) signature(3309.0) ctx(173.0) False
+tcID 37: ML-DSA-65 key(1974.0) message(961.0) signature(3309.0) ctx(133.0) True
+tcID 38: ML-DSA-65 key(1974.0) message(7713.0) signature(3309.0) ctx(41.0) False
+tcID 39: ML-DSA-65 key(1974.0) message(7224.0) signature(3309.0) ctx(46.0) False
+tcID 40: ML-DSA-65 key(1974.0) message(7903.0) signature(3309.0) ctx(222.0) False
+tcID 41: ML-DSA-65 key(1974.0) message(468.0) signature(3309.0) ctx(48.0) False
+tcID 42: ML-DSA-65 key(1974.0) message(1.0) signature(3309.0) ctx(84.0) False
+tcID 43: ML-DSA-65 key(1974.0) message(6290.0) signature(3309.0) ctx(160.0) False
+tcID 44: ML-DSA-65 key(1974.0) message(4867.0) signature(3309.0) ctx(159.0) False
+tcID 45: ML-DSA-65 key(1974.0) message(8192.0) signature(3309.0) ctx(255.0) False
+tcID 61: ML-DSA-87 key(2614.0) message(4752.0) signature(4627.0) ctx(219.0) False
+tcID 62: ML-DSA-87 key(2614.0) message(6144.0) signature(4627.0) ctx(0.0) False
+tcID 63: ML-DSA-87 key(2614.0) message(1790.0) signature(4627.0) ctx(181.0) True
+tcID 64: ML-DSA-87 key(2614.0) message(329.0) signature(4627.0) ctx(237.0) False
+tcID 65: ML-DSA-87 key(2614.0) message(8018.0) signature(4627.0) ctx(124.0) True
+tcID 66: ML-DSA-87 key(2614.0) message(2011.0) signature(4627.0) ctx(24.0) False
+tcID 67: ML-DSA-87 key(2614.0) message(8192.0) signature(4627.0) ctx(151.0) False
+tcID 68: ML-DSA-87 key(2614.0) message(2386.0) signature(4627.0) ctx(32.0) False
+tcID 69: ML-DSA-87 key(2614.0) message(4318.0) signature(4627.0) ctx(162.0) False
+tcID 70: ML-DSA-87 key(2614.0) message(6821.0) signature(4627.0) ctx(131.0) False
+tcID 71: ML-DSA-87 key(2614.0) message(7927.0) signature(4627.0) ctx(12.0) False
+tcID 72: ML-DSA-87 key(2614.0) message(4942.0) signature(4627.0) ctx(255.0) False
+tcID 73: ML-DSA-87 key(2614.0) message(1.0) signature(4627.0) ctx(178.0) True
+tcID 74: ML-DSA-87 key(2614.0) message(1925.0) signature(4627.0) ctx(128.0) False
+tcID 75: ML-DSA-87 key(2614.0) message(4980.0) signature(4627.0) ctx(248.0) False
+tcID 1: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 2: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 3: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 4: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 5: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 6: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 7: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 8: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 9: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 10: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 11: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 12: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 13: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 14: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 15: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 16: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 17: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 18: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 19: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 20: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 21: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 22: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 23: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 24: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 25: ML-DSA-44 seed(32.0) pubk(1312.0) privk(2560.0)
+tcID 26: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 27: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 28: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 29: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 30: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 31: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 32: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 33: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 34: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 35: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 36: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 37: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 38: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 39: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 40: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 41: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 42: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 43: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 44: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 45: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 46: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 47: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 48: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 49: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 50: ML-DSA-65 seed(32.0) pubk(1952.0) privk(4032.0)
+tcID 51: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 52: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 53: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 54: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 55: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 56: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 57: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 58: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 59: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 60: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 61: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 62: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 63: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 64: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 65: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 66: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 67: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 68: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 69: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 70: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 71: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 72: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 73: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 74: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
+tcID 75: ML-DSA-87 seed(32.0) pubk(2592.0) privk(4896.0)
