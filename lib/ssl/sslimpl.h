@@ -46,6 +46,7 @@ typedef struct sslPskStr sslPsk;
 typedef struct sslDelegatedCredentialStr sslDelegatedCredential;
 typedef struct sslEphemeralKeyPairStr sslEphemeralKeyPair;
 typedef struct TLS13KeyShareEntryStr TLS13KeyShareEntry;
+typedef struct tlsSignOrVerifyContextStr tlsSignOrVerifyContext;
 
 #include "sslencode.h"
 #include "sslexp.h"
@@ -113,7 +114,7 @@ typedef enum { SSLAppOpRead = 0,
 
 /* number of wrap mechanisms potentially used to wrap master secrets. */
 #define SSL_NUM_WRAP_MECHS 15
-#define SSL_NUM_WRAP_KEYS 6
+#define SSL_NUM_WRAP_KEYS 9
 
 /* This makes the cert cache entry exactly 4k. */
 #define SSL_MAX_CACHED_CERT_LEN 4060
@@ -1694,20 +1695,29 @@ extern SECStatus ssl_ParseSignatureSchemes(const sslSocket *ss, PLArenaPool *are
                                            unsigned int *len);
 extern SECStatus ssl_ConsumeSignatureScheme(
     sslSocket *ss, PRUint8 **b, PRUint32 *length, SSLSignatureScheme *out);
-extern SECStatus ssl3_SignHashesWithPrivKey(SSL3Hashes *hash,
-                                            SECKEYPrivateKey *key,
-                                            SSLSignatureScheme scheme,
-                                            PRBool isTls,
-                                            SECItem *buf);
 extern SECStatus ssl3_SignHashes(sslSocket *ss, SSL3Hashes *hash,
                                  SECKEYPrivateKey *key, SECItem *buf);
-extern SECStatus ssl_VerifySignedHashesWithPubKey(sslSocket *ss,
-                                                  SECKEYPublicKey *spki,
-                                                  SSLSignatureScheme scheme,
-                                                  SSL3Hashes *hash,
-                                                  SECItem *buf);
 extern SECStatus ssl3_VerifySignedHashes(sslSocket *ss, SSLSignatureScheme scheme,
                                          SSL3Hashes *hash, SECItem *buf);
+/* new signaure algorithms don't really have a 'sign hashes' interface,
+ * TLS13 now supports proper signing, where, if we are signing hashes, we
+ * will sign them with a proper hash and signed signature. Provide
+ * an API for those places in tls 13 where we need to sign. This leverages
+ * the work in secsign and secvfy, so we don't need to add a lot of
+ * algorithm specific code. Once the sign/verify interfaces work, we can
+ * just add the oid in tls13con.c and the ssl_sig_xxxx value and we are
+ * good to go */
+extern tlsSignOrVerifyContext * tls_SignOrVerifyGetNewContext(
+                              SECKEYPrivateKey *privKey,
+                              SECKEYPublicKey *pubKey,
+                              SSLSignatureScheme scheme, PRBool sign,
+                              SECItem *signature, void *pwArg);
+SECStatus tls_SignOrVerifyUpdate(tlsSignOrVerifyContext *ctx,
+                                 const unsigned char *buf, int len);
+SECStatus tls_SignOrVerifyEnd(tlsSignOrVerifyContext *ctx, SECItem *sig);
+void tls_DestroySignOrVerifyContext(tlsSignOrVerifyContext *ctx);
+
+
 extern SECStatus ssl3_CacheWrappedSecret(sslSocket *ss, sslSessionID *sid,
                                          PK11SymKey *secret);
 extern void ssl3_FreeSniNameArray(TLSExtensionData *xtnData);
@@ -1794,12 +1804,14 @@ SECStatus ssl3_HandleServerSpki(sslSocket *ss);
 SECStatus ssl3_AuthCertificate(sslSocket *ss);
 SECStatus ssl_ReadCertificateStatus(sslSocket *ss, PRUint8 *b,
                                     PRUint32 length);
-SECStatus ssl3_EncodeSigAlgs(const sslSocket *ss, PRUint16 minVersion, PRBool forCert,
+SECStatus ssl3_EncodeSigAlgs(const sslSocket *ss, PRUint16 minVersion,
+                             PRUint16 maxVersion, PRBool forCert,
                              PRBool grease, sslBuffer *buf);
 SECStatus ssl3_EncodeFilteredSigAlgs(const sslSocket *ss,
                                      const SSLSignatureScheme *schemes,
                                      PRUint32 numSchemes, PRBool grease, sslBuffer *buf);
-SECStatus ssl3_FilterSigAlgs(const sslSocket *ss, PRUint16 minVersion, PRBool disableRsae, PRBool forCert,
+SECStatus ssl3_FilterSigAlgs(const sslSocket *ss, PRUint16 minVersion,
+                             PRUint16 maxVersion, PRBool disableRsae, PRBool forCert,
                              unsigned int maxSchemes, SSLSignatureScheme *filteredSchemes,
                              unsigned int *numFilteredSchemes);
 SECStatus ssl_GetCertificateRequestCAs(const sslSocket *ss,
@@ -1859,7 +1871,7 @@ SECStatus ssl_PickClientSignatureScheme(sslSocket *ss,
                                         unsigned int numSchemes,
                                         SSLSignatureScheme *schemePtr);
 SECOidTag ssl3_HashTypeToOID(SSLHashType hashType);
-SECOidTag ssl3_AuthTypeToOID(SSLAuthType hashType);
+SECOidTag ssl3_AuthTypeToOID(SSLAuthType authType);
 SSLHashType ssl_SignatureSchemeToHashType(SSLSignatureScheme scheme);
 SSLAuthType ssl_SignatureSchemeToAuthType(SSLSignatureScheme scheme);
 
@@ -1869,6 +1881,8 @@ SECStatus ssl_InsertRecordHeader(const sslSocket *ss, ssl3CipherSpec *cwSpec,
                                  PRBool *needsLength);
 PRBool ssl_SignatureSchemeValid(SSLSignatureScheme scheme, SECOidTag spkiOid,
                                 PRBool isTls13);
+SSLSignatureScheme ssl_SignatureSchemeFromPublicKeyOid(SECOidTag tag);
+
 
 /* Pull in DTLS functions */
 #include "dtlscon.h"

@@ -246,7 +246,7 @@ start_selfserv()
       echo "$SCRIPTNAME: $testname ----"
   fi
   if [ -z "$NO_ECC_CERTS" -o "$NO_ECC_CERTS" != "1" ] ; then
-      ECC_OPTIONS="-e ${HOSTADDR}-ecmixed -e ${HOSTADDR}-ec"
+      ECC_OPTIONS="-e ${HOSTADDR}-ecmixed -e ${HOSTADDR}-ec "
   else
       ECC_OPTIONS=""
   fi
@@ -256,25 +256,34 @@ start_selfserv()
       RSA_OPTIONS="-n ${HOSTADDR}-rsa-pss"
   fi
   if [ -z "$NSS_DISABLE_DSA" ]; then
-      DSA_OPTIONS="-S ${HOSTADDR}-dsa"
+      DSA_OPTIONS="-S ${HOSTADDR}-dsa "
   else
       DSA_OPTIONS=""
+  fi
+  # There are no differences any more between -e, and -S. They both do
+  # exactly the same thing. SSL looks at the certificate itself and decides
+  # how to use it. The -n is expecting a single value, using it here will mess
+  # up SNI test. So use -e as the most generic.
+  if [ -n "$NSS_ENABLE_ML_DSA" ]; then
+      ML_DSA_OPTIONS="-e ${HOSTADDR}-ml-dsa-44 -e ${HOSTADDR}-ml-dsa-65 -e ${HOSTADDR}-ml-dsa-87 "
+  else
+      ML_DSA_OPTIONS=""
   fi
 
   SERVER_VMIN=${SERVER_VMIN-ssl3}
   SERVER_VMAX=${SERVER_VMAX-tls1.2}
   echo "selfserv starting at `date`"
   echo "selfserv -D -p ${PORT} -d ${P_R_SERVERDIR} ${RSA_OPTIONS} ${SERVER_OPTIONS} \\"
-  echo "         ${ECC_OPTIONS} ${DSA_OPTIONS} -w nss "$@" -i ${R_SERVERPID}\\"
+  echo "         ${ECC_OPTIONS}${DSA_OPTIONS}${ML_DSA_OPTIONS}-w nss "$@" -i ${R_SERVERPID}\\"
   echo "         -V ${SERVER_VMIN}:${SERVER_VMAX} $verbose -H 1 &"
   if [ ${fileout} -eq 1 ]; then
       ${PROFTOOL} ${BINDIR}/selfserv -D -p ${PORT} -d ${P_R_SERVERDIR} ${RSA_OPTIONS} ${SERVER_OPTIONS} \
-               ${ECC_OPTIONS} ${DSA_OPTIONS} -w nss "$@" -i ${R_SERVERPID} -V ${SERVER_VMIN}:${SERVER_VMAX} $verbose -H 1 \
+               ${ECC_OPTIONS}${DSA_OPTIONS}${ML_DSA_OPTIONS}-w nss "$@" -i ${R_SERVERPID} -V ${SERVER_VMIN}:${SERVER_VMAX} $verbose -H 1 \
                > ${SERVEROUTFILE} 2>&1 &
       RET=$?
   else
       ${PROFTOOL} ${BINDIR}/selfserv -D -p ${PORT} -d ${P_R_SERVERDIR} ${RSA_OPTIONS} ${SERVER_OPTIONS} \
-               ${ECC_OPTIONS} ${DSA_OPTIONS} -w nss "$@" -i ${R_SERVERPID} -V ${SERVER_VMIN}:${SERVER_VMAX} $verbose -H 1 &
+               ${ECC_OPTIONS}${DSA_OPTIONS}${ML_DSA_OPTIONS}-w nss "$@" -i ${R_SERVERPID} -V ${SERVER_VMIN}:${SERVER_VMAX} $verbose -H 1 &
       RET=$?
   fi
 
@@ -382,20 +391,26 @@ ssl_cov()
       fi
 
       TLS_GROUPS=${CLIENT_GROUPS}
+      TLS_SIG_SCHEMES=""
       if [ "$ectype" = "MLKEM256" ]; then
           TLS_GROUPS="secp256r1mlkem768"
+          TLS_SIG_SCHEMES="-J mldsa65"
       elif [ "$ectype" = "MLKEM219" ]; then
           TLS_GROUPS="x25519mlkem768"
+          TLS_SIG_SCHEMES="-J mldsa44"
       elif [ "$ectype" = "MLKEM384" ]; then
           TLS_GROUPS="secp384r1mlkem1024"
+          TLS_SIG_SCHEMES="-J mldsa87"
+      elif [ "$ectype" = "MLDSAECC" ]; then
+          TLS_SIG_SCHEMES="-J mldsa44"
       fi
       echo "TLS_GROUPS=${TLS_GROUPS}"
 
-      echo "tstclnt -4 -p ${PORT} -h ${HOSTADDR} -c ${param} -I \"${TLS_GROUPS}\" -V ${VMIN}:${VMAX} ${CLIENT_OPTIONS} \\"
+      echo "tstclnt -4 -p ${PORT} -h ${HOSTADDR} -c ${param} -I \"${TLS_GROUPS}\" ${TLS_SIG_SCHEMES} -V ${VMIN}:${VMAX} ${CLIENT_OPTIONS} \\"
       echo "        -f -d ${P_R_CLIENTDIR} $verbose -w nss < ${REQUEST_FILE}"
 
       rm ${TMP}/$HOST.tmp.$$ 2>/dev/null
-      ${PROFTOOL} ${BINDIR}/tstclnt -4 -p ${PORT} -h ${HOSTADDR} -c ${param} -I "${TLS_GROUPS}" -V ${VMIN}:${VMAX} ${CLIENT_OPTIONS} -f \
+      ${PROFTOOL} ${BINDIR}/tstclnt -4 -p ${PORT} -h ${HOSTADDR} -c ${param} -I "${TLS_GROUPS}" ${TLS_SIG_SCHEMES} -V ${VMIN}:${VMAX} ${CLIENT_OPTIONS} -f \
               -d ${P_R_CLIENTDIR} $verbose -w nss < ${REQUEST_FILE} \
               >${TMP}/$HOST.tmp.$$  2>&1
       ret=$?
@@ -698,6 +713,12 @@ ssl_stress()
            [ "${CLIENT_MODE}" = "fips" -o "$NORM_EXT" = "Extended Test" ] ; then
           echo "$SCRIPTNAME: skipping  $testname for $NORM_EXT"
       else
+          unset SERVER_VMIN
+          unset SERVER_VMAX
+          if [ "$ectype" = "MLDSA" ]; then
+             SERVER_VMIN="tls1.1"
+             SERVER_VMAX="tls1.3"
+          fi
           cparam=`echo $cparam | sed -e 's;_; ;g' -e "s/TestUser/$USER_NICKNAME/g" `
           if [ "$ectype" = "SNI" ]; then
               cparam=`echo $cparam | sed -e "s/Host/$HOST/g" -e "s/Dom/$DOMSUF/g" `
@@ -718,10 +739,10 @@ ssl_stress()
           fi
 
           echo "strsclnt -4 -q -p ${PORT} -d ${dbdir} ${CLIENT_OPTIONS} -w nss $cparam \\"
-          echo "         -V ssl3:tls1.2 $verbose ${HOSTADDR}"
+          echo "         $verbose ${HOSTADDR}"
           echo "strsclnt started at `date`"
           ${PROFTOOL} ${BINDIR}/strsclnt -4 -q -p ${PORT} -d ${dbdir} ${CLIENT_OPTIONS} -w nss $cparam \
-                   -V ssl3:tls1.2 $verbose ${HOSTADDR}
+                   $verbose ${HOSTADDR}
           ret=$?
           echo "strsclnt completed at `date`"
           html_msg $ret $value \
@@ -1058,7 +1079,7 @@ ssl_policy_selfserv()
   # when our test suite kills the parent, so just use the single process
   # self serve for them
   # if [ "${OS_ARCH}" != "WINNT" ]; then
-  #    SERVER_OPTIONS="-M 3 ${SERVER_OPTIONS}"
+      SERVER_OPTIONS="-M 3 ${SERVER_OPTIONS}"
   # fi
 
   start_selfserv $CIPHER_SUITES
@@ -1649,10 +1670,10 @@ ssl_run_tests()
 
             case "${SERVER_MODE}" in
             "normal")
-                SERVER_OPTIONS=
+                SERVER_OPTIONS=""
                 ;;
             "fips")
-                SERVER_OPTIONS=
+                SERVER_OPTIONS=""
                 ssl_set_fips server on
                 ;;
             *)

@@ -59,6 +59,20 @@ ssl_gtest_certs() {
   if [ -z "${NSS_DISABLE_DSA}" ]; then
       make_cert dsa dsa sign
   fi
+  if [ -n "${NSS_ENABLE_ML_DSA}" ]; then
+      make_cert mldsa44 mldsa44 sign
+      make_cert mldsa44_ca mldsa44_ca ca
+      make_cert mldsa44_chain mldsa44_chain sign
+      make_cert delegator_mldsa44 delegator_mldsa44 sign
+      make_cert mldsa65 mldsa65 sign
+      make_cert mldsa65_ca mldsa65_ca ca
+      make_cert mldsa65_chain mldsa65_chain sign
+      make_cert delegator_mldsa65 delegator_mldsa65 sign
+      make_cert mldsa87 mldsa87 sign
+      make_cert mldsa87_ca mldsa87_ca ca
+      make_cert mldsa87_chain mldsa87_chain sign
+      make_cert delegator_mldsa87 delegator_mldsa87 sign
+  fi
   make_cert delegator_ecdsa256 delegator_p256 sign
   make_cert delegator_rsae2048 delegator_rsae2048 sign
   make_cert delegator_rsa_pss2048 delegator_rsa_pss2048 sign

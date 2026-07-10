@@ -174,7 +174,8 @@ Usage(void)
             "          ecdsa_secp521r1_sha512,\n"
             "          rsa_pss_rsae_sha256, rsa_pss_rsae_sha384, rsa_pss_rsae_sha512,\n"
             "          rsa_pss_pss_sha256, rsa_pss_pss_sha384, rsa_pss_pss_sha512,\n"
-            "          dsa_sha1, dsa_sha256, dsa_sha384, dsa_sha512\n",
+            "          dsa_sha1, dsa_sha256, dsa_sha384, dsa_sha512\n"
+            "          mldsa44, mldsa65, mldsa87\n",
             progName);
     exit(1);
 }

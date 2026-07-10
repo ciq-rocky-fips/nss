@@ -141,6 +141,9 @@ signatureSchemeName(SSLSignatureScheme scheme)
         strcase(dsa_sha256);
         strcase(dsa_sha384);
         strcase(dsa_sha512);
+        strcase(mldsa44);
+        strcase(mldsa65);
+        strcase(mldsa87);
 #undef strcase
         case ssl_sig_rsa_pkcs1_sha1md5:
             return "RSA PKCS#1 SHA1+MD5";
@@ -323,7 +326,7 @@ PrintParameterUsage()
                     "%-20s ecdsa_secp521r1_sha512,\n"
                     "%-20s rsa_pss_rsae_sha256, rsa_pss_rsae_sha384, rsa_pss_rsae_sha512,\n"
                     "%-20s rsa_pss_pss_sha256, rsa_pss_pss_sha384, rsa_pss_pss_sha512,\n"
-                    "%-20s dsa_sha1, dsa_sha256, dsa_sha384, dsa_sha512\n",
+                    "%-20s dsa_sha1, dsa_sha256, dsa_sha384, dsa_sha512 mldsa44 mldsa65 mldsa87\n",
             "-J", "", "", "", "", "", "", "");
     fprintf(stderr, "%-20s Use DTLS\n", "-P {client, server}");
     fprintf(stderr, "%-20s Exit after handshake\n", "-Q");

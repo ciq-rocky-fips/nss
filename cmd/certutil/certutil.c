@@ -303,10 +303,7 @@ CertReq(SECKEYPrivateKey *privk, SECKEYPublicKey *pubk, KeyType keyType,
     } else {
         /* sigh, we need to create a new SEC_GetSignatureAlgorithOidTag()
          * that takes a public key and one that takes a private key */
-        if (keyType == mldsaKey) {
-            hashAlgTag = pubk->u.mldsa.params;
-        }
-        signAlgTag = SEC_GetSignatureAlgorithmOidTag(keyType, hashAlgTag);
+        signAlgTag = SECU_GetSignatureAlgorithmFromPublicKey(pubk, hashAlgTag);
         if (signAlgTag == SEC_OID_UNKNOWN) {
             PORT_FreeArena(arena, PR_FALSE);
             SECU_PrintError(progName, "unknown Key or Hash type");
@@ -2061,29 +2058,6 @@ MakeV1Cert(CERTCertDBHandle *handle,
     return (cert);
 }
 
-/* sigh look up the ml-dsa oid by string */
-static SECOidTag
-FindTagFromString(char *cipherString)
-{
-    SECOidTag tag;
-    SECOidData *oid;
-
-    /* future enhancement: accept dotted oid spec? */
-
-    for (tag = 1; (oid = SECOID_FindOIDByTag(tag)) != NULL; tag++) {
-        /* only interested in oids that we actually understand */
-        if (oid->mechanism == CKM_INVALID_MECHANISM) {
-            continue;
-        }
-        if (PORT_Strcasecmp(oid->desc, cipherString) != 0) {
-            continue;
-        }
-        return tag;
-    }
-    return SEC_OID_UNKNOWN;
-}
-
-
 static SECStatus
 SetSignatureAlgorithm(PLArenaPool *arena,
                       SECAlgorithmID *signAlg,
@@ -2124,62 +2098,13 @@ SetSignatureAlgorithm(PLArenaPool *arena,
             SECU_PrintError(progName, "Could not set signature algorithm id.");
             return rv;
         }
-    } else if (privKey->keyType == mldsaKey) {
-        /* sigh, we need toexport SECKEY_GetParameterSet(), for now
-         * just do it inline */
-        /* this is temp code until we fix it correctly upstream. Don't
-         * push this upstream */
-        SECOidTag algID;
-        SECItem item;
-        CK_ULONG paramSet;
-
-        rv = PK11_ReadRawAttribute(PK11_TypePrivKey, privKey,
-                                   CKA_PARAMETER_SET, &item);
-
-        if (rv != SECSuccess) {
-            SECU_PrintError(progName, "missing parameter set for ml-dsa key.");
-            return SECFailure;
-        }
-        if (item.len != sizeof (paramSet)) {
-            SECU_PrintError(progName, "corrupted parameter set for ml-dsa key.");
-            PORT_Free(item.data);
-            return SECFailure;
-        }
-        paramSet = *(CK_ULONG *)item.data;
-        PORT_Free(item.data);
-        switch  (paramSet) {
-            case CKP_ML_DSA_44:
-                algID = FindTagFromString("ML-DSA-44");
-                break;
-            case CKP_ML_DSA_65:
-                algID = FindTagFromString("ML-DSA-65");
-                break;
-            case CKP_ML_DSA_87:
-                algID = FindTagFromString("ML-DSA-87");
-                break;
-            default:
-                algID = SEC_OID_UNKNOWN;
-                break;
-        }
-        if (algID == SEC_OID_UNKNOWN) {
-                PORT_SetError(SEC_ERROR_INVALID_KEY);
-                SECU_PrintError(progName, "invalid parameter set for ml-dsa key.");
-                return SECFailure;
-        }
-                
-        rv = SECOID_SetAlgorithmID(arena, signAlg, algID, 0);
-        if (rv != SECSuccess) {
-            SECU_PrintError(progName, "Could not set signature algorithm id.");
-            return rv;
-        }
     } else {
-        KeyType keyType = SECKEY_GetPrivateKeyType(privKey);
         SECOidTag algID;
        
         /* first, try to get the ParameterSet from the key, If the
          * key as a parameter set, use it, otherwise fall back to
          * SEC_GetSignatureAlgorithmoidTag */ 
-        algID = SEC_GetSignatureAlgorithmOidTag(keyType, hashAlgTag);
+        algID = SECU_GetSignatureAlgorithmFromPrivateKey(privKey, hashAlgTag);
         if (algID == SEC_OID_UNKNOWN) {
             SECU_PrintError(progName, "Unknown key or hash type for issuer.");
             return SECFailure;

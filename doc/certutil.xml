@@ -275,7 +275,7 @@ Add one or multiple extensions that certutil cannot encode yet, by loading their
         <listitem>
           <para>Specify the type or specific ID of a key.</para>
           <para>
-           The valid key type options are rsa, dsa, ec, or all. The default 
+           The valid key type options are rsa, dsa, ec, mldsa or all. The default 
            value is rsa. Specifying the type of key can avoid mistakes caused by
            duplicate nicknames. Giving a key type generates a new key pair; 
            giving the ID of an existing key reuses that key pair (which is 
@@ -316,7 +316,7 @@ Add one or multiple extensions that certutil cannot encode yet, by loading their
       </varlistentry>
 
       <varlistentry>
-        <term>-q pqgfile or curve-name</term>
+        <term>-q pqgfile or curve-name or ml-dsa-parameter-set</term>
         <listitem>
         <para>Read an alternate PQG value from the specified file when generating DSA key pairs. If this argument is not used, <command>certutil</command> generates its own PQG value. PQG files are created with a separate DSA utility.</para>
         <para>Elliptic curve name is one of the ones from nistp256, nistp384, nistp521, curve25519.</para>
@@ -340,6 +340,7 @@ Add one or multiple extensions that certutil cannot encode yet, by loading their
            secp112r2, secp128r1, secp128r2, sect113r1, sect113r2,
            sect131r1, sect131r2
         </para>
+        <para>ML-DSA parameter set is one of ml-dsa-44, ml-dsa-65, ml-dsa-87.</para>
         </listitem>
         
       </varlistentry>
