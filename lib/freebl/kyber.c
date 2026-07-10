@@ -168,7 +168,6 @@ valid_enc_seed(KyberParams params, const SECItem *seed)
 #endif
         case params_ml_kem768_test_mode:
         case params_ml_kem1024_test_mode:
-            return !seed;
             return !seed || seed->len == KYBER_SHARED_SECRET_BYTES;
         default:
             return false;
