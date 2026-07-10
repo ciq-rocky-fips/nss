@@ -15,6 +15,8 @@
 
 #include "internal/libcrux_mlkem_portable.h"
 
+#include "lc_memset_secure.h"
+
 /**
  Portable decapsulate
 */
@@ -79,11 +81,14 @@ libcrux_ml_kem.ind_cca.instantiations.portable.encapsulate with const generics
 static tuple_21 encapsulate_021(
     libcrux_ml_kem_types_MlKemPublicKey_1f *public_key,
     uint8_t randomness[32U]) {
+  tuple_21 ret;
   libcrux_ml_kem_types_MlKemPublicKey_1f *uu____0 = public_key;
   /* Passing arrays by value in Rust generates a copy in C */
   uint8_t copy_of_randomness[32U];
   memcpy(copy_of_randomness, randomness, (size_t)32U * sizeof(uint8_t));
-  return libcrux_ml_kem_ind_cca_encapsulate_eb1(uu____0, copy_of_randomness);
+  ret = libcrux_ml_kem_ind_cca_encapsulate_eb1(uu____0, copy_of_randomness);
+  lc_memset_secure(copy_of_randomness, 0U, (size_t)32U * sizeof(uint8_t));
+  return ret;
 }
 
 /**
@@ -96,11 +101,14 @@ static tuple_21 encapsulate_021(
 tuple_21 libcrux_ml_kem_mlkem1024_portable_encapsulate(
     libcrux_ml_kem_types_MlKemPublicKey_1f *public_key,
     uint8_t randomness[32U]) {
+  tuple_21 ret;
   libcrux_ml_kem_types_MlKemPublicKey_1f *uu____0 = public_key;
   /* Passing arrays by value in Rust generates a copy in C */
   uint8_t copy_of_randomness[32U];
   memcpy(copy_of_randomness, randomness, (size_t)32U * sizeof(uint8_t));
-  return encapsulate_021(uu____0, copy_of_randomness);
+  ret = encapsulate_021(uu____0, copy_of_randomness);
+  lc_memset_secure(copy_of_randomness, 0U, (size_t)32U * sizeof(uint8_t));
+  return ret;
 }
 
 /**
@@ -120,10 +128,13 @@ generics
 */
 static libcrux_ml_kem_mlkem1024_MlKem1024KeyPair generate_keypair_871(
     uint8_t randomness[64U]) {
+  libcrux_ml_kem_mlkem1024_MlKem1024KeyPair ret;
   /* Passing arrays by value in Rust generates a copy in C */
   uint8_t copy_of_randomness[64U];
   memcpy(copy_of_randomness, randomness, (size_t)64U * sizeof(uint8_t));
-  return libcrux_ml_kem_ind_cca_generate_keypair_f61(copy_of_randomness);
+  ret = libcrux_ml_kem_ind_cca_generate_keypair_f61(copy_of_randomness);
+  lc_memset_secure(copy_of_randomness, 0U, (size_t)64U * sizeof(uint8_t));
+  return ret;
 }
 
 /**
@@ -132,9 +143,12 @@ static libcrux_ml_kem_mlkem1024_MlKem1024KeyPair generate_keypair_871(
 libcrux_ml_kem_mlkem1024_MlKem1024KeyPair
 libcrux_ml_kem_mlkem1024_portable_generate_key_pair(uint8_t randomness[64U]) {
   /* Passing arrays by value in Rust generates a copy in C */
+  libcrux_ml_kem_mlkem1024_MlKem1024KeyPair ret;
   uint8_t copy_of_randomness[64U];
   memcpy(copy_of_randomness, randomness, (size_t)64U * sizeof(uint8_t));
-  return generate_keypair_871(copy_of_randomness);
+  ret = generate_keypair_871(copy_of_randomness);
+  lc_memset_secure(copy_of_randomness, 0U, (size_t)64U * sizeof(uint8_t));
+  return ret;
 }
 
 /**
