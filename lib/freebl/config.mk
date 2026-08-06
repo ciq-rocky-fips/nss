@@ -75,6 +75,8 @@ else
 ifeq ($(FREEBL_NO_DEPEND),1)
 #drop pthreads as well
 OS_PTHREAD=
+# Jitterentropy requires pthreads directly (not via NSPR)
+OS_LIBS += -lpthread
 else
 EXTRA_SHARED_LIBS += \
 	-L$(DIST)/lib \
@@ -89,6 +91,9 @@ endif
 ifeq ($(OS_ARCH), Darwin)
 EXTRA_SHARED_LIBS += -dylib_file @executable_path/libplc4.dylib:$(DIST)/lib/libplc4.dylib -dylib_file @executable_path/libplds4.dylib:$(DIST)/lib/libplds4.dylib
 endif
+
+# Link the bundled jitterentropy static library
+EXTRA_SHARED_LIBS += $(CORE_DEPTH)/bundled_libjitterentropy/install/lib/libjitterentropy.a
 
 ifdef NSS_FIPS_140_3
 DEFINES += -DNSS_FIPS_140_3
