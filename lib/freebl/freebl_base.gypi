@@ -79,6 +79,9 @@
     'leancrypto/signature_domain_separation.c',
     'leancrypto/mldsa_zetas.c',
   ],
+  'include_dirs': [
+    '<(DEPTH)/bundled_libjitterentropy',
+  ],
   'defines': [
     # For kyber-pqcrystals-ref.c. If we ever decide to support Kyber512 or
     # Kyber1024, we'll need to build separate static libraries with different
@@ -112,6 +115,12 @@
             'chacha20-ppc64le.S',
           ],
         }]
+      ],
+    }],
+    [ 'OS=="linux"', {
+      'libraries': [
+        '<(DEPTH)/bundled_libjitterentropy/install/lib/libjitterentropy.a',
+        '-lpthread',
       ],
     }],
     [ 'OS=="win"', {
