@@ -64,6 +64,9 @@
     'verified/Hacl_Curve25519_51.c',
     'verified/Hacl_Ed25519.c',
   ],
+  'include_dirs': [
+    '<(DEPTH)/bundled_libjitterentropy',
+  ],
   'defines': [
     # For kyber-pqcrystals-ref.c. If we ever decide to support Kyber512 or
     # Kyber1024, we'll need to build separate static libraries with different
@@ -242,7 +245,12 @@
             'verified/libcrux_mlkem1024_portable.c',
         ],
     }]
-
+    [ 'OS=="linux"', {
+      'libraries': [
+        '<(DEPTH)/bundled_libjitterentropy/install/lib/libjitterentropy.a',
+        '-lpthread',
+      ],
+    }],
 
   ],
  'ldflags': [

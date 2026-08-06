@@ -706,6 +706,7 @@ vpath %.S mpi ecl
 vpath %.s mpi ecl
 vpath %.asm mpi ecl
 INCLUDES += -Impi -Iecl -Iverified -Iverified/internal -Iverified/karamel/include -Iverified/karamel/krmllib/dist/minimal -Iverified/eurydice -Ideprecated
+INCLUDES += -I$(CORE_DEPTH)/bundled_libjitterentropy
 
 
 DEFINES += -DMP_API_COMPATIBLE
