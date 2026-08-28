@@ -292,9 +292,15 @@ Create_ECC_CMS_SharedInfo(PLArenaPool *poolp,
     unsigned char suppPubInfo[4] = { 0 };
 
     SI.keyInfo = keyInfo;
-    SI.entityUInfo.type = ukm->type;
-    SI.entityUInfo.data = ukm->data;
-    SI.entityUInfo.len = ukm->len;
+    if (ukm) {
+        SI.entityUInfo.type = ukm->type;
+        SI.entityUInfo.data = ukm->data;
+        SI.entityUInfo.len = ukm->len;
+    } else {
+        SI.entityUInfo.type = siBuffer;
+        SI.entityUInfo.data = NULL;
+        SI.entityUInfo.len = 0;
+    }
 
     SI.suppPubInfo.type = siBuffer;
     SI.suppPubInfo.data = suppPubInfo;
@@ -322,7 +328,7 @@ Create_ECC_CMS_SharedInfo(PLArenaPool *poolp,
 SECStatus
 NSS_CMSUtil_EncryptSymKey_ESECDH(PLArenaPool *poolp, CERTCertificate *cert,
                                  PK11SymKey *bulkkey, SECItem *encKey,
-                                 PRBool genUkm, SECItem *ukm,
+                                 PRBool genUkm, SECItem **ukmp,
                                  SECAlgorithmID *keyEncAlg, SECItem *pubKey,
                                  void *wincx)
 {
@@ -337,10 +343,11 @@ NSS_CMSUtil_EncryptSymKey_ESECDH(PLArenaPool *poolp, CERTCertificate *cert,
     SECAlgorithmID keyWrapAlg;
     SECOidTag keyEncAlgtag;
     SECItem keyWrapAlg_params, *keyEncAlg_params, *SharedInfo;
+    SECItem *ukm = *ukmp;
     CK_MECHANISM_TYPE keyDerivationType, keyWrapMech;
     CK_ULONG kdf;
 
-    if (genUkm && (ukm->len != 0 || ukm->data != NULL)) {
+    if (genUkm && (ukm != NULL)) {
         PORT_SetError(PR_INVALID_ARGUMENT_ERROR);
         return SECFailure;
     }
@@ -427,17 +434,17 @@ NSS_CMSUtil_EncryptSymKey_ESECDH(PLArenaPool *poolp, CERTCertificate *cert,
      * contain 512 bits for Diffie-Hellman key agreement. */
 
     if (genUkm) {
-        ukm->type = siBuffer;
-        ukm->len = 64;
-        ukm->data = (unsigned char *)PORT_ArenaAlloc(poolp, ukm->len);
-
-        if (ukm->data == NULL) {
+        ukm = SECITEM_AllocItem(poolp, NULL, 64);
+        if (ukm == NULL) {
             goto loser;
         }
+        ukm->type = siBuffer;
+
         rv = PK11_GenerateRandom(ukm->data, ukm->len);
         if (rv != SECSuccess) {
             goto loser;
         }
+        *ukmp = ukm; /* return it */
     }
 
     SharedInfo = Create_ECC_CMS_SharedInfo(poolp, &keyWrapAlg,

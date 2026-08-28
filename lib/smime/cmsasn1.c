@@ -350,7 +350,7 @@ static const SEC_ASN1Template NSSCMSKeyAgreeRecipientInfoTemplate[] = {
     { SEC_ASN1_OPTIONAL | SEC_ASN1_CONSTRUCTED | SEC_ASN1_EXPLICIT |
           SEC_ASN1_CONTEXT_SPECIFIC | SEC_ASN1_XTRN | 1,
       offsetof(NSSCMSKeyAgreeRecipientInfo, ukm),
-      SEC_ASN1_SUB(SEC_OctetStringTemplate) },
+      SEC_ASN1_SUB(SEC_PointerToOctetStringTemplate) },
     { SEC_ASN1_INLINE | SEC_ASN1_XTRN,
       offsetof(NSSCMSKeyAgreeRecipientInfo, keyEncAlg),
       SEC_ASN1_SUB(SECOID_AlgorithmIDTemplate) },
