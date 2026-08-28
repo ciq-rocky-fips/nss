@@ -3129,13 +3129,13 @@ PK11_Encapsulate(SECKEYPublicKey *pubKey, CK_MECHANISM_TYPE target,
     PORT_Assert(outKey);
     PORT_Assert(outCiphertext);
 
-    PK11SlotInfo *slot = pubKey->pkcs11Slot;
 
     PK11SymKey *sharedSecret = NULL;
     SECItem *ciphertext = NULL;
 
     CK_ATTRIBUTE keyTemplate[MAX_TEMPL_ATTRS];
     unsigned int templateCount;
+
 
     CK_ATTRIBUTE *attrs;
     CK_BBOOL cktrue = CK_TRUE;
@@ -3145,7 +3145,28 @@ PK11_Encapsulate(SECKEYPublicKey *pubKey, CK_MECHANISM_TYPE target,
     CK_MECHANISM_TYPE kemType = pk11_mapKemKeyType(pubKey->keyType);
     CK_MECHANISM mech = { kemType, NULL, 0 };
     CK_ULONG ciphertextLen = 0;
-    CK_RV crv;
+    CK_RV crv = CKR_OK;
+
+    PK11SlotInfo *slot = pubKey->pkcs11Slot;
+
+    if (slot == NULL) {
+        CK_MECHANISM_TYPE mechs[] = { kemType, target};
+        CK_ULONG mech_count = PR_ARRAY_SIZE(mechs);
+        slot = PK11_GetBestSlotMultiple(mechs, mech_count, NULL /*sigh*/);
+    } else {
+        /* should we check if the slot can do target and kemtype
+         * here and move the public key if it can't? */
+        slot = PK11_ReferenceSlot(slot);
+    }
+    if (slot == NULL) {
+        goto loser; /* error already set */
+    }
+
+    CK_OBJECT_HANDLE id = PK11_ImportPublicKey(slot, pubKey, PR_FALSE);
+
+    if (id == CK_INVALID_HANDLE) {
+        goto loser; /* error already set */
+    }
 
     /* set up the target key template */
     attrs = keyTemplate;
@@ -3167,8 +3188,8 @@ PK11_Encapsulate(SECKEYPublicKey *pubKey, CK_MECHANISM_TYPE target,
     /* create a struxture for the target key */
     sharedSecret = pk11_CreateSymKey(slot, target, PR_TRUE, PR_TRUE, NULL);
     if (sharedSecret == NULL) {
-        PORT_SetError(SEC_ERROR_NO_MEMORY);
-        return SECFailure;
+        crv = CKR_HOST_MEMORY;
+        goto loser;
     }
     sharedSecret->origin = PK11_OriginDerive;
 
@@ -3180,7 +3201,7 @@ PK11_Encapsulate(SECKEYPublicKey *pubKey, CK_MECHANISM_TYPE target,
          * from the key */
         crv = PK11_GETTAB(slot)->C_EncapsulateKey(sharedSecret->session,
                                                   &mech,
-                                                  pubKey->pkcs11ID,
+                                                  id,
                                                   keyTemplate,
                                                   templateCount,
                                                   NULL,
@@ -3202,7 +3223,7 @@ PK11_Encapsulate(SECKEYPublicKey *pubKey, CK_MECHANISM_TYPE target,
          * the vendor interface */
         crv = PK11_GETTAB(slot)->C_EncapsulateKey(sharedSecret->session,
                                                   &mech,
-                                                  pubKey->pkcs11ID,
+                                                  id,
                                                   keyTemplate,
                                                   templateCount,
                                                   ciphertext->data,
@@ -3233,11 +3254,11 @@ PK11_Encapsulate(SECKEYPublicKey *pubKey, CK_MECHANISM_TYPE target,
         /* the old API expected the parameter set as a parameter, the
          * pkcs11 v3.2 gets it from the key */
         kemParameterSet = PK11_ReadULongAttribute(slot,
-                                                  pubKey->pkcs11ID,
+                                                  id,
                                                   CKA_NSS_PARAMETER_SET);
         if (kemParameterSet == CK_UNAVAILABLE_INFORMATION) {
             kemParameterSet = PK11_ReadULongAttribute(slot,
-                                                      pubKey->pkcs11ID,
+                                                      id,
                                                       CKA_PARAMETER_SET);
             if (kemParameterSet == CK_UNAVAILABLE_INFORMATION) {
                 crv = CKR_PUBLIC_KEY_INVALID;
@@ -3264,7 +3285,7 @@ PK11_Encapsulate(SECKEYPublicKey *pubKey, CK_MECHANISM_TYPE target,
         pk11_EnterKeyMonitor(sharedSecret);
         crv = KEMInterfaceFunctions->C_Encapsulate(sharedSecret->session,
                                                    &mech,
-                                                   pubKey->pkcs11ID,
+                                                   id,
                                                    keyTemplate,
                                                    templateCount,
                                                    &sharedSecret->objectID,
@@ -3278,15 +3299,24 @@ PK11_Encapsulate(SECKEYPublicKey *pubKey, CK_MECHANISM_TYPE target,
         PORT_Assert(ciphertextLen == ciphertext->len);
     }
 
+    PK11_FreeSlot(slot);
+
     *outKey = sharedSecret;
     *outCiphertext = ciphertext;
 
     return SECSuccess;
 
 loser:
-    PK11_FreeSymKey(sharedSecret);
+    if (slot) {
+        PK11_FreeSlot(slot);
+    }
+    if (sharedSecret) {
+        PK11_FreeSymKey(sharedSecret);
+    }
     SECITEM_FreeItem(ciphertext, PR_TRUE);
-    PORT_SetError(PK11_MapError(crv));
+    if (crv != CKR_OK) {
+        PORT_SetError(PK11_MapError(crv));
+    }
     return SECFailure;
 }
 
@@ -3317,7 +3347,7 @@ PK11_Decapsulate(SECKEYPrivateKey *privKey, const SECItem *ciphertext,
     CK_RV crv;
 
     *outKey = NULL;
-    sharedSecret = pk11_CreateSymKey(slot, target, PR_TRUE, PR_TRUE, NULL);
+    sharedSecret = pk11_CreateSymKey(slot, target, PR_TRUE, PR_TRUE, privKey->wincx);
     if (sharedSecret == NULL) {
         PORT_SetError(SEC_ERROR_NO_MEMORY);
         return SECFailure;
