@@ -819,6 +819,8 @@ sec_CreateRSAPSSParameters(PLArenaPool *arena,
     int hashLength;
     unsigned long saltLength;
     PRBool defaultSHA1 = PR_FALSE;
+    PRBool overWriteHash = PR_TRUE;
+    PRBool overWriteMask = PR_TRUE;
     SECStatus rv;
 
     PORT_Memset(&pssParams, 0, sizeof(pssParams));
@@ -836,6 +838,8 @@ sec_CreateRSAPSSParameters(PLArenaPool *arena,
             return NULL;
         }
         defaultSHA1 = PR_TRUE;
+        overWriteHash = PR_FALSE;
+        overWriteMask = PR_FALSE;
     }
 
     if (pssParams.trailerField.data) {
@@ -856,9 +860,11 @@ sec_CreateRSAPSSParameters(PLArenaPool *arena,
      * pssParams.hashAlg; there are 6  cases.
      *  case:
      *  1) We have params and params.hashAlg and we have a specified hashAlgTag,
-     *  make sure that hashAlgTag specified by the appication matches.
+     *  make sure that hashAlgTag specified by the appication matches, othersize we
+     *  overwrite params.hashAlg with hashAlgTag.
      *  2) We have params, but no params.hashAlg and we have a specified
-     *  hashAlg, make sure the hashAlgTag matches SEC_OID_SHA1.
+     *  hashAlg, make sure the hashAlgTag matches SEC_OID_SHA1, otherwise we
+     *  overwrite params.hashAlg with hashAlgTag..
      *  3) we did not specify any parameters but we did specified
      *  a hashAlgTag. Use the specified hash algtag.
      *  4) We have params and params.hashAlg and we did not specify a
@@ -878,8 +884,7 @@ sec_CreateRSAPSSParameters(PLArenaPool *arena,
         }
 
         if (tag != SEC_OID_UNKNOWN && tag != hashAlgTag) {
-            PORT_SetError(SEC_ERROR_INVALID_ARGS);
-            return NULL;
+            overWriteHash = PR_TRUE;
         }
     } else if (hashAlgTag == SEC_OID_UNKNOWN) {
         if (pssParams.hashAlg) {
@@ -895,7 +900,14 @@ sec_CreateRSAPSSParameters(PLArenaPool *arena,
             } else {
                 hashAlgTag = SEC_OID_SHA512;
             }
+            overWriteHash = PR_TRUE;
         }
+    }
+
+    /* handle the case where the params invalidly encoded SEC_OID_SHA1. This
+     * will force the correct encoding */
+    if ((hashAlgTag == SEC_OID_SHA1) && pssParams.hashAlg) {
+        overWriteHash = PR_TRUE;
     }
 
     /* explicitly restrict hashAlg to SHA2 variants */
@@ -932,13 +944,14 @@ sec_CreateRSAPSSParameters(PLArenaPool *arena,
         /* Following the recommendation in RFC 4055, assume the hash
          * algorithm identical to pssParam.hashAlg */
         if (SECOID_GetAlgorithmTag(&maskHashAlg) != hashAlgTag) {
-            PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
-            return NULL;
+            overWriteMask = PR_TRUE;
+        }
+        if (hashAlgTag == SEC_OID_SHA1) {
+            overWriteMask = PR_TRUE;
         }
     } else if (defaultSHA1) {
         if (hashAlgTag != SEC_OID_SHA1) {
-            PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
-            return NULL;
+            overWriteMask = PR_TRUE;
         }
     }
 
@@ -966,13 +979,11 @@ sec_CreateRSAPSSParameters(PLArenaPool *arena,
     }
 
     /* Fill in the parameters */
-    if (pssParams.hashAlg) {
+    if (overWriteHash) {
         if (hashAlgTag == SEC_OID_SHA1) {
             /* Omit hashAlg if the the algorithm is SHA-1 (default) */
             pssParams.hashAlg = NULL;
-        }
-    } else {
-        if (hashAlgTag != SEC_OID_SHA1) {
+        } else {
             pssParams.hashAlg = PORT_ArenaZAlloc(arena, sizeof(SECAlgorithmID));
             if (!pssParams.hashAlg) {
                 return NULL;
@@ -985,13 +996,11 @@ sec_CreateRSAPSSParameters(PLArenaPool *arena,
         }
     }
 
-    if (pssParams.maskAlg) {
+    if (overWriteMask) {
         if (hashAlgTag == SEC_OID_SHA1) {
             /* Omit maskAlg if the the algorithm is SHA-1 (default) */
             pssParams.maskAlg = NULL;
-        }
-    } else {
-        if (hashAlgTag != SEC_OID_SHA1) {
+        } else {
             SECItem *hashAlgItem;
 
             PORT_Assert(pssParams.hashAlg != NULL);
@@ -1091,7 +1100,6 @@ SEC_CreateSignatureAlgorithmParameters(PLArenaPool *arena,
         case SEC_OID_PKCS1_RSA_PSS_SIGNATURE:
             return SEC_CreateRSAPSSParameters(arena, result,
                                               hashAlgTag, params, key, NULL);
-
         default:
             if (params == NULL)
                 return NULL;
@@ -1117,6 +1125,9 @@ SEC_CreateVerifyAlgorithmParameters(PLArenaPool *arena,
     PORT_SetError(0);
     switch (signAlgTag) {
         case SEC_OID_PKCS1_RSA_PSS_SIGNATURE:
+            if ((hashAlgTag == SEC_OID_UNKNOWN) && ((params == NULL) || (params->len == 0))){
+                return NULL;
+            }
             return SEC_CreateRSAPSSParameters(arena, result,
                                               hashAlgTag, params, NULL, key);
 

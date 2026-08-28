@@ -233,6 +233,10 @@ CertReq(SECKEYPrivateKey *privk, SECKEYPublicKey *pubk, KeyType keyType,
         /* force a PSS signature. We can do a PSS signature with an
          * RSA key, this will force us to generate a PSS signature */
         signAlgTag = SEC_OID_PKCS1_RSA_PSS_SIGNATURE;
+        /* we are reusing an algorithm id, prevent the assert when we try
+         * to set the parameters of that algorithm id */
+        spki->algorithm.parameters.data = NULL;
+        spki->algorithm.parameters.len = 0;
         /* override the SPKI algorithm id. */
         rv = SEC_CreateSignatureAlgorithmID(arena, &spki->algorithm,
                                             signAlgTag, hashAlgTag,

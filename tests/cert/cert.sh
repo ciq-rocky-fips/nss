@@ -2168,10 +2168,8 @@ EOF
   certu -R -d "${PROFILEDIR}" -f "${R_PWFILE}" -z "${R_NOISE_FILE}" --pss -o req  2>&1
 
   CU_ACTION="Sign ${CERTNAME}'s Request"
-  RETEXPECTED=255
   certu -C -c "TestCA-rsa-pss" --pss-sign -Z SHA512 -m "${CERTSERIAL}" -v 60 -d "${P_R_CADIR}" \
         -i req -o "${CERTNAME}.cert" -f "${R_PWFILE}" "$1" 2>&1
-  RETEXPECTED=0
 
   CERTSERIAL=`expr $CERTSERIAL + 1`
 
@@ -2279,10 +2277,8 @@ EOF
   certu -R -d "${PROFILEDIR}" -f "${R_PWFILE}" -z "${R_NOISE_FILE}" --pss -o req  2>&1
 
   CU_ACTION="Sign ${CERTNAME}'s Request"
-  RETEXPECTED=255
   certu -C -c "TestCA-rsa-pss-sha1" --pss-sign -Z SHA256 -m "${CERTSERIAL}" -v 60 -d "${P_R_CADIR}" \
         -i req -o "${CERTNAME}.cert" -f "${R_PWFILE}" "$1" 2>&1
-  RETEXPECTED=0
 }
 
 cert_test_orphan_key_delete()

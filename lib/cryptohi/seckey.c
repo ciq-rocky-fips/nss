@@ -2881,11 +2881,13 @@ sec_DecodeRSAPSSParams(PLArenaPool *arena,
     SECStatus rv;
 
     PORT_Memset(&pssParams, 0, sizeof(pssParams));
-    rv = SEC_QuickDERDecodeItem(arena, &pssParams,
-                                SECKEY_RSAPSSParamsTemplate,
-                                params);
-    if (rv != SECSuccess) {
-        return rv;
+    if (params && (params->len != 0)) {
+        rv = SEC_QuickDERDecodeItem(arena, &pssParams,
+                                    SECKEY_RSAPSSParamsTemplate,
+                                    params);
+        if (rv != SECSuccess) {
+            return rv;
+        }
     }
 
     if (pssParams.hashAlg) {

@@ -110,7 +110,7 @@ class SignParamsTestF : public ::testing::Test {
   void CheckHashAlg(SECKEYRSAPSSParams *params, SECOidTag hashAlgTag) {
     // If hash algorithm is SHA-1, it must be omitted in the parameters
     if (hashAlgTag == SEC_OID_SHA1) {
-      EXPECT_EQ(nullptr, params->hashAlg);
+      EXPECT_EQ(nullptr, params->hashAlg) << "oid==" << SECOID_FindOIDTagDescription(SECOID_GetAlgorithmTag(params->hashAlg));
     } else {
       EXPECT_NE(nullptr, params->hashAlg);
       EXPECT_EQ(hashAlgTag, SECOID_GetAlgorithmTag(params->hashAlg));
@@ -230,12 +230,6 @@ TEST_P(SignParamsTest, CreateRsaPss) {
       arena_.get(), nullptr, SEC_OID_PKCS1_RSA_PSS_SIGNATURE, hashAlg,
       srcParams, privk_.get());
 
-  if (hashAlg != SEC_OID_UNKNOWN && srcHashAlg != SEC_OID_UNKNOWN &&
-      hashAlg != srcHashAlg) {
-    EXPECT_EQ(nullptr, params);
-    return;
-  }
-
   EXPECT_NE(nullptr, params);
 
   SECKEYRSAPSSParams pssParams;
@@ -299,7 +293,7 @@ TEST_P(SignParamsTest, CreateRsaPssWithInvalidHashAlg) {
   if (srcHashAlg != SEC_OID_UNKNOWN) {
     SECKEYRSAPSSParams pssParams;
     ASSERT_NO_FATAL_FAILURE(
-        CreatePssParams(&pssParams, srcHashAlg, srcHashAlg));
+        CreatePssParams(&pssParams, SEC_OID_MD5, SEC_OID_MD5));
     srcParams = SEC_ASN1EncodeItem(arena_.get(), nullptr, &pssParams,
                                    SEC_ASN1_GET(SECKEY_RSAPSSParamsTemplate));
     ASSERT_NE(nullptr, srcParams);
@@ -308,10 +302,12 @@ TEST_P(SignParamsTest, CreateRsaPssWithInvalidHashAlg) {
   }
 
   SECItem *params = SEC_CreateSignatureAlgorithmParameters(
-      arena_.get(), nullptr, SEC_OID_PKCS1_RSA_PSS_SIGNATURE, SEC_OID_MD5,
+      arena_.get(), nullptr, SEC_OID_PKCS1_RSA_PSS_SIGNATURE, srcHashAlg,
       srcParams, privk_.get());
 
-  EXPECT_EQ(nullptr, params);
+  /* override invalid hash with valid hash */
+  EXPECT_NE(nullptr, params);
+  /* assert params ->hashAlg != SEC_OID_MD5 */
 }
 
 TEST_P(SignParamsSourceTest, CreateRsaPssWithInvalidHashAlg) {
@@ -320,13 +316,13 @@ TEST_P(SignParamsSourceTest, CreateRsaPssWithInvalidHashAlg) {
   SECItem *srcParams;
   SECKEYRSAPSSParams pssParams;
   ASSERT_NO_FATAL_FAILURE(
-      CreatePssParams(&pssParams, SEC_OID_MD5, SEC_OID_MD5));
+      CreatePssParams(&pssParams, hashAlg, hashAlg));
   srcParams = SEC_ASN1EncodeItem(arena_.get(), nullptr, &pssParams,
                                  SEC_ASN1_GET(SECKEY_RSAPSSParamsTemplate));
   ASSERT_NE(nullptr, srcParams);
 
   SECItem *params = SEC_CreateSignatureAlgorithmParameters(
-      arena_.get(), nullptr, SEC_OID_PKCS1_RSA_PSS_SIGNATURE, hashAlg,
+      arena_.get(), nullptr, SEC_OID_PKCS1_RSA_PSS_SIGNATURE, SEC_OID_MD4,
       srcParams, privk_.get());
 
   EXPECT_EQ(nullptr, params);
@@ -338,7 +334,7 @@ TEST_P(SignParamsSourceTest, CreateRsaPssWithInvalidSaltLength) {
   SECItem *srcParams;
   SECKEYRSAPSSParams pssParams;
   ASSERT_NO_FATAL_FAILURE(
-      CreatePssParams(&pssParams, SEC_OID_SHA512, SEC_OID_SHA512, 100));
+      CreatePssParams(&pssParams, SEC_OID_SHA512, SEC_OID_SHA512, 110));
   srcParams = SEC_ASN1EncodeItem(arena_.get(), nullptr, &pssParams,
                                  SEC_ASN1_GET(SECKEY_RSAPSSParamsTemplate));
   ASSERT_NE(nullptr, srcParams);
@@ -355,17 +351,32 @@ TEST_P(SignParamsSourceTest, CreateRsaPssWithHashMismatch) {
 
   SECItem *srcParams;
   SECKEYRSAPSSParams pssParams;
+  if ((hashAlg ==  SEC_OID_UNKNOWN) || (hashAlg == SEC_OID_SHA512)) {
+    hashAlg = SEC_OID_SHA1;
+  }
   ASSERT_NO_FATAL_FAILURE(
-      CreatePssParams(&pssParams, SEC_OID_SHA256, SEC_OID_SHA512));
+      CreatePssParams(&pssParams, hashAlg, SEC_OID_SHA512));
   srcParams = SEC_ASN1EncodeItem(arena_.get(), nullptr, &pssParams,
                                  SEC_ASN1_GET(SECKEY_RSAPSSParamsTemplate));
   ASSERT_NE(nullptr, srcParams);
 
   SECItem *params = SEC_CreateSignatureAlgorithmParameters(
-      arena_.get(), nullptr, SEC_OID_PKCS1_RSA_PSS_SIGNATURE, hashAlg,
+      arena_.get(), nullptr, SEC_OID_PKCS1_RSA_PSS_SIGNATURE, SEC_OID_UNKNOWN,
       srcParams, privk_.get());
 
-  EXPECT_EQ(nullptr, params);
+  EXPECT_NE(nullptr, params);
+
+  PORT_Memset(&pssParams, 0, sizeof(pssParams));
+  SECStatus rv =
+      SEC_QuickDERDecodeItem(arena_.get(), &pssParams,
+                             SEC_ASN1_GET(SECKEY_RSAPSSParamsTemplate), params);
+  ASSERT_EQ(SECSuccess, rv);
+  ASSERT_NO_FATAL_FAILURE(CheckHashAlg(&pssParams, hashAlg));
+  ASSERT_NO_FATAL_FAILURE(CheckMaskAlg(&pssParams, hashAlg));
+  ASSERT_NO_FATAL_FAILURE(CheckSaltLength(&pssParams, hashAlg));
+
+  // The default trailer field (1) must be omitted
+  EXPECT_EQ(nullptr, pssParams.trailerField.data);
 }
 
 INSTANTIATE_TEST_SUITE_P(
