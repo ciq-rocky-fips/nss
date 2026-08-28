@@ -977,6 +977,18 @@ ssl_policy_pkix_ocsp()
   #verbose="-v"
   html_head "Check that OCSP doesn't break if we disable sha1 $NORM_EXT - server $SERVER_MODE/client $CLIENT_MODE"
 
+  # if we are running on a build machine that can't tolerate external
+  # references don't run.
+  vfyserv -o wrong.host.badssl.com -d ${P_R_SERVERDIR} > ${P_R_SERVERDIR}/vfy2.out 2>&1
+  RET=$? ; cat "${P_R_SERVERDIR}/vfy2.out" 
+  # 5961 reset by peer
+  grep 5961 ${P_R_SERVERDIR}/vfy2.out
+  GRET=$?  ; echo "OCSP: RET=$RET GRET=$GRET"
+  if [ $RET -ne 0 -o $GRET -eq 0  ]; then
+      echo "$SCRIPTNAME: skipping Check that OCSP doesn't break if we disable sha1 $NORM_EXT - server $SERVER_MODE/client $CLIENT_MODE - can't reach external servers"
+      return 0
+  fi
+
   PKIX_SAVE=${NSS_DISABLE_LIBPKIX_VERIFY-"unset"}
   unset NSS_DISABLE_LIBPKIX_VERIFY
 
