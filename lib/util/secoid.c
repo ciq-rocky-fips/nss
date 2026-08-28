@@ -642,10 +642,10 @@ CONST_OID curve25519[] = { 0x2B, 0x06, 0x01, 0x04, 0x01, 0xDA, 0x47, 0x0F, 0x01 
         locations.
 */
 
-CONST_OID ed25519PublicKey[] = { 0x2B, 0x65, 0x70 };
-CONST_OID ed25519Signature[] = { 0x2B, 0x65, 0x70 };
-
 /*https://www.rfc-editor.org/rfc/rfc8410#section-3*/
+/* 1.3.101.112 */
+CONST_OID ed25519[] = { 0x2B, 0x65, 0x70 };
+/* 1.3.101.110 */
 CONST_OID x25519PublicKey[] = { 0x2b, 0x65, 0x6e };
 
 /*
@@ -1871,11 +1871,14 @@ const static SECOidData oids[SEC_OID_TOTAL] = {
     ODE(SEC_OID_XYBER768D00,
         "X25519+Kyber768 key exchange", CKM_INVALID_MECHANISM, INVALID_CERT_EXTENSION),
 
-    OD(ed25519Signature, SEC_OID_ED25519_SIGNATURE, "X9.62 EDDSA signature", CKM_EDDSA,
-       INVALID_CERT_EXTENSION),
+    /* SEC_OID_ED25519_PUBLIC_KEY and SEC_OID_ED25519_SIGNATURE have the same
+     * values, so we should only have one entry in the table, We can't
+     * shift the values of the other entries, so just leav a dead spot here */
+    ODE(SEC_OID_RESERVED_OLD_EDSIG, "Reserved", CKM_INVALID_MECHANISM,
+        INVALID_CERT_EXTENSION),
 
-    OD(ed25519PublicKey, SEC_OID_ED25519_PUBLIC_KEY,
-       "X9.62 elliptic edwards curve public key", CKM_EC_EDWARDS_KEY_PAIR_GEN, INVALID_CERT_EXTENSION),
+    OD(ed25519, SEC_OID_ED25519,
+       "X9.62 Elliptic Edwards Curve 25519", CKM_EDDSA, INVALID_CERT_EXTENSION),
 
     OD(dhSinglePassstdDHsha1kdfscheme, SEC_OID_DHSINGLEPASS_STDDH_SHA1KDF_SCHEME,
        "Eliptic Curve Diffie-Hellman Single Pass Standard with SHA1 KDF", CKM_ECDH1_DERIVE,

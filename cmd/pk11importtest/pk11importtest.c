@@ -193,6 +193,8 @@ static const char *const usageInfo[] = {
     " -h                    skip dh test",
     " -e                    skip ec test",
     " -K                    skip mk-kem test",
+    " -w                    skip ed test",
+    " -g                    skip ec montgomery test",
 };
 static int nUsageInfo = sizeof(usageInfo) / sizeof(char *);
 
@@ -218,6 +220,8 @@ enum {
     opt_NoDH,
     opt_NoEC,
     opt_NoMLKEM,
+    opt_NoED,
+    opt_NoECMont,
 };
 
 static secuCommandFlag options[] = {
@@ -232,6 +236,8 @@ static secuCommandFlag options[] = {
     { /* opt_NoDH             */ 'h', PR_FALSE, 0, PR_FALSE },
     { /* opt_NoEC             */ 'e', PR_FALSE, 0, PR_FALSE },
     { /* opt_NoMLKEM          */ 'K', PR_FALSE, 0, PR_FALSE },
+    { /* opt_NoED             */ 'w', PR_FALSE, 0, PR_FALSE },
+    { /* opt_NoECMont         */ 'g', PR_FALSE, 0, PR_FALSE },
 };
 
 int
@@ -248,6 +254,8 @@ main(int argc, char **argv)
     PRBool doDH = PR_FALSE; /* NSS currently can't export wrapped DH keys */
     PRBool doEC = PR_TRUE;
     PRBool doMLKEM = PR_TRUE;
+    PRBool doED = PR_TRUE;
+    PRBool doECMont = PR_TRUE;
     PRBool noPub = PR_FALSE;
     PQGParams *pqgParams = NULL;
     int keySize;
@@ -408,6 +416,51 @@ main(int argc, char **argv)
                                               noPub, &paramSet, &pwArgs);
         if (rv != SECSuccess) {
             fprintf(stderr, "MLKEM Import Failed!\n");
+            failed = PR_TRUE;
+        }
+    }
+
+    if (doED) {
+        SECKEYECParams ecParams;
+        SECOidData *curve = SECOID_FindOIDByTag(SEC_OID_ED25519);
+        ecParams.data = PORT_Alloc(curve->oid.len + 2);
+        if (ecParams.data == NULL) {
+            rv = SECFailure;
+            goto ed_failed;
+        }
+        ecParams.data[0] = SEC_ASN1_OBJECT_ID;
+        ecParams.data[1] = (unsigned char)curve->oid.len;
+        PORT_Memcpy(&ecParams.data[2], curve->oid.data, curve->oid.len);
+        ecParams.len = curve->oid.len + 2;
+        rv = handleEncryptedPrivateImportTest(progName, slot, "EDDSA",
+                                              CKM_EC_EDWARDS_KEY_PAIR_GEN,
+                                              noPub, &ecParams, &pwArgs);
+        PORT_Free(ecParams.data);
+    ed_failed:
+        if (rv != SECSuccess) {
+            fprintf(stderr, "EDDSA Import Failed!\n");
+            failed = PR_TRUE;
+        }
+    }
+    if (doECMont) {
+        SECKEYECParams ecParams;
+        SECOidData *curve = SECOID_FindOIDByTag(SEC_OID_X25519);
+        ecParams.data = PORT_Alloc(curve->oid.len + 2);
+        if (ecParams.data == NULL) {
+            rv = SECFailure;
+            goto ecmont_failed;
+        }
+        ecParams.data[0] = SEC_ASN1_OBJECT_ID;
+        ecParams.data[1] = (unsigned char)curve->oid.len;
+        PORT_Memcpy(&ecParams.data[2], curve->oid.data, curve->oid.len);
+        ecParams.len = curve->oid.len + 2;
+        rv = handleEncryptedPrivateImportTest(progName, slot, "EC Mont",
+                                              CKM_EC_MONTGOMERY_KEY_PAIR_GEN,
+                                              noPub, &ecParams, &pwArgs);
+        PORT_Free(ecParams.data);
+    ecmont_failed:
+        if (rv != SECSuccess) {
+            fprintf(stderr, "EC Montgomery Import Failed!\n");
             failed = PR_TRUE;
         }
     }

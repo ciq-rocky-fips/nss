@@ -1644,6 +1644,8 @@ stfk_CopyTokenPrivateKey(SFTKObject *destObject, SFTKTokenObject *src_to)
                                            dhPrivKeyAttrsCount);
             break;
         case CKK_EC:
+        case CKK_EC_EDWARDS:
+        case CKK_EC_MONTGOMERY:
             crv = stfk_CopyTokenAttributes(destObject, src_to, ecPrivKeyAttrs,
                                            ecPrivKeyAttrsCount);
             break;
@@ -1708,6 +1710,8 @@ stfk_CopyTokenPublicKey(SFTKObject *destObject, SFTKTokenObject *src_to)
                                            dhPubKeyAttrsCount);
             break;
         case CKK_EC:
+        case CKK_EC_EDWARDS:
+        case CKK_EC_MONTGOMERY:
             crv = stfk_CopyTokenAttributes(destObject, src_to, ecPubKeyAttrs,
                                            ecPubKeyAttrsCount);
             break;

@@ -6467,8 +6467,6 @@ NSC_GenerateKeyPair(CK_SESSION_HANDLE hSession,
             seed.len = sizeof(seedData);
             rv = RNG_GenerateGlobalRandomBytes(seed.data, seed.len);
             if (rv != SECSuccess) {
-                fprintf(stderr, "Generate bytes failed nbytes=%d err=%d\n",
-                        seed.len, PORT_GetError());
                 crv = sftk_MapCryptError(PORT_GetError());
                 goto kyber_done;
             }
@@ -6484,8 +6482,6 @@ NSC_GenerateKeyPair(CK_SESSION_HANDLE hSession,
             }
             rv = Kyber_NewKey(kyberParams, &seed, &privKey, &pubKey);
             if (rv != SECSuccess) {
-                fprintf(stderr, "Generate Kyber_NewKey failed nbytes=%d err=%d\n",
-                        seed.len, PORT_GetError());
                 crv = sftk_MapCryptError(PORT_GetError());
                 goto kyber_done;
             }
@@ -6904,6 +6900,7 @@ sftk_PackagePrivateKey(SFTKObject *key, CK_RV *crvp)
             algorithm = SEC_OID_ANSIX9_DSA_SIGNATURE;
             break;
         case NSSLOWKEYECKey:
+            algorithm = SEC_OID_ANSIX962_EC_PUBLIC_KEY;
             prepare_low_ec_priv_key_for_asn1(lk);
             /* Public value is encoded as a bit string so adjust length
              * to be in bits before ASN encoding and readjust
@@ -6928,8 +6925,26 @@ sftk_PackagePrivateKey(SFTKObject *key, CK_RV *crvp)
 #endif
 
             param = SECITEM_DupItem(&lk->u.ec.ecParams.DEREncoding);
-
-            algorithm = SEC_OID_ANSIX962_EC_PUBLIC_KEY;
+            break;
+        /* X25519, ED25519, X448, and ED448 encode the private key
+         * as just and int. The public key and Curve come from the
+         * generaly key structure */
+        case NSSLOWKEYECEdwardsKey:
+            algorithm = SEC_OID_ED25519;
+            goto ec_continue;
+        case NSSLOWKEYECMontgomeryKey:
+            algorithm = SEC_OID_X25519;
+        ec_continue:
+            prepare_low_ec_priv_key_for_asn1(lk);
+            /* if we have a public key, copy it to pki public key */
+            if (lk->u.ec.publicValue.len) {
+                pki->publicKey = lk->u.ec.publicValue;
+                pki->publicKey.len <<= 3;
+            }
+            dummy = SEC_ASN1EncodeItem(arena, &pki->privateKey,
+                                       &lk->u.ec.privateValue,
+                                       SEC_ASN1_GET(SEC_OctetStringTemplate));
+            param = NULL;
             break;
         case NSSLOWKEYMLKEMKey: {
             SECItem seed = { siBuffer, NULL, 0 };
@@ -7260,6 +7275,8 @@ sftk_unwrapPrivateKey(SFTKObject *key, SECItem *bpki)
     NSSLOWKEYPrivateKeyInfo *pki = NULL;
     CK_RV crv = CKR_KEY_TYPE_INCONSISTENT;
     CK_ULONG paramSet = 0;
+    const SECOidData *oidData = NULL;
+    SECOidTag pkiAlg = SEC_OID_UNKNOWN;
 
     arena = PORT_NewArena(2048);
     if (!arena) {
@@ -7285,7 +7302,8 @@ sftk_unwrapPrivateKey(SFTKObject *key, SECItem *bpki)
     }
     lpk->arena = arena;
 
-    switch (SECOID_GetAlgorithmTag(&pki->algorithm)) {
+    pkiAlg = SECOID_GetAlgorithmTag(&pki->algorithm);
+    switch (pkiAlg) {
         case SEC_OID_PKCS1_RSA_ENCRYPTION:
         case SEC_OID_PKCS1_RSA_PSS_SIGNATURE:
             keyTemplate = nsslowkey_RSAPrivateKeyTemplate;
@@ -7310,6 +7328,42 @@ sftk_unwrapPrivateKey(SFTKObject *key, SECItem *bpki)
             lpk->keyType = NSSLOWKEYECKey;
             prepare_low_ec_priv_key_for_asn1(lpk);
             prepare_low_ecparams_for_asn1(&lpk->u.ec.ecParams);
+            break;
+        case SEC_OID_X25519:
+            lpk->keyType = NSSLOWKEYECMontgomeryKey;
+            goto ecx_continue;
+        case SEC_OID_ED25519:
+            lpk->keyType = NSSLOWKEYECEdwardsKey;
+        ecx_continue:
+            /* we decode the whole key here rather than do the normal
+             * later decode step */
+            keyTemplate = NULL;
+            paramTemplate = NULL;
+            paramDest = NULL;
+            oidData = SECOID_FindOIDByTag(pkiAlg);
+            if (oidData == NULL) {
+                goto loser;
+            }
+            /* CURVE is provided by the tag, not encoded in the parameters
+             * for the x25519, x448, ed25519 and ed448 keys */
+            if (SEC_ASN1EncodeItem(arena, &(lpk->u.ec.ecParams.DEREncoding),
+                                   &oidData->oid,
+                                   SEC_ASN1_GET(SEC_ObjectIDTemplate)) == NULL) {
+                goto loser;
+            }
+            prepare_low_ec_priv_key_for_asn1(lpk);
+            /* private key is a simple octet string, just decode it now */
+            rv = SEC_QuickDERDecodeItem(arena, &(lpk->u.ec.privateValue),
+                                        SEC_ASN1_GET(SEC_OctetStringTemplate),
+                                        &(pki->privateKey));
+            if (rv != SECSuccess) {
+                goto loser;
+            }
+            if (pki->publicKey.len) {
+                lpk->u.ec.publicValue = pki->publicKey;
+                /* convert length in bits to length in bytes */
+                lpk->u.ec.publicValue.len >>= 3;
+            }
             break;
         case SEC_OID_ML_KEM_768:
             paramSet = CKP_ML_KEM_768;
@@ -7346,7 +7400,8 @@ sftk_unwrapPrivateKey(SFTKObject *key, SECItem *bpki)
                     break;
                 default:
                     keyTemplate = NULL;
-                    break;
+                    PORT_SetError(SEC_ERROR_BAD_KEY);
+                    goto loser;
             }
 
             paramTemplate = NULL;
@@ -7357,15 +7412,15 @@ sftk_unwrapPrivateKey(SFTKObject *key, SECItem *bpki)
             keyTemplate = NULL;
             paramTemplate = NULL;
             paramDest = NULL;
-            break;
-    }
-
-    if (!keyTemplate) {
-        goto loser;
+            PORT_SetError(SEC_ERROR_BAD_KEY);
+            goto loser;
     }
 
     /* decode the private key and any algorithm parameters */
-    rv = SEC_QuickDERDecodeItem(arena, lpk, keyTemplate, &pki->privateKey);
+    rv = SECSuccess;
+    if (keyTemplate) {
+        rv = SEC_QuickDERDecodeItem(arena, lpk, keyTemplate, &pki->privateKey);
+    }
 
     if (lpk->keyType == NSSLOWKEYECKey) {
         /* convert length in bits to length in bytes */
@@ -7562,9 +7617,15 @@ sftk_unwrapPrivateKey(SFTKObject *key, SECItem *bpki)
             keyType = CKK_DH;
             break;
 #endif
-        /* what about fortezza??? */
+        case NSSLOWKEYECEdwardsKey:
+            keyType = CKK_EC_EDWARDS;
+            goto ec_import_continue;
+        case NSSLOWKEYECMontgomeryKey:
+            keyType = CKK_EC_MONTGOMERY;
+            goto ec_import_continue;
         case NSSLOWKEYECKey:
             keyType = CKK_EC;
+        ec_import_continue:
             /* if we weren't passed the CKA_NSS_DB, get it
              * from the public key */
             if (!sftk_hasAttribute(key, CKA_NSS_DB)) {
