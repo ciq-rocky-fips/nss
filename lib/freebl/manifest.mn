@@ -87,6 +87,7 @@ EXPORTS = \
 	shsign.h \
 	ecl-exp.h \
 	$(LOWHASH_EXPORTS) \
+	$(ML_DSA_EXPORTS) \
 	$(NULL)
 
 PRIVATE_EXPORTS = \
@@ -113,6 +114,8 @@ ECL_SRCS = ecp_25519.c ecp_secp256r1.c ecp_secp384r1.c ecp_secp521r1.c
 SHA_SRCS = sha_fast.c
 MPCPU_SRCS = mpcpucache.c
 VERIFIED_SRCS = $(NULL)
+ML_DSA_SRCS = $(NULL)
+
 
 CSRCS = \
 	freeblver.c \
@@ -162,6 +165,7 @@ CSRCS = \
 	$(MPCPU_SRCS) \
 	$(ECL_SRCS) \
 	$(VERIFIED_SRCS) \
+	$(ML_DSA_SRCS) \
 	$(STUBS_SRCS) \
 	$(LOWHASH_SRCS) \
 	$(EXTRA_SRCS) \

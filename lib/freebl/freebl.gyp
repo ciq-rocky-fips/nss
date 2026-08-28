@@ -524,6 +524,7 @@
     'include_dirs': [
       'mpi',
       'ecl',
+      'leancrypto',
       'verified',
       'verified/internal',
       'verified/karamel/include',

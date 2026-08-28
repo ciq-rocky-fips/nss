@@ -605,6 +605,22 @@ VERIFIED_SRCS += Hacl_Hash_SHA3.c Hacl_P256.c Hacl_P384.c Hacl_P521.c libcrux_sh
 VERIFIED_SRCS += Hacl_Ed25519.c
 VERIFIED_SRCS += Hacl_Curve25519_51.c
 
+INCLUDES += -Ileancrypto
+ML_DSA_SRCS += ml_dsa_44_ntt.c
+ML_DSA_SRCS += ml_dsa_44_poly.c
+ML_DSA_SRCS += ml_dsa_44_rounding.c
+ML_DSA_SRCS += ml_dsa_44_signature_c.c
+ML_DSA_SRCS += ml_dsa_65_ntt.c
+ML_DSA_SRCS += ml_dsa_65_poly.c
+ML_DSA_SRCS += ml_dsa_65_rounding.c
+ML_DSA_SRCS += ml_dsa_65_signature_c.c
+ML_DSA_SRCS += ml_dsa_87_ntt.c
+ML_DSA_SRCS += ml_dsa_87_poly.c
+ML_DSA_SRCS += ml_dsa_87_rounding.c
+ML_DSA_SRCS += ml_dsa_87_signature_c.c
+ML_DSA_SRCS += signature_domain_separation.c
+ML_DSA_SRCS += mldsa_zetas.c
+
 # Bug 1918767 / Bug 1918711 - by setting KRML_MUSTINLINE=inline here, we
 # avoid it being defined to `inline __forceinline` (for msvc) or `inline
 # __attribute__((always_inline))` (for gcc/clang) in
@@ -642,8 +658,8 @@ rijndael_tables:
 	         $(DEFINES) $(INCLUDES) $(OBJDIR)/libfreebl.a
 	$(OBJDIR)/make_rijndael_tab
 
-vpath %.h mpi ecl verified deprecated
-vpath %.c mpi ecl verified deprecated
+vpath %.h mpi ecl verified oqs leancrypto deprecated
+vpath %.c mpi ecl verified oqs leancrypto deprecated
 vpath %.S mpi ecl
 vpath %.s mpi ecl
 vpath %.asm mpi ecl
