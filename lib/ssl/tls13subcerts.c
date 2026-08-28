@@ -652,7 +652,13 @@ tls13_MakeDcSpki(const SECKEYPublicKey *dcPub, SSLSignatureScheme dcCertVerifyAl
             }
             return SECKEY_CreateSubjectPublicKeyInfo(dcPub);
         }
-
+        case mldsaKey:
+            if (ssl_SignatureSchemeFromPublicKeyOid(dcPub->u.mldsa.paramSet)
+                    != dcCertVerifyAlg) {
+                PORT_SetError(SSL_ERROR_INCORRECT_SIGNATURE_ALGORITHM);
+                return NULL;
+            }
+            return SECKEY_CreateSubjectPublicKeyInfo(dcPub);
         default:
             break;
     }
