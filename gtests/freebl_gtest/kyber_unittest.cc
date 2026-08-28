@@ -394,6 +394,7 @@ INSTANTIATE_TEST_SUITE_P(SelfTests, KyberSelfTest,
                                            params_kyber768_round3));
 #endif
 
+#ifndef NSS_DISABLE_KYBER
 TEST(Kyber768Test, KnownAnswersTest) {
   ScopedSECItem privateKey(
       SECITEM_AllocItem(nullptr, nullptr, MAX_ML_KEM_PRIVATE_KEY_LENGTH));
@@ -446,6 +447,7 @@ TEST(Kyber768Test, KnownAnswersTest) {
     EXPECT_EQ(0, memcmp(secret->data, secret2->data, secret2->len));
   }
 }
+#endif
 
 TEST(MlKemKeyGen, KnownAnswersTest) {
   ScopedSECItem privateKey(
