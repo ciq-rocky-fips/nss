@@ -514,7 +514,7 @@ tools_p12_import_old_files()
   echo "pk12util -I -l corrupted_cert_bag.p12 -W start"
   ${BINDIR}/pk12util -I -l ${TOOLSDIR}/data/corrupted_cert_bag.p12 -W start 2>&1
   ret=$?
-  html_msg $ret 17 "Listing a PKCS#12 file with corrupted certificate bag"
+  html_msg $ret 19 "Listing a PKCS#12 file with corrupted certificate bag"
   check_tmpfile
 
 }
