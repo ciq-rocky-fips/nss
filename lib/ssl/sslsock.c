@@ -168,12 +168,12 @@ const sslNamedGroupDef ssl_named_groups[] = {
     /* Note that 256 for 25519 and x25519mlkem786 is a lie, but we only use it
      * for checking bit security and expect 256 bits there (not 255). */
     HYGROUP(mlkem768, x25519, 256, MLKEM768, X25519, PR_TRUE),
+    HYGROUP(secp256r1, mlkem768, 256, SECP256R1, MLKEM768, PR_TRUE),
+    HYGROUP(secp384r1, mlkem1024, 256, SECP384R1, MLKEM1024, PR_TRUE),
     { ssl_grp_ec_curve25519, 256, ssl_kea_ecdh, SEC_OID_CURVE25519, PR_TRUE },
     ECGROUP(secp256r1, 256, SECP256R1, PR_TRUE),
     ECGROUP(secp384r1, 384, SECP384R1, PR_TRUE),
     ECGROUP(secp521r1, 521, SECP521R1, PR_TRUE),
-    HYGROUP(secp256r1, mlkem768, 256, SECP256R1, MLKEM768, PR_TRUE),
-    HYGROUP(secp384r1, mlkem1024, 256, SECP384R1, MLKEM1024, PR_TRUE),
     { ssl_grp_kem_xyber768d00, 256, ssl_kea_ecdh_hybrid, SEC_OID_XYBER768D00, PR_FALSE },
     FFGROUP(2048),
     FFGROUP(3072),
