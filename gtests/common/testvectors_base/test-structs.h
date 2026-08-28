@@ -105,6 +105,23 @@ typedef struct EddsaTestVectorStr {
   bool valid;
 } EddsaTestVector;
 
+typedef struct MlDsaVerifyTestVectorStr {
+  uint32_t id;
+  std::vector<uint8_t> sig;
+  std::vector<uint8_t> public_key;
+  std::vector<uint8_t> ctx;
+  std::vector<uint8_t> msg;
+  bool valid;
+} MlDsaVerifyTestVector;
+
+typedef struct MlDsaKeyGenTestVectorStr {
+  uint32_t id;
+  CK_ML_DSA_PARAMETER_SET_TYPE param_set;
+  std::vector<uint8_t> seed;
+  std::vector<uint8_t> public_key;
+  std::vector<uint8_t> private_key;
+} MlDsaKeyGenTestVector;
+
 typedef struct EcdhTestVectorStr {
   uint64_t id;
   std::vector<uint8_t> private_key;

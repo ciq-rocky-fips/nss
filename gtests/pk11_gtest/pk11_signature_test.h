@@ -52,6 +52,10 @@ class Pk11SignatureTest : public ::testing::Test {
   ScopedSECKEYPublicKey ImportPublicKey(const DataBuffer& spki);
 
   bool ComputeHash(const DataBuffer& data, DataBuffer* hash) {
+    if (hash_oid_ == SEC_OID_UNKNOWN) { /* the NULL hash */
+      hash->Assign(data);
+      return true;
+    }
     hash->Allocate(static_cast<size_t>(HASH_ResultLenByOidTag(hash_oid_)));
     SECStatus rv =
         PK11_HashBuf(hash_oid_, hash->data(), data.data(), data.len());
