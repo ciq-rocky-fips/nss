@@ -219,6 +219,7 @@ enum {
     opt_NoDSA,
     opt_NoDH,
     opt_NoEC,
+    opt_NoMLDSA,
     opt_NoMLKEM,
     opt_NoED,
     opt_NoECMont,
@@ -235,6 +236,7 @@ static secuCommandFlag options[] = {
     { /* opt_NoDSA            */ 'D', PR_FALSE, 0, PR_FALSE },
     { /* opt_NoDH             */ 'h', PR_FALSE, 0, PR_FALSE },
     { /* opt_NoEC             */ 'e', PR_FALSE, 0, PR_FALSE },
+    { /* opt_NoMLDSA          */ 'm', PR_FALSE, 0, PR_FALSE },
     { /* opt_NoMLKEM          */ 'K', PR_FALSE, 0, PR_FALSE },
     { /* opt_NoED             */ 'w', PR_FALSE, 0, PR_FALSE },
     { /* opt_NoECMont         */ 'g', PR_FALSE, 0, PR_FALSE },
@@ -253,6 +255,8 @@ main(int argc, char **argv)
     PRBool doDSA = PR_TRUE;
     PRBool doDH = PR_FALSE; /* NSS currently can't export wrapped DH keys */
     PRBool doEC = PR_TRUE;
+    PRBool doMLDSA = PR_FALSE;
+    CK_ML_DSA_PARAMETER_SET_TYPE mldsaParamSet = CKP_ML_DSA_44;
     PRBool doMLKEM = PR_TRUE;
     PRBool doED = PR_TRUE;
     PRBool doECMont = PR_TRUE;
@@ -312,6 +316,9 @@ main(int argc, char **argv)
     }
     if (args.options[opt_NoEC].activated) {
         doEC = PR_FALSE;
+    }
+    if (args.options[opt_NoMLDSA].activated) {
+        doMLDSA = PR_FALSE;
     }
     if (args.options[opt_NoMLKEM].activated) {
         doMLKEM = PR_FALSE;
@@ -408,6 +415,16 @@ main(int argc, char **argv)
         }
     }
 
+    if (doMLDSA) {
+        rv = handleEncryptedPrivateImportTest(progName, slot, "MLDSA",
+                                              CKM_ML_DSA_KEY_PAIR_GEN,
+                                              noPub, &mldsaParamSet, &pwArgs);
+        if (rv != SECSuccess) {
+            fprintf(stderr, "MLDSA Import Failed!\n");
+            failed = PR_TRUE;
+        }
+    }
+    
     if (doMLKEM) {
         CK_ML_KEM_PARAMETER_SET_TYPE paramSet = CKP_ML_KEM_768;
 
