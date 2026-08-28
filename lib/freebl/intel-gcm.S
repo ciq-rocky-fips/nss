@@ -4,6 +4,30 @@
 # //mozilla.org/MPL/2.0/. 
 ################################################################################
 # Copyright(c) 2012, Intel Corp.
+/* none of the functions are used as a target of an indirect call, so
+ * it's safe to set IBT. If we ever need to put these at the end of a
+ * function table pointer, then we should and ENDBR64 instructions as the
+ * first instruction of each function. */
+# reference names are in /usr/include/elf.h
+        .section        .note.gnu.property,"a"
+        .align 8
+        .long    1f - 0f # note_gnu_name_end - note_gnu_name
+        .long    4f - 1f # note_gnu_descriptor_end -note_gnu_descriptor
+        .long    5 # GNU_PROPERTY_TYPE_0
+0: #note_gnu_name
+        .string  "GNU"
+1: #note_gnu_end
+   #note_gnu_descriptor
+        .align 8
+        .long    0xc0000002 # GNU_PROPERTY_X86_FEATURE_1_AND
+        .long    3f - 2f #note_gnu_flags_end - note_gnu_flags
+2: #note_gnu_flags
+        .long    0x3    # GNU_PROPERTY_X86_FEATURE_1_IBT = 1 |
+                        # GNU_PROPERTY_X86_FEATURE_1_SHSTK = 2
+3: #note_gnu_flags_end
+        .align 8
+4: #note_gnu_descriptor_end
+        .text
 
 #if defined(DARWIN)
 # define cdecl(s) _##s
