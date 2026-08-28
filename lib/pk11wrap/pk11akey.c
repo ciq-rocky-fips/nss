@@ -2145,7 +2145,7 @@ SECKEY_SetPublicValue(SECKEYPrivateKey *privKey, const SECItem *publicValue)
                 PORT_SetError(SEC_ERROR_BAD_KEY);
                 break;
             }
-            pubKey.u.mldsa.paramSet = SECKEY_GetMLDSAPkcs11ParamSetByOidTag(paramSet);
+            pubKey.u.mldsa.paramSet = SECKEY_GetMLDSAOidTagByPkcs11ParamSet(paramSet);
             if (pubKey.u.mldsa.paramSet == SEC_OID_UNKNOWN) {
                 PORT_SetError(SEC_ERROR_BAD_KEY);
                 break;

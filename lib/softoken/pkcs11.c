@@ -1570,6 +1570,11 @@ sftk_handlePrivateKeyObject(SFTKSession *session, SFTKObject *object, CK_KEY_TYP
                                 crv = CKR_ATTRIBUTE_VALUE_INVALID;
                             }
                         }
+                        if (crv == CKR_OK && !sftk_hasAttribute(object, CKA_NSS_DB)) {
+                            crv = sftk_forceAttribute(object, CKA_NSS_DB,
+                                                      pubKey.keyVal,
+                                                      pubKey.keyValLen);
+                        }
                         PORT_SafeZero(&privKey, sizeof(privKey));
                         PORT_SafeZero(&pubKey, sizeof(pubKey));
                     }
