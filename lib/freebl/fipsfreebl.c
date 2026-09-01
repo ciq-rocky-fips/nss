@@ -1797,6 +1797,243 @@ loser:
 }
 
 static SECStatus
+freebl_ML_KEM_Test(KyberParams param_set,
+                   const unsigned char *seed, size_t seed_len,
+                   const unsigned char *enc_seed, size_t enc_seed_len,
+                   const unsigned char *pub_key, size_t pub_key_len,
+                   const unsigned char *priv_key, size_t priv_key_len,
+                   const unsigned char *cipher_text, size_t cipher_text_len,
+                   const unsigned char *key, size_t key_len)
+{
+    SECStatus rv;
+    unsigned char cipher_text_buf[MAX_ML_KEM_CIPHER_LENGTH];
+    unsigned char priv_key_buf[MAX_ML_KEM_PRIVATE_KEY_LENGTH];
+    unsigned char pub_key_buf[MAX_ML_KEM_PUBLIC_KEY_LENGTH];
+    unsigned char key_buf[KYBER_SHARED_SECRET_BYTES];
+    unsigned char key2_buf[KYBER_SHARED_SECRET_BYTES];
+    SECItem ct_item = { siBuffer, cipher_text_buf, cipher_text_len };
+    SECItem priv_key_item = { siBuffer, priv_key_buf, priv_key_len };
+    SECItem pub_key_item = { siBuffer, pub_key_buf, pub_key_len };
+    SECItem key_item = { siBuffer, key_buf, sizeof(key_buf) };
+    SECItem key2_item = { siBuffer, key2_buf, sizeof(key2_buf) };
+    SECItem seed_item = { siBuffer, (unsigned char *)seed, seed_len };
+    SECItem eseed_item = { siBuffer, (unsigned char *)enc_seed, enc_seed_len };
+
+    PORT_Assert(pub_key_len <= sizeof(pub_key_buf));
+    PORT_Assert(priv_key_len <= sizeof(priv_key_buf));
+    PORT_Assert(cipher_text_len <= sizeof(cipher_text_buf));
+
+    rv = Kyber_NewKey(param_set, &seed_item, &priv_key_item, &pub_key_item);
+    if (rv != SECSuccess) {
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        return rv;
+    }
+
+    if ((priv_key_item.len != priv_key_len) ||
+        (pub_key_item.len != pub_key_len) ||
+        (PORT_Memcmp(priv_key_item.data, priv_key, priv_key_len) != 0) ||
+        (PORT_Memcmp(pub_key_item.data, pub_key, pub_key_len) != 0)) {
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        return SECFailure;
+    }
+
+    rv = Kyber_Encapsulate(param_set,  &eseed_item, &pub_key_item,
+                           &ct_item, &key_item);
+    if (rv != SECSuccess) {
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        return rv;
+    }
+
+    if ((ct_item.len != cipher_text_len) ||
+        (key_item.len != key_len) ||
+        (PORT_Memcmp(ct_item.data, cipher_text, cipher_text_len) != 0) ||
+        (PORT_Memcmp(key_item.data, key, key_len) != 0)) {
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        return SECFailure;
+    }
+
+    rv = Kyber_Decapsulate(param_set,  &priv_key_item, &ct_item, &key2_item);
+    if (rv != SECSuccess) {
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        return rv;
+    }
+    if (SECITEM_CompareItem(&key2_item, &key_item) != 0) {
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        return SECFailure;
+    }
+    return SECSuccess;
+}
+
+static SECStatus
+freebl_fips_ML_KEM_PowerUpSelfTest()
+{
+    SECStatus rv;
+
+#include "ml_kem_fips_vectors.h"
+    PORT_Assert(sizeof (ml_kem_key_seed) == KYBER_KEYPAIR_COIN_BYTES);
+    PORT_Assert(sizeof (ml_kem_enc_seed) == KYBER_SHARED_SECRET_BYTES);
+    PORT_Assert(sizeof (ml_kem768_pub_key) == KYBER768_PUBLIC_KEY_BYTES);
+    PORT_Assert(sizeof (ml_kem768_priv_key) == KYBER768_PRIVATE_KEY_BYTES);
+    PORT_Assert(sizeof (ml_kem768_cipher_text) == KYBER768_CIPHERTEXT_BYTES);
+    PORT_Assert(sizeof (ml_kem768_key) == KYBER_SHARED_SECRET_BYTES);
+    PORT_Assert(sizeof (ml_kem1024_pub_key) == MLKEM1024_PUBLIC_KEY_BYTES);
+    PORT_Assert(sizeof (ml_kem1024_priv_key) == MLKEM1024_PRIVATE_KEY_BYTES);
+    PORT_Assert(sizeof (ml_kem1024_cipher_text) == MLKEM1024_CIPHERTEXT_BYTES);
+    PORT_Assert(sizeof (ml_kem1024_key) == KYBER_SHARED_SECRET_BYTES);
+
+    rv = freebl_ML_KEM_Test(params_ml_kem768_test_mode,
+                            ml_kem_key_seed, KYBER_KEYPAIR_COIN_BYTES,
+                            ml_kem_enc_seed, KYBER_SHARED_SECRET_BYTES,
+                            ml_kem768_pub_key, KYBER768_PUBLIC_KEY_BYTES,
+                            ml_kem768_priv_key, KYBER768_PRIVATE_KEY_BYTES,
+                            ml_kem768_cipher_text, KYBER768_CIPHERTEXT_BYTES,
+                            ml_kem768_key, KYBER_SHARED_SECRET_BYTES);
+    if (rv != SECSuccess) {
+        return SECFailure;
+    }
+    rv = freebl_ML_KEM_Test(params_ml_kem1024_test_mode,
+                            ml_kem_key_seed, KYBER_KEYPAIR_COIN_BYTES,
+                            ml_kem_enc_seed, KYBER_SHARED_SECRET_BYTES,
+                            ml_kem1024_pub_key, MLKEM1024_PUBLIC_KEY_BYTES,
+                            ml_kem1024_priv_key, MLKEM1024_PRIVATE_KEY_BYTES,
+                            ml_kem1024_cipher_text, MLKEM1024_CIPHERTEXT_BYTES,
+                            ml_kem1024_key, KYBER_SHARED_SECRET_BYTES);
+    if (rv != SECSuccess) {
+        return SECFailure;
+    }
+
+    return SECSuccess;
+}
+
+static SECStatus
+freebl_ML_DSA_Test(CK_ML_DSA_PARAMETER_SET_TYPE param_set,
+                   const unsigned char *seed, size_t seed_len,
+                   const unsigned char *message, size_t message_len,
+                   const unsigned char *pub_key, size_t pub_key_len,
+                   const unsigned char *priv_key, size_t priv_key_len,
+                   const unsigned char *sig, size_t sig_len)
+{
+    SECStatus rv;
+    MLDSAPrivateKey mldsa_priv_key;
+    MLDSAPublicKey mldsa_pub_key;
+    SECItem seed_item={ siBuffer, (unsigned char *)seed, seed_len};
+    SECItem message_item={ siBuffer, (unsigned char *)message,  message_len};
+    unsigned char sig_buf[MAX_ML_DSA_SIGNATURE_LEN];
+    SECItem sig_item={siBuffer, sig_buf,  sizeof(sig_buf)};
+    MLDSAContext *ctx = NULL;
+
+    /* generate the public and private key from the seed */
+    rv = MLDSA_NewKey(param_set, &seed_item, &mldsa_priv_key, &mldsa_pub_key);
+    if (rv != SECSuccess) {
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        return rv;
+    }
+    /* verify that it was correct */
+    if ((mldsa_priv_key.keyValLen != priv_key_len) ||
+        (mldsa_pub_key.keyValLen != pub_key_len) ||
+        (mldsa_priv_key.seedLen != seed_len) ||
+        (PORT_Memcmp(mldsa_priv_key.keyVal, priv_key, priv_key_len) != 0) ||
+        (PORT_Memcmp(mldsa_priv_key.seed, seed, seed_len) != 0) ||
+        (PORT_Memcmp(mldsa_pub_key.keyVal, pub_key, pub_key_len) != 0)) {
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        return (SECFailure);
+    }
+
+    /* make a deterministic the signature and compare it to what was
+     * passed in */
+    rv = MLDSA_SignInit(&mldsa_priv_key, CKH_DETERMINISTIC_REQUIRED,
+                        NULL, &ctx);
+    if (rv != SECSuccess) {
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        return rv;
+    }
+    rv = MLDSA_SignUpdate(ctx, &message_item);
+    if (rv != SECSuccess) {
+        /* attempt to free the context */
+        MLDSA_SignFinal(ctx, &sig_item);
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        return rv;
+    }
+    rv = MLDSA_SignFinal(ctx, &sig_item);
+    if (rv != SECSuccess) {
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        return rv;
+    }
+    /* verify that it was correct */
+    if ((sig_item.len != sig_len) ||
+        (PORT_Memcmp(sig_item.data, sig, sig_len) != 0)) {
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        return (SECFailure);
+    }
+
+    /* now verify the signature with the public key */
+    rv = MLDSA_VerifyInit(&mldsa_pub_key, NULL, &ctx);
+    if (rv != SECSuccess) {
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        return rv;
+    }
+    rv = MLDSA_VerifyUpdate(ctx, &message_item);
+    if (rv != SECSuccess) {
+        /* attempt to free the context */
+        MLDSA_VerifyFinal(ctx, &sig_item);
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        return rv;
+    }
+    rv = MLDSA_VerifyFinal(ctx, &sig_item);
+    if (rv != SECSuccess) {
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        return rv;
+    }
+
+    return SECSuccess;
+}
+
+static SECStatus
+freebl_fips_ML_DSA_PowerUpSelfTest()
+{
+    SECStatus rv;
+
+#include "ml_dsa_fips_vectors.h"
+    PORT_Assert(sizeof (ml_dsa_seed) == ML_DSA_SEED_LEN);
+    PORT_Assert(sizeof (ml_dsa_44_pub_key) == ML_DSA_44_PUBLICKEY_LEN);
+    PORT_Assert(sizeof (ml_dsa_44_priv_key) == ML_DSA_44_PRIVATEKEY_LEN);
+    PORT_Assert(sizeof (ml_dsa_65_pub_key) == ML_DSA_65_PUBLICKEY_LEN);
+    PORT_Assert(sizeof (ml_dsa_65_priv_key) == ML_DSA_65_PRIVATEKEY_LEN);
+    PORT_Assert(sizeof (ml_dsa_87_pub_key) == ML_DSA_87_PUBLICKEY_LEN);
+    PORT_Assert(sizeof (ml_dsa_87_priv_key) == ML_DSA_87_PRIVATEKEY_LEN);
+    PORT_Assert(sizeof (ml_dsa_44_sig) == ML_DSA_44_SIGNATURE_LEN);
+    PORT_Assert(sizeof (ml_dsa_65_sig) == ML_DSA_65_SIGNATURE_LEN);
+    PORT_Assert(sizeof (ml_dsa_87_sig) == ML_DSA_87_SIGNATURE_LEN);
+
+    rv = freebl_ML_DSA_Test(CKP_ML_DSA_44, ml_dsa_seed, ML_DSA_SEED_LEN,
+                            ml_dsa_message, sizeof(ml_dsa_message),
+                            ml_dsa_44_pub_key, ML_DSA_44_PUBLICKEY_LEN,
+                            ml_dsa_44_priv_key, ML_DSA_44_PRIVATEKEY_LEN,
+                            ml_dsa_44_sig, ML_DSA_44_SIGNATURE_LEN);
+    if (rv != SECSuccess) {
+        return SECFailure;
+    }
+    rv = freebl_ML_DSA_Test(CKP_ML_DSA_65, ml_dsa_seed, ML_DSA_SEED_LEN,
+                            ml_dsa_message, sizeof(ml_dsa_message),
+                            ml_dsa_65_pub_key, ML_DSA_65_PUBLICKEY_LEN,
+                            ml_dsa_65_priv_key, ML_DSA_65_PRIVATEKEY_LEN,
+                            ml_dsa_65_sig, ML_DSA_65_SIGNATURE_LEN);
+    if (rv != SECSuccess) {
+        return SECFailure;
+    }
+    rv = freebl_ML_DSA_Test(CKP_ML_DSA_87, ml_dsa_seed, ML_DSA_SEED_LEN,
+                            ml_dsa_message, sizeof(ml_dsa_message),
+                            ml_dsa_87_pub_key, ML_DSA_87_PUBLICKEY_LEN,
+                            ml_dsa_87_priv_key, ML_DSA_87_PRIVATEKEY_LEN,
+                            ml_dsa_87_sig, ML_DSA_87_SIGNATURE_LEN);
+    if (rv != SECSuccess) {
+        return SECFailure;
+    }
+
+    return (SECSuccess);
+}
+
+static SECStatus
 freebl_fips_RNG_PowerUpSelfTest(void)
 {
     SECStatus rng_status = SECSuccess;
@@ -1908,6 +2145,18 @@ freebl_fipsPowerUpSelfTest(unsigned int tests)
 
         /* EC Power-Up SelfTest(s). */
         rv = freebl_fips_EC_PowerUpSelfTest();
+
+        if (rv != SECSuccess)
+            return rv;
+
+        /* ML_KEM Power-Up SelfTest(s). */
+        rv = freebl_fips_ML_KEM_PowerUpSelfTest();
+
+        if (rv != SECSuccess)
+            return rv;
+
+        /* ML_DSA Power-Up SelfTest(s). */
+        rv = freebl_fips_ML_DSA_PowerUpSelfTest();
 
         if (rv != SECSuccess)
             return rv;
