@@ -12,6 +12,7 @@
  */
 
 #include "internal/libcrux_core.h"
+#include "lc_memset_secure.h"
 
 /**
  Return 1 if `value` is not zero and 0 otherwise.
@@ -76,6 +77,8 @@ select_ct(Eurydice_slice lhs, Eurydice_slice rhs,
         out[i0] = outi;
     }
     memcpy(ret, out, (size_t)32U * sizeof(uint8_t));
+    /* Sanitize intermediate(s) */
+    lc_memset_secure(out, 0U, sizeof(out));
 }
 
 static KRML_NOINLINE void
@@ -95,6 +98,8 @@ libcrux_ml_kem_constant_time_ops_compare_ciphertexts_select_shared_secret_in_con
     uint8_t ret0[32U];
     select_shared_secret_in_constant_time(lhs_s, rhs_s, selector, ret0);
     memcpy(ret, ret0, (size_t)32U * sizeof(uint8_t));
+    /* Sanitize intermediate(s) */
+    lc_memset_secure(ret0, 0U, sizeof(ret0));
 }
 
 /**
@@ -442,6 +447,8 @@ libcrux_ml_kem_types_from_77_39(
     memcpy(copy_of_value, value, (size_t)3168U * sizeof(uint8_t));
     libcrux_ml_kem_types_MlKemPrivateKey_83 lit;
     memcpy(lit.value, copy_of_value, (size_t)3168U * sizeof(uint8_t));
+    /* Sanitize intermediate(s) */
+    lc_memset_secure(copy_of_value, 0U, sizeof(copy_of_value));
     return lit;
 }
 
@@ -497,6 +504,8 @@ libcrux_ml_kem_types_from_77_28(
     memcpy(copy_of_value, value, (size_t)2400U * sizeof(uint8_t));
     libcrux_ml_kem_types_MlKemPrivateKey_d9 lit;
     memcpy(lit.value, copy_of_value, (size_t)2400U * sizeof(uint8_t));
+    /* Sanitize intermediate(s) */
+    lc_memset_secure(copy_of_value, 0U, sizeof(copy_of_value));
     return lit;
 }
 
@@ -548,6 +557,8 @@ libcrux_ml_kem_types_from_fd_d0(
     memcpy(copy_of_value, value, (size_t)1184U * sizeof(uint8_t));
     libcrux_ml_kem_types_MlKemPublicKey_30 lit;
     memcpy(lit.value, copy_of_value, (size_t)1184U * sizeof(uint8_t));
+    /* Sanitize intermediate(s) */
+    lc_memset_secure(copy_of_value, 0U, sizeof(copy_of_value));
     return lit;
 }
 
@@ -604,6 +615,8 @@ libcrux_ml_kem_types_from_e0_80(
     memcpy(copy_of_value, value, (size_t)1088U * sizeof(uint8_t));
     libcrux_ml_kem_mlkem768_MlKem768Ciphertext lit;
     memcpy(lit.value, copy_of_value, (size_t)1088U * sizeof(uint8_t));
+    /* Sanitize intermediate(s) */
+    lc_memset_secure(copy_of_value, 0U, sizeof(copy_of_value));
     return lit;
 }
 
@@ -657,6 +670,8 @@ libcrux_ml_kem_utils_into_padded_array_15(Eurydice_slice slice,
             uu____0, (size_t)0U, Eurydice_slice_len(slice, uint8_t), uint8_t *),
         slice, uint8_t);
     memcpy(ret, out, (size_t)1120U * sizeof(uint8_t));
+    /* Sanitize intermediate(s) */
+    lc_memset_secure(out, 0U, sizeof(out));
 }
 
 /**
@@ -692,6 +707,8 @@ libcrux_ml_kem_types_from_fd_af(
     memcpy(copy_of_value, value, (size_t)1568U * sizeof(uint8_t));
     libcrux_ml_kem_types_MlKemPublicKey_64 lit;
     memcpy(lit.value, copy_of_value, (size_t)1568U * sizeof(uint8_t));
+    /* Sanitize intermediate(s) */
+    lc_memset_secure(copy_of_value, 0U, sizeof(copy_of_value));
     return lit;
 }
 
@@ -746,6 +763,8 @@ core_result_unwrap_26_b3(core_result_Result_fb self, uint8_t ret[32U])
         uint8_t f0[32U];
         memcpy(f0, self.val.case_Ok, (size_t)32U * sizeof(uint8_t));
         memcpy(ret, f0, (size_t)32U * sizeof(uint8_t));
+        /* Sanitize intermediate(s) */
+        lc_memset_secure(f0, 0U, sizeof(f0));
     } else {
         KRML_HOST_EPRINTF("KaRaMeL abort at %s:%d\n%s\n", __FILE__, __LINE__,
                           "unwrap not Ok");
@@ -772,6 +791,8 @@ libcrux_ml_kem_utils_into_padded_array_b6(Eurydice_slice slice,
             uu____0, (size_t)0U, Eurydice_slice_len(slice, uint8_t), uint8_t *),
         slice, uint8_t);
     memcpy(ret, out, (size_t)34U * sizeof(uint8_t));
+    /* Sanitize intermediate(s) */
+    lc_memset_secure(out, 0U, sizeof(out));
 }
 
 /**
@@ -792,6 +813,8 @@ libcrux_ml_kem_types_from_e0_af(
     memcpy(copy_of_value, value, (size_t)1568U * sizeof(uint8_t));
     libcrux_ml_kem_types_MlKemCiphertext_64 lit;
     memcpy(lit.value, copy_of_value, (size_t)1568U * sizeof(uint8_t));
+    /* Sanitize intermediate(s) */
+    lc_memset_secure(copy_of_value, 0U, sizeof(copy_of_value));
     return lit;
 }
 
@@ -829,6 +852,8 @@ libcrux_ml_kem_utils_into_padded_array_c8(Eurydice_slice slice,
             uu____0, (size_t)0U, Eurydice_slice_len(slice, uint8_t), uint8_t *),
         slice, uint8_t);
     memcpy(ret, out, (size_t)33U * sizeof(uint8_t));
+    /* Sanitize intermediate(s) */
+    lc_memset_secure(out, 0U, sizeof(out));
 }
 
 /**
@@ -866,6 +891,8 @@ libcrux_ml_kem_utils_into_padded_array_7f(Eurydice_slice slice,
             uu____0, (size_t)0U, Eurydice_slice_len(slice, uint8_t), uint8_t *),
         slice, uint8_t);
     memcpy(ret, out, (size_t)1600U * sizeof(uint8_t));
+    /* Sanitize intermediate(s) */
+    lc_memset_secure(out, 0U, sizeof(out));
 }
 
 /**
@@ -887,6 +914,8 @@ libcrux_ml_kem_utils_into_padded_array_24(Eurydice_slice slice,
             uu____0, (size_t)0U, Eurydice_slice_len(slice, uint8_t), uint8_t *),
         slice, uint8_t);
     memcpy(ret, out, (size_t)64U * sizeof(uint8_t));
+    /* Sanitize intermediate(s) */
+    lc_memset_secure(out, 0U, sizeof(out));
 }
 
 /**
@@ -1059,6 +1088,8 @@ core_result_unwrap_26_00(core_result_Result_0a self, int16_t ret[16U])
         int16_t f0[16U];
         memcpy(f0, self.val.case_Ok, (size_t)16U * sizeof(int16_t));
         memcpy(ret, f0, (size_t)16U * sizeof(int16_t));
+        /* Sanitize intermediate(s) */
+        lc_memset_secure(f0, 0U, sizeof(f0));
     } else {
         KRML_HOST_EPRINTF("KaRaMeL abort at %s:%d\n%s\n", __FILE__, __LINE__,
                           "unwrap not Ok");
@@ -1097,6 +1128,8 @@ core_result_unwrap_26_68(core_result_Result_15 self, uint8_t ret[8U])
         uint8_t f0[8U];
         memcpy(f0, self.val.case_Ok, (size_t)8U * sizeof(uint8_t));
         memcpy(ret, f0, (size_t)8U * sizeof(uint8_t));
+        /* Sanitize intermediate(s) */
+        lc_memset_secure(f0, 0U, sizeof(f0));
     } else {
         KRML_HOST_EPRINTF("KaRaMeL abort at %s:%d\n%s\n", __FILE__, __LINE__,
                           "unwrap not Ok");
