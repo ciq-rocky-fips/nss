@@ -96,7 +96,7 @@ typedef double float64_t;
 
 #ifndef KRML_NOINLINE
 #if defined(__GNUC__) || defined(__clang__)
-#define KRML_NOINLINE __attribute__((noinline, unused))
+#define KRML_NOINLINE __attribute__((__noinline__, __unused__))
 #elif defined(_MSC_VER)
 #define KRML_NOINLINE __declspec(noinline)
 #elif defined(__SUNPRO_C)
