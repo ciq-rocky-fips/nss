@@ -473,16 +473,34 @@ MLDSA_VerifyInit(MLDSAPublicKey *key, const SECItem *sgnCtx, MLDSAContext **ctx)
 
     switch (key->paramSet) {
         case CKP_ML_DSA_44:
+            /* the public key length must match the selected parameter set,
+             * otherwise the fixed-size cast below reinterprets bytes that are
+             * not part of this key (or leftover buffer) as key material */
+            if (key->keyValLen != ML_DSA_44_PUBLICKEY_LEN) {
+                PORT_SetError(SEC_ERROR_BAD_KEY);
+                break; /* ret stays -1: fall through to the cleanup below */
+            }
             ret = lc_dilithium_44_verify_init_c(&lctx->lc_dilithium,
                                                 (struct lc_dilithium_44_pk *)key->keyVal);
             break;
         case CKP_ML_DSA_65:
+            if (key->keyValLen != ML_DSA_65_PUBLICKEY_LEN) {
+                PORT_SetError(SEC_ERROR_BAD_KEY);
+                break;
+            }
             ret = lc_dilithium_65_verify_init_c(&lctx->lc_dilithium,
                                                 (struct lc_dilithium_65_pk *)key->keyVal);
             break;
         case CKP_ML_DSA_87:
+            if (key->keyValLen != ML_DSA_87_PUBLICKEY_LEN) {
+                PORT_SetError(SEC_ERROR_BAD_KEY);
+                break;
+            }
             ret = lc_dilithium_87_verify_init_c(&lctx->lc_dilithium,
                                                 (struct lc_dilithium_87_pk *)key->keyVal);
+            break;
+        default:
+            PORT_SetError(SEC_ERROR_INVALID_ARGS);
             break;
     }
 
