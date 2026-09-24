@@ -529,19 +529,42 @@ MLDSA_VerifyFinal(MLDSAContext *ctx, const SECItem *signature)
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         return SECFailure;
     }
+    if (signature == NULL || signature->data == NULL) {
+        mldsa_DestroyContext(ctx);
+        PORT_SetError(SEC_ERROR_INVALID_ARGS);
+        return SECFailure;
+    }
     ret = -1;
     switch (key->paramSet) {
         case CKP_ML_DSA_44:
+            /* the signature length is part of what we are verifying: reject
+             * anything that isn't exactly this parameter set's fixed length,
+             * otherwise the fixed-size cast below reads past signature->data */
+            if (signature->len != ML_DSA_44_SIGNATURE_LEN) {
+                mldsa_DestroyContext(ctx);
+                PORT_SetError(SEC_ERROR_BAD_SIGNATURE);
+                return SECFailure;
+            }
             ret = lc_dilithium_44_verify_final_c(
                 (struct lc_dilithium_44_sig *)signature->data,
                 &ctx->lc_dilithium, (struct lc_dilithium_44_pk *)key->keyVal);
             break;
         case CKP_ML_DSA_65:
+            if (signature->len != ML_DSA_65_SIGNATURE_LEN) {
+                mldsa_DestroyContext(ctx);
+                PORT_SetError(SEC_ERROR_BAD_SIGNATURE);
+                return SECFailure;
+            }
             ret = lc_dilithium_65_verify_final_c(
                 (struct lc_dilithium_65_sig *)signature->data,
                 &ctx->lc_dilithium, (struct lc_dilithium_65_pk *)key->keyVal);
             break;
         case CKP_ML_DSA_87:
+            if (signature->len != ML_DSA_87_SIGNATURE_LEN) {
+                mldsa_DestroyContext(ctx);
+                PORT_SetError(SEC_ERROR_BAD_SIGNATURE);
+                return SECFailure;
+            }
             ret = lc_dilithium_87_verify_final_c(
                 (struct lc_dilithium_87_sig *)signature->data,
                 &ctx->lc_dilithium, (struct lc_dilithium_87_pk *)key->keyVal);
