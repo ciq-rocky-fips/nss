@@ -195,7 +195,9 @@ static SECStatus MLDSA_CheckKey(MLDSAPrivateKey *privKey,
     rv = MLDSA_VerifyFinal(verifyCtx,
                            &si_signature_out);
     if (rv != SECSuccess) {
-        mldsa_DestroyContext(verifyCtx);
+        /* MLDSA_VerifyFinal destroys the context on failure as well as on
+         * success, so unlike the sign path above we must not destroy it
+         * here -- doing so would double-free the context arena. */
         return rv;
     }
 
