@@ -324,6 +324,7 @@ Kyber_Encapsulate(KyberParams params, const SECItem *enc_seed, const SECItem *pu
 
         bool valid_pk = libcrux_ml_kem_mlkem768_portable_validate_public_key(&pk_value);
         if (!valid_pk) {
+            PORT_SafeZero(randbuf, sizeof(randbuf));
             PORT_SetError(SEC_ERROR_INVALID_ARGS);
             return SECFailure;
         }
@@ -338,6 +339,7 @@ Kyber_Encapsulate(KyberParams params, const SECItem *enc_seed, const SECItem *pu
 
         bool valid_pk = libcrux_ml_kem_mlkem1024_portable_validate_public_key(&pk_value);
         if (!valid_pk) {
+            PORT_SafeZero(randbuf, sizeof(randbuf));
             PORT_SetError(SEC_ERROR_INVALID_ARGS);
             return SECFailure;
         }
@@ -354,10 +356,12 @@ Kyber_Encapsulate(KyberParams params, const SECItem *enc_seed, const SECItem *pu
 #endif
     } else {
         /* unreachable */
+        PORT_SafeZero(randbuf, sizeof(randbuf));
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
         return SECFailure;
     }
 
+    PORT_SafeZero(randbuf, sizeof(randbuf));
     return SECSuccess;
 }
 
