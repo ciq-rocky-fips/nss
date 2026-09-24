@@ -317,16 +317,34 @@ MLDSA_SignInit(MLDSAPrivateKey *key, CK_HEDGE_TYPE hedgeType,
 
     switch (key->paramSet) {
         case CKP_ML_DSA_44:
+            /* the private key length must match the selected parameter set,
+             * otherwise the fixed-size cast below reinterprets bytes that are
+             * not part of this key (or leftover buffer) as key material */
+            if (key->keyValLen != ML_DSA_44_PRIVATEKEY_LEN) {
+                PORT_SetError(SEC_ERROR_BAD_KEY);
+                break; /* ret stays -1: fall through to the cleanup below */
+            }
             ret = lc_dilithium_44_sign_init_c(&lctx->lc_dilithium,
                                               (struct lc_dilithium_44_sk *)key->keyVal);
             break;
         case CKP_ML_DSA_65:
+            if (key->keyValLen != ML_DSA_65_PRIVATEKEY_LEN) {
+                PORT_SetError(SEC_ERROR_BAD_KEY);
+                break;
+            }
             ret = lc_dilithium_65_sign_init_c(&lctx->lc_dilithium,
                                               (struct lc_dilithium_65_sk *)key->keyVal);
             break;
         case CKP_ML_DSA_87:
+            if (key->keyValLen != ML_DSA_87_PRIVATEKEY_LEN) {
+                PORT_SetError(SEC_ERROR_BAD_KEY);
+                break;
+            }
             ret = lc_dilithium_87_sign_init_c(&lctx->lc_dilithium,
                                               (struct lc_dilithium_87_sk *)key->keyVal);
+            break;
+        default:
+            PORT_SetError(SEC_ERROR_INVALID_ARGS);
             break;
     }
 
