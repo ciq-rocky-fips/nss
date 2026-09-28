@@ -2398,6 +2398,12 @@ sftk_AttributeToFlags(CK_ATTRIBUTE_TYPE op)
         case CKA_DERIVE:
             flags = CKF_DERIVE;
             break;
+        case CKA_ENCAPSULATE:
+            flags = CKF_ENCAPSULATE;
+            break;
+        case CKA_DECAPSULATE:
+            flags = CKF_DECAPSULATE;
+            break;
         /* fake attribute to select digesting */
         case CKA_DIGEST:
             flags = CKF_DIGEST;
