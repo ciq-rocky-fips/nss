@@ -319,6 +319,9 @@ NSC_EncapsulateKey(CK_SESSION_HANDLE hSession,
     uint8_t secretBuf[MAX_SHARED_SECRET_BYTES] = { 0 };
     SECItem secret = { siBuffer, secretBuf, sizeof secretBuf };
 
+    /* If this eventually succeeds, lastOpWasFIPS will be set to the resulting
+     * key's FIPS state below. */
+    session->lastOpWasFIPS = PR_FALSE;
     sftk_setFIPS(key, sftk_operationIsFIPS(slot, pMechanism, CKA_ENCAPSULATE,
                                            encapsulationKeyObject, 0));
     key->source = SFTK_SOURCE_KEA;
@@ -346,6 +349,7 @@ NSC_EncapsulateKey(CK_SESSION_HANDLE hSession,
             if (crv != CKR_OK) {
                 goto cleanup;
             }
+            session->lastOpWasFIPS = sftk_hasFIPS(key);
 
             /* We wrote the ciphertext out directly in Kyber_Encapsulate */
             *phKey = key->handle;
@@ -482,6 +486,9 @@ NSC_DecapsulateKey(CK_SESSION_HANDLE hSession,
      * by changing the define at the top of this file */
     uint8_t secretBuf[MAX_SHARED_SECRET_BYTES] = { 0 };
     SECItem secret = { siBuffer, secretBuf, sizeof secretBuf };
+    /* If this eventually succeeds, lastOpWasFIPS will be set to the resulting
+     * key's FIPS state below. */
+    session->lastOpWasFIPS = PR_FALSE;
     sftk_setFIPS(key, sftk_operationIsFIPS(slot, pMechanism, CKA_DECAPSULATE,
                                            decapsulationKeyObject, 0));
     key->source = SFTK_SOURCE_KEA;
@@ -509,6 +516,7 @@ NSC_DecapsulateKey(CK_SESSION_HANDLE hSession,
             if (crv != CKR_OK) {
                 goto cleanup;
             }
+            session->lastOpWasFIPS = sftk_hasFIPS(key);
             *phKey = key->handle;
             break;
         default:
