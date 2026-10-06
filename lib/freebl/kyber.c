@@ -268,6 +268,7 @@ Kyber_NewKey(KyberParams params, const SECItem *keypair_seed, SECItem *privkey, 
 	PORT_SafeZero(keys.sk.value, MLKEM1024_PRIVATE_KEY_BYTES);
     } else if (params == params_kyber768_round3 || params == params_kyber768_round3_test_mode) {
 #ifdef NSS_DISABLE_KYBER
+        PORT_SafeZero(randbuf, sizeof(randbuf));
         PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
         return SECFailure;
 #else
@@ -275,6 +276,7 @@ Kyber_NewKey(KyberParams params, const SECItem *keypair_seed, SECItem *privkey, 
 #endif
     } else {
         /* unreachable */
+        PORT_SafeZero(randbuf, sizeof(randbuf));
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
         return SECFailure;
     }
@@ -282,12 +284,14 @@ Kyber_NewKey(KyberParams params, const SECItem *keypair_seed, SECItem *privkey, 
     if (kyber_in_fips_mode) {
         SECStatus rv = Kyber_CheckKey(params, privkey, pubkey);
         if (rv != SECSuccess) {
+            PORT_SafeZero(randbuf, sizeof(randbuf));
             PORT_SafeZero(pubkey->data, pubkey->len);
             PORT_SafeZero(privkey->data, privkey->len);
             PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
             return rv;
         }
     }
+    PORT_SafeZero(randbuf, sizeof(randbuf));
     NSS_DECLASSIFY(pubkey->data, pubkey->len);
     return SECSuccess;
 }
