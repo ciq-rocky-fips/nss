@@ -2617,6 +2617,9 @@ sftk_checkFIPSHash(CK_MECHANISM_TYPE hash, PRBool allowSmall, PRBool allowCMAC)
             return allowCMAC;
         case CKM_SHA_1:
         case CKM_SHA_1_HMAC:
+            /* SP 800-131Ar3 disallows SHA-1; it is never approved, even as a
+             * KDF PRF where other small hashes (SHA-224) are still allowed. */
+            return PR_FALSE;
         case CKM_SHA224:
         case CKM_SHA224_HMAC:
             return allowSmall;
