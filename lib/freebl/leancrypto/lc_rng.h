@@ -24,7 +24,6 @@ lc_rng_generate(struct lc_rng_ctx *rng,
                 unsigned char *out,
                 size_t outlen)
 {
-    size_t len;
     if (rng->dummy != NULL) {
         if (outlen > rng->dummy->seedlen) {
             return -1;
@@ -35,8 +34,9 @@ lc_rng_generate(struct lc_rng_ctx *rng,
     if (addlen != 0) {
         RNG_RandomUpdate(addinput, addlen);
     }
-    len = RNG_SystemRNG(out, outlen);
-    if (len != outlen) {
+    /* Draw from the SP 800-90A approved Hash DRBG rather than RNG_SystemRNG,
+     * so ML-DSA hedged signing uses an approved DRBG. */
+    if (RNG_GenerateGlobalRandomBytes(out, outlen) != SECSuccess) {
         return -1;
     }
     return 0;
@@ -47,7 +47,7 @@ lc_rng_generate(struct lc_rng_ctx *rng,
         if (pers_len != 0) {                           \
             RNG_RandomUpdate(pers, perslen);           \
         }                                              \
-        RNG_SystemRNG(seed, seedlen);                  \
+        RNG_GenerateGlobalRandomBytes(seed, seedlen);  \
     }
 #define lc_rng_check(rng)
 
