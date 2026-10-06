@@ -391,11 +391,13 @@ Kyber_Decapsulate(KyberParams params, const SECItem *privkey, const SECItem *cip
 
         bool valid = libcrux_ml_kem_mlkem768_portable_validate_private_key(&private_key, &cipher_text);
         if (!valid) {
+            PORT_SafeZero(&private_key, sizeof(private_key));
             PORT_SetError(SEC_ERROR_INVALID_ARGS);
             return SECFailure;
         }
 
         libcrux_ml_kem_mlkem768_portable_decapsulate(&private_key, &cipher_text, secret->data);
+        PORT_SafeZero(&private_key, sizeof(private_key));
     } else if (params == params_ml_kem1024 || params == params_ml_kem1024_test_mode) {
         libcrux_ml_kem_mlkem1024_MlKem1024PrivateKey private_key;
         memcpy(private_key.value, privkey->data, MLKEM1024_PRIVATE_KEY_BYTES);
@@ -405,11 +407,13 @@ Kyber_Decapsulate(KyberParams params, const SECItem *privkey, const SECItem *cip
 
         bool valid = libcrux_ml_kem_mlkem1024_portable_validate_private_key(&private_key, &cipher_text);
         if (!valid) {
+            PORT_SafeZero(&private_key, sizeof(private_key));
             PORT_SetError(SEC_ERROR_INVALID_ARGS);
             return SECFailure;
         }
 
         libcrux_ml_kem_mlkem1024_portable_decapsulate(&private_key, &cipher_text, secret->data);
+        PORT_SafeZero(&private_key, sizeof(private_key));
     } else if (params == params_kyber768_round3 || params == params_kyber768_round3_test_mode) {
 #ifdef NSS_DISABLE_KYBER
         PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
