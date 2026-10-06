@@ -286,8 +286,8 @@ MLDSA_NewKey(CK_ML_DSA_PARAMETER_SET_TYPE paramSet, SECItem *seed,
     return SECSuccess;
 
 loser:
-    PORT_SafeZero(privKey, sizeof(privKey));
-    PORT_SafeZero(pubKey, sizeof(pubKey));
+    PORT_SafeZero(privKey, sizeof(*privKey));
+    PORT_SafeZero(pubKey, sizeof(*pubKey));
     return SECFailure;
 }
 
