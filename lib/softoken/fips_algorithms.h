@@ -92,7 +92,10 @@ SFTKFIPSAlgorithmList sftk_fips_mechs[] = {
     /* ------------------------- RC2 Operations --------------------------- */
     /* ------------------------- AES Operations --------------------------- */
     { CKM_AES_KEY_GEN, { AES_FB_KEY, CKF_GEN }, AES_FB_STEP, SFTKFIPSNone },
-    { CKM_AES_ECB, { AES_FB_KEY, CKF_ENC }, AES_FB_STEP, SFTKFIPSNone },
+    /* SP 800-131Ar3 disallows AES-ECB encryption; decryption remains approved
+     * for legacy use. Report encryption as non-approved in the service
+     * indicator by only claiming CKF_DECRYPT here. */
+    { CKM_AES_ECB, { AES_FB_KEY, CKF_DECRYPT }, AES_FB_STEP, SFTKFIPSNone },
     { CKM_AES_CBC, { AES_FB_KEY, CKF_ENC }, AES_FB_STEP, SFTKFIPSNone },
     { CKM_AES_CMAC, { AES_FB_KEY, CKF_SGN }, AES_FB_STEP, SFTKFIPSNone },
     { CKM_AES_CMAC_GENERAL, { AES_FB_KEY, CKF_SGN }, AES_FB_STEP, SFTKFIPSNone },
