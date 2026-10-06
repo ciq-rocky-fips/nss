@@ -234,7 +234,10 @@ MLDSA_NewKey(CK_ML_DSA_PARAMETER_SET_TYPE paramSet, SECItem *seed,
         }
         PORT_Memcpy(privKey->seed, seed->data, ML_DSA_SEED_LEN);
     } else {
-        RNG_SystemRNG(privKey->seed, ML_DSA_SEED_LEN);
+        if (RNG_GenerateGlobalRandomBytes(privKey->seed, ML_DSA_SEED_LEN) != SECSuccess) {
+            PORT_SetError(SEC_ERROR_NEED_RANDOM);
+            goto loser;
+        }
     }
     privKey->seedLen = ML_DSA_SEED_LEN;
 
