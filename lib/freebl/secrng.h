@@ -60,6 +60,15 @@ extern void RNG_FileForRNG(const char *filename);
 */
 extern size_t RNG_SystemRNG(void *buf, size_t maxbytes);
 
+/*
+** Release any process-global resources held by the system RNG
+** implementation (for example the FIPS jitterentropy collector).  Called
+** from RNG_RNGShutdown() during C_Finalize so that this state is not
+** leaked across finalize/initialize cycles.  Safe to call when no such
+** resources have been allocated.
+*/
+extern void RNG_SystemRNGShutdown(void);
+
 SEC_END_PROTOS
 
 #endif /* _SECRNG_H_ */

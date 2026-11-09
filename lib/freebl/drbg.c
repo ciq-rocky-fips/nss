@@ -736,6 +736,10 @@ RNG_GenerateGlobalRandomBytes(void *dest, size_t len)
 void
 RNG_RNGShutdown(void)
 {
+    /* Release system RNG resources (e.g. the FIPS jitterentropy collector).
+     * Done before the globalrng check below because RNG_SystemRNG() can
+     * allocate this state independently of the DRBG context. */
+    RNG_SystemRNGShutdown();
     /* check for a valid global RNG context */
     PORT_Assert(globalrng != NULL);
     if (globalrng == NULL) {
