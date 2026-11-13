@@ -2025,8 +2025,10 @@ static SECStatus
 freebl_fips_ML_DSA_PowerUpSelfTest()
 {
     SECStatus rv;
+    size_t i;
 
 #include "ml_dsa_fips_vectors.h"
+#include "ml_dsa_fips_reject_vectors.h"
     PORT_Assert(sizeof (ml_dsa_seed) == ML_DSA_SEED_LEN);
     PORT_Assert(sizeof (ml_dsa_44_pub_key) == ML_DSA_44_PUBLICKEY_LEN);
     PORT_Assert(sizeof (ml_dsa_44_priv_key) == ML_DSA_44_PRIVATEKEY_LEN);
@@ -2061,6 +2063,47 @@ freebl_fips_ML_DSA_PowerUpSelfTest()
                             ml_dsa_87_sig, ML_DSA_87_SIGNATURE_LEN);
     if (rv != SECSuccess) {
         return SECFailure;
+    }
+
+    /* Repeat each parameter set with vectors whose seed and message force the
+     * signing rejection-sampling (Fiat-Shamir reject-and-retry) loop to
+     * iterate at least once, so the self-test exercises that code path, which
+     * the vectors above are not chosen to drive. */
+    for (i = 0; i < PR_ARRAY_SIZE(ml_dsa_44_reject); i++) {
+        rv = freebl_ML_DSA_Test(
+            CKP_ML_DSA_44,
+            ml_dsa_44_reject[i].seed, ML_DSA_SEED_LEN,
+            ml_dsa_44_reject[i].msg, sizeof(ml_dsa_44_reject[i].msg),
+            ml_dsa_44_reject[i].pub_key, ML_DSA_44_PUBLICKEY_LEN,
+            ml_dsa_44_reject[i].priv_key, ML_DSA_44_PRIVATEKEY_LEN,
+            ml_dsa_44_reject[i].sig, ML_DSA_44_SIGNATURE_LEN);
+        if (rv != SECSuccess) {
+            return SECFailure;
+        }
+    }
+    for (i = 0; i < PR_ARRAY_SIZE(ml_dsa_65_reject); i++) {
+        rv = freebl_ML_DSA_Test(
+            CKP_ML_DSA_65,
+            ml_dsa_65_reject[i].seed, ML_DSA_SEED_LEN,
+            ml_dsa_65_reject[i].msg, sizeof(ml_dsa_65_reject[i].msg),
+            ml_dsa_65_reject[i].pub_key, ML_DSA_65_PUBLICKEY_LEN,
+            ml_dsa_65_reject[i].priv_key, ML_DSA_65_PRIVATEKEY_LEN,
+            ml_dsa_65_reject[i].sig, ML_DSA_65_SIGNATURE_LEN);
+        if (rv != SECSuccess) {
+            return SECFailure;
+        }
+    }
+    for (i = 0; i < PR_ARRAY_SIZE(ml_dsa_87_reject); i++) {
+        rv = freebl_ML_DSA_Test(
+            CKP_ML_DSA_87,
+            ml_dsa_87_reject[i].seed, ML_DSA_SEED_LEN,
+            ml_dsa_87_reject[i].msg, sizeof(ml_dsa_87_reject[i].msg),
+            ml_dsa_87_reject[i].pub_key, ML_DSA_87_PUBLICKEY_LEN,
+            ml_dsa_87_reject[i].priv_key, ML_DSA_87_PRIVATEKEY_LEN,
+            ml_dsa_87_reject[i].sig, ML_DSA_87_SIGNATURE_LEN);
+        if (rv != SECSuccess) {
+            return SECFailure;
+        }
     }
 
     return (SECSuccess);
